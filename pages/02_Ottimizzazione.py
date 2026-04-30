@@ -1,51 +1,42 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+import requests
+import base64
 
-st.set_page_config(page_title="Ottimizzazione Cloud", layout="wide")
+st.set_page_config(page_title="Analisi Margini", layout="wide")
 
-def format_it(val):
-    return f"{val:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+REPO = "antonellomazzilli-bit/agri-finance"
+FILE_PATH = "database.csv"
 
-st.title("📊 Analisi e Ottimizzazione (Cloud)")
+def load_data():
+    url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        content = base64.b64decode(r.json()["content"]).decode("utf-8")
+        from io import StringIO
+        return pd.read_csv(StringIO(content))
+    return pd.DataFrame()
 
-# Connessione a Google Sheets
-conn = st.connection("gsheets", type=GSheetsConnection)
-df = conn.read(ttl=0)
+st.title("📊 Analisi e Ottimizzazione")
+df = load_data()
 
 if not df.empty:
-    # Preparazione dati
     df['data'] = pd.to_datetime(df['data'])
-    df['anno'] = df['data'].dt.year
+    anno = st.selectbox("Anno", sorted(df['data'].dt.year.unique(), reverse=True))
+    df_anno = df[df['data'].dt.year == anno]
     
-    anni = sorted(df['anno'].unique(), reverse=True)
-    anno_sel = st.selectbox("Seleziona Anno di Analisi", anni)
-    df_anno = df[df['anno'] == anno_sel]
-
-    # Metriche
-    e_tot = df_anno[df_anno['tipo'] == 'Entrata']['importo'].sum()
-    u_tot = df_anno[df_anno['tipo'] == 'Uscita']['importo'].sum()
+    e = df_anno[df_anno['tipo'] == 'Entrata']['importo'].sum()
+    u = df_anno[df_anno['tipo'] == 'Uscita']['importo'].sum()
     
     c1, c2 = st.columns(2)
-    c1.metric("Totale Entrate", format_it(e_tot))
-    c2.metric("Totale Uscite", format_it(u_tot))
-
-    st.subheader("Redditività per Coltura")
-    stats = []
-    for c in df_anno['coltura_id'].unique():
-        if not c: continue
-        e = df_anno[(df_anno['coltura_id'] == c) & (df_anno['tipo'] == 'Entrata')]['importo'].sum()
-        u = df_anno[(df_anno['coltura_id'] == c) & (df_anno['tipo'] == 'Uscita')]['importo'].sum()
-        roi = ((e - u) / u * 100) if u > 0 else 0
-        stats.append({
-            "Coltura": c, 
-            "Entrate": format_it(e), 
-            "Uscite": format_it(u), 
-            "Margine": format_it(e-u),
-            "ROI": f"{roi:,.2f} %".replace(".", ",")
-        })
+    c1.metric("Entrate", f"€ {e:,.2f}".replace(".", "X").replace(",", ".").replace("X", ","))
+    c2.metric("Uscite", f"€ {u:,.2f}".replace(".", "X").replace(",", ".").replace("X", ","))
     
-    if stats:
-        st.table(pd.DataFrame(stats))
+    st.subheader("Margine per Coltura")
+    # Logica raggruppamento per coltura_id
+    res = df_anno.groupby('coltura_id')['importo'].sum().reset_index()
+    st.bar_chart(data=res, x='coltura_id', y='importo')
 else:
-    st.info("Nessun dato trovato nel foglio Google.")
+    st.warning("Database non trovato o vuoto.")
