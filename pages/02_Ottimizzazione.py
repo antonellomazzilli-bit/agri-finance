@@ -1,45 +1,51 @@
 import streamlit as st
-import sqlite3
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-st.set_page_config(page_title="Ottimizzazione", layout="wide")
-DB_NAME = 'agri_finance.db'
+st.set_page_config(page_title="Ottimizzazione Cloud", layout="wide")
 
 def format_it(val):
     return f"{val:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
 
-def load_data():
-    with sqlite3.connect(DB_NAME) as conn:
-        df = pd.read_sql_query("SELECT * FROM transactions", conn)
-        if not df.empty:
-            df['data'] = pd.to_datetime(df['data'], errors='coerce')
-            df = df.dropna(subset=['data'])
-            df['anno'] = df['data'].dt.year.astype(int)
-        return df
+st.title("📊 Analisi e Ottimizzazione (Cloud)")
 
-st.title("📊 Analisi e Ottimizzazione")
-df = load_data()
+# Connessione a Google Sheets
+conn = st.connection("gsheets", type=GSheetsConnection)
+df = conn.read(ttl=0)
 
 if not df.empty:
+    # Preparazione dati
+    df['data'] = pd.to_datetime(df['data'])
+    df['anno'] = df['data'].dt.year
+    
     anni = sorted(df['anno'].unique(), reverse=True)
-    anno_sel = st.selectbox("Anno", anni)
+    anno_sel = st.selectbox("Seleziona Anno di Analisi", anni)
     df_anno = df[df['anno'] == anno_sel]
 
-    # Metriche formattate
-    entrate = df_anno[df_anno['tipo'] == 'Entrata']['importo'].sum()
-    uscite = df_anno[df_anno['tipo'] == 'Uscita']['importo'].sum()
+    # Metriche
+    e_tot = df_anno[df_anno['tipo'] == 'Entrata']['importo'].sum()
+    u_tot = df_anno[df_anno['tipo'] == 'Uscita']['importo'].sum()
     
     c1, c2 = st.columns(2)
-    c1.metric("Totale Entrate", format_it(entrate))
-    c2.metric("Totale Uscite", format_it(uscite))
+    c1.metric("Totale Entrate", format_it(e_tot))
+    c2.metric("Totale Uscite", format_it(u_tot))
 
-    # Tabella ROI
-    st.subheader("Efficienza per Coltura")
+    st.subheader("Redditività per Coltura")
     stats = []
     for c in df_anno['coltura_id'].unique():
+        if not c: continue
         e = df_anno[(df_anno['coltura_id'] == c) & (df_anno['tipo'] == 'Entrata')]['importo'].sum()
         u = df_anno[(df_anno['coltura_id'] == c) & (df_anno['tipo'] == 'Uscita')]['importo'].sum()
         roi = ((e - u) / u * 100) if u > 0 else 0
-        stats.append({"Coltura": c, "Entrate": format_it(e), "Uscite": format_it(u), "ROI": f"{roi:.2f} %"})
+        stats.append({
+            "Coltura": c, 
+            "Entrate": format_it(e), 
+            "Uscite": format_it(u), 
+            "Margine": format_it(e-u),
+            "ROI": f"{roi:,.2f} %".replace(".", ",")
+        })
     
-    st.table(pd.DataFrame(stats))
+    if stats:
+        st.table(pd.DataFrame(stats))
+else:
+    st.info("Nessun dato trovato nel foglio Google.")
