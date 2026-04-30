@@ -2,47 +2,69 @@ import streamlit as st
 import pandas as pd
 import requests
 import base64
+import io
 
-st.set_page_config(page_title="Gestione Dati", layout="wide")
+st.set_page_config(page_title="Gestione Database", layout="wide")
 
+# --- CONFIGURAZIONE GITHUB ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 REPO = "antonellomazzilli-bit/agri-finance"
 FILE_PATH = "database.csv"
 
-def get_data():
+def get_github_data():
     url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
-        content = base64.b64decode(r.json()["content"]).decode("utf-8")
-        from io import StringIO
-        return pd.read_csv(StringIO(content)), r.json()["sha"]
+        data_json = r.json()
+        content = base64.b64decode(data_json["content"]).decode("utf-8")
+        # Correzione: uso di io.StringIO
+        df = pd.read_csv(io.StringIO(content))
+        return df, data_json["sha"]
     return pd.DataFrame(), None
 
-def update_github(df, sha):
+def update_github_file(df, sha):
     url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    content = df.to_csv(index=False)
-    data = {
-        "message": "Delete row via AgriApp",
-        "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
-        "sha": sha
+    csv_content = df.to_csv(index=False)
+    
+    payload = {
+        "message": "Eliminazione riga correzione dati",
+        "content": base64.b64encode(csv_content.encode("utf-8")).decode("utf-8"),
+        "sha": sha,
+        "branch": "main"
     }
-    requests.put(url, headers=headers, json=data)
+    
+    r = requests.put(url, headers=headers, json=payload)
+    return r.status_code in [200, 201]
 
-st.title("✏️ Gestione Database")
-df, sha = get_data()
+st.title("✏️ Manutenzione Dati")
+st.write("Usa questa pagina per eliminare registrazioni errate dal database cloud.")
+
+df, sha = get_github_data()
 
 if not df.empty:
-    st.write("Seleziona una riga da eliminare:")
-    df['id_temp'] = df.index
-    selected_row = st.selectbox("Movimento", df.apply(lambda r: f"{r['data']} - {r['categoria']} - {r['importo']}€", axis=1))
+    # Creiamo una descrizione leggibile per la selezione
+    df['desc_scelta'] = df['data'].astype(str) + " | " + df['categoria'] + " | " + df['importo'].astype(str) + " €"
     
-    if st.button("🗑️ Elimina Definitivamente"):
-        idx = df[df.apply(lambda r: f"{r['data']} - {r['categoria']} - {r['importo']}€", axis=1) == selected_row].index[0]
-        df = df.drop(idx).drop(columns=['id_temp'], errors='ignore')
-        update_github(df, sha)
-        st.success("Riga eliminata! L'app si riavvierà...")
-        st.rerun()
+    operazione_da_eliminare = st.selectbox("Seleziona l'operazione da cancellare:", df['desc_scelta'].tolist())
+    
+    if st.button("🗑️ Elimina questa operazione"):
+        # Troviamo l'indice della riga selezionata
+        indice = df[df['desc_scelta'] == operazione_da_eliminare].index[0]
+        
+        # Creiamo il nuovo dataframe senza quella riga
+        df_nuovo = df.drop(indice).drop(columns=['desc_scelta'])
+        
+        with st.spinner("Aggiornamento database su GitHub..."):
+            if update_github_file(df_nuovo, sha):
+                st.success("Operazione eliminata con successo!")
+                st.rerun()
+            else:
+                st.error("Errore durante la sincronizzazione con GitHub.")
+    
+    st.divider()
+    st.subheader("Contenuto attuale del database")
+    st.dataframe(df.drop(columns=['desc_scelta']), use_container_width=True)
 else:
-    st.info("Nessun dato da gestire.")
+    st.info("Il database è vuoto.")
