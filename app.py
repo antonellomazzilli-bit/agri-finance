@@ -15,14 +15,20 @@ BRANCH = "main"
 def format_euro(val):
     return f"€ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+import io  # Aggiungi questa riga in alto insieme agli altri import
+
 def get_github_file():
     url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
         content = base64.b64decode(r.json()["content"]).decode("utf-8")
-        return pd.read_csv(pd.compat.StringIO(content)), r.json()["sha"]
-    return pd.DataFrame(columns=["data", "tipo", "categoria", "descrizione", "importo", "coltura_id"]), None
+        # Questa è la riga corretta che sostituisce quella che dava errore:
+        return pd.read_csv(io.StringIO(content)), r.json()["sha"]
+    
+    # Se il file non esiste ancora, creiamo un dataframe vuoto con le colonne giuste
+    columns = ["data", "tipo", "categoria", "descrizione", "importo", "coltura_id"]
+    return pd.DataFrame(columns=columns), None
 
 def save_to_github(df, sha):
     url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
