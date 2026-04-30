@@ -1,49 +1,48 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+import requests
+import base64
 
-st.set_page_config(page_title="Gestione Cloud", layout="wide")
+st.set_page_config(page_title="Gestione Dati", layout="wide")
 
-def format_it(val):
-    return f"{val:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+REPO = "antonellomazzilli-bit/agri-finance"
+FILE_PATH = "database.csv"
 
-st.title("✏️ Gestione e Modifica (Cloud)")
+def get_data():
+    url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        content = base64.b64decode(r.json()["content"]).decode("utf-8")
+        from io import StringIO
+        return pd.read_csv(StringIO(content)), r.json()["sha"]
+    return pd.DataFrame(), None
 
-conn = st.connection("gsheets", type=GSheetsConnection)
-df = conn.read(ttl=0)
+def update_github(df, sha):
+    url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    content = df.to_csv(index=False)
+    data = {
+        "message": "Delete row via AgriApp",
+        "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
+        "sha": sha
+    }
+    requests.put(url, headers=headers, json=data)
+
+st.title("✏️ Gestione Database")
+df, sha = get_data()
 
 if not df.empty:
-    df['display_label'] = df['data'].astype(str) + " | " + df['categoria'] + " | " + df['importo'].astype(str) + " €"
+    st.write("Seleziona una riga da eliminare:")
+    df['id_temp'] = df.index
+    selected_row = st.selectbox("Movimento", df.apply(lambda r: f"{r['data']} - {r['categoria']} - {r['importo']}€", axis=1))
     
-    scelta = st.selectbox("Seleziona il movimento da gestire:", df['display_label'].tolist())
-    index_riga = df[df['display_label'] == scelta].index[0]
-    riga = df.iloc[index_riga]
-
-    with st.form("edit_form"):
-        c1, c2 = st.columns(2)
-        with c1:
-            n_data = st.date_input("Data", value=pd.to_datetime(riga['data']))
-            n_imp = st.number_input("Importo (€)", value=float(riga['importo']), format="%.2f")
-            n_tipo = st.selectbox("Tipo", ["Uscita", "Entrata"], index=0 if riga['tipo']=="Uscita" else 1)
-        with col2:
-            n_cat = st.text_input("Categoria", value=riga['categoria'])
-            n_colt = st.text_input("Coltura", value=riga['coltura_id'])
-            n_desc = st.text_area("Note", value=riga['descrizione'])
-        
-        if st.form_submit_button("💾 Salva Modifiche"):
-            df.at[index_riga, 'data'] = n_data.strftime('%Y-%m-%d')
-            df.at[index_riga, 'importo'] = n_imp
-            df.at[index_riga, 'tipo'] = n_tipo
-            df.at[index_riga, 'categoria'] = n_cat
-            df.at[index_riga, 'coltura_id'] = n_colt
-            df.at[index_riga, 'descrizione'] = n_desc
-            
-            conn.update(data=df)
-            st.success("Dato aggiornato sul foglio Google!")
-            st.rerun()
-
-    if st.button("🗑️ Elimina Movimento"):
-        df = df.drop(index_riga)
-        conn.update(data=df)
-        st.warning("Movimento eliminato dal cloud.")
+    if st.button("🗑️ Elimina Definitivamente"):
+        idx = df[df.apply(lambda r: f"{r['data']} - {r['categoria']} - {r['importo']}€", axis=1) == selected_row].index[0]
+        df = df.drop(idx).drop(columns=['id_temp'], errors='ignore')
+        update_github(df, sha)
+        st.success("Riga eliminata! L'app si riavvierà...")
         st.rerun()
+else:
+    st.info("Nessun dato da gestire.")
