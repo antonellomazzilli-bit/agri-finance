@@ -1,63 +1,28 @@
 import streamlit as st
-import sqlite3
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-# --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Export Bilancio", layout="wide")
-DB_NAME = 'agri_finance.db'
+st.set_page_config(page_title="Export Cloud", layout="wide")
 
-def load_data_export():
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            df = pd.read_sql_query("SELECT * FROM transactions", conn)
-            if not df.empty:
-                df['data'] = pd.to_datetime(df['data'], errors='coerce')
-                df = df.dropna(subset=['data'])
-                df['anno'] = df['data'].dt.year.astype(int)
-            return df
-    except:
-        return pd.DataFrame()
+st.title("📂 Esportazione Dati (Cloud)")
 
-def main():
-    st.title("📂 Esportazione Dati per il Commercialista")
-    df = load_data_export()
+conn = st.connection("gsheets", type=GSheetsConnection)
+df = conn.read(ttl=0)
 
-    if df.empty:
-        st.warning("Nessun dato da esportare.")
-        return
-
-    # --- FILTRO ANNO ---
-    anni = sorted(df['anno'].unique(), reverse=True)
-    anno_fiscale = st.selectbox("Seleziona l'anno fiscale da esportare", anni)
+if not df.empty:
+    df['data'] = pd.to_datetime(df['data'])
+    anni = sorted(df['data'].dt.year.unique(), reverse=True)
+    anno_fiscale = st.selectbox("Seleziona Anno Fiscale", anni)
     
-    df_fiscale = df[df['anno'] == anno_fiscale].copy()
+    report = df[df['data'].dt.year == anno_fiscale].copy()
+    report['data'] = report['data'].dt.strftime('%d/%m/%Y')
     
-    # Pulizia colonne per il commercialista
-    report = df_fiscale[['data', 'tipo', 'categoria', 'descrizione', 'importo', 'coltura_id']]
-    report.columns = ['DATA', 'TIPO', 'CATEGORIA', 'DESCRIZIONE', 'IMPORTO (€)', 'COLTURA']
-
-    # --- RIEPILOGO ---
-    c1, c2, c3 = st.columns(3)
-    entrate = report[report['TIPO'] == 'Entrata']['IMPORTO (€)'].sum()
-    uscite = report[report['TIPO'] == 'Uscita']['IMPORTO (€)'].sum()
+    st.dataframe(report, use_container_width=True)
     
-    c1.metric("Totale Ricavi", f"{entrate:,.2f} €")
-    c2.metric("Totale Costi", f"{uscite:,.2f} €")
-    c3.metric("Utile Lordo", f"{entrate - uscite:,.2f} €")
-
-    st.divider()
-
-    # --- DOWNLOAD ---
     csv = report.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Scarica Bilancio (CSV/Excel)",
+        label="📥 Scarica Bilancio CSV",
         data=csv,
-        file_name=f"Bilancio_Agricolo_{anno_fiscale}.csv",
+        file_name=f"Bilancio_{anno_fiscale}.csv",
         mime='text/csv'
     )
-
-    st.subheader("Dettaglio Movimenti")
-    st.dataframe(report, use_container_width=True)
-
-if __name__ == "__main__":
-    main()
