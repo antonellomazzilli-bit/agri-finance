@@ -1,109 +1,91 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
+import requests
+import base64
+import io
 import plotly.express as px
 
-# --- CONFIGURAZIONE DASHBOARD ---
-st.set_page_config(page_title="AgriFinance Analytics", layout="wide")
+st.set_page_config(page_title="Business Intelligence Agricola", layout="wide")
 
-DB_NAME = 'agri_finance.db'
+# --- CONFIGURAZIONE GITHUB ---
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+REPO = "antonellomazzilli-bit/agri-finance"
+FILE_PATH = "database.csv"
 
-# --- 1. RECUPERO DATI ---
-def load_data():
-    """Legge i dati dal DB e restituisce un DataFrame pulito."""
-    try:
-        with sqlite3.connect(DB_NAME) as conn:
-            query = "SELECT * FROM transactions"
-            df = pd.read_sql_query(query, conn)
-            
-            if df.empty:
-                return df
-            
-            # --- 2. TRASFORMAZIONE ---
-            # Conversione data e creazione raggruppamento temporale
-            df['data'] = pd.to_datetime(df['data'])
-            df['Mese-Anno'] = df['data'].dt.strftime('%Y-%m')
-            return df
-    except Exception as e:
-        st.error(f"Errore nel caricamento dati: {e}")
-        return pd.DataFrame()
+def load_data_from_github():
+    """Recupera i dati dal file database.csv su GitHub."""
+    url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        content = base64.b64decode(r.json()["content"]).decode("utf-8")
+        return pd.read_csv(io.StringIO(content))
+    return pd.DataFrame()
 
-# --- LOGICA DASHBOARD ---
-def main():
-    st.title("📊 Business Intelligence Agricola")
-    st.markdown("Analisi delle performance finanziarie e dei costi colturali.")
+# Funzione per formattare la valuta nel grafico
+def format_it(val):
+    return f"€ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-    df = load_data()
+st.title("📊 Business Intelligence Agricola")
+st.markdown("Analisi delle performance finanziarie e dei costi colturali.")
 
-    if df.empty:
-        st.warning("Il database è vuoto o non esiste. Inserisci dei dati per visualizzare l'analisi.")
-        return
+# Caricamento Dati
+df = load_data_from_github()
 
-    # --- 5. FILTRI (Sidebar) ---
-    st.sidebar.header("Filtri di Analisi")
+if df.empty or len(df) == 0:
+    st.info("💡 Il database è vuoto o non esiste ancora su GitHub. Inserisci il primo movimento nella pagina principale per vedere le analisi.")
+else:
+    # Pre-elaborazione dati sicura
+    df['data'] = pd.to_datetime(df['data'], errors='coerce')
+    df['importo'] = pd.to_numeric(df['importo'], errors='coerce').fillna(0.0)
+    df = df.dropna(subset=['data'])
     
-    # Lista unica di colture + opzione per vederle tutte
-    colture_disponibili = ["Tutte"] + sorted(df['coltura_id'].unique().tolist())
-    scelta_coltura = st.sidebar.selectbox("Seleziona Coltura", colture_disponibili)
+    # Filtro Anno
+    df['anno'] = df['data'].dt.year
+    anni_disponibili = sorted(df['anno'].unique(), reverse=True)
+    anno_selezionato = st.selectbox("Seleziona Anno di Analisi", anni_disponibili)
+    
+    df_filtrato = df[df['anno'] == anno_selezionato]
 
-    # Applicazione filtro
-    if scelta_coltura != "Tutte":
-        df_filtered = df[df['coltura_id'] == scelta_coltura]
+    st.divider()
+
+    # --- GRAFICO 1: DISTRIBUZIONE DEI COSTI (USCITE) ---
+    st.subheader("📌 Distribuzione delle Spese per Categoria")
+    df_uscite = df_filtrato[df_filtrato['tipo'] == 'Uscita']
+    
+    if not df_uscite.empty:
+        df_cat = df_uscite.groupby('categoria')['importo'].sum().reset_index()
+        
+        fig_torta = px.pie(
+            df_cat, 
+            values='importo', 
+            names='categoria', 
+            hole=0.4,
+            color_discrete_sequence=px.colors.qualitative.Dark2
+        )
+        fig_torta.update_traces(textposition='inside', textinfo='percent+label')
+        st.plotly_chart(fig_torta, use_container_width=True)
     else:
-        df_filtered = df
+        st.write("Nessuna spesa registrata per l'anno selezionato.")
 
-    # --- 3. VISUALIZZAZIONE CASH FLOW (Bar Chart) ---
-    st.subheader(f"Flussi di Cassa: {scelta_coltura}")
+    st.divider()
+
+    # --- GRAFICO 2: ENTRATE VS USCITE NEL TEMPO ---
+    st.subheader("📈 Andamento Finanziario Mensile")
+    df_filtrato['mese'] = df_filtrato['data'].dt.strftime('%m - %B')
     
-    # Raggruppamento per Mese-Anno e Tipo
-    cash_flow = df_filtered.groupby(['Mese-Anno', 'tipo'])['importo'].sum().reset_index()
+    df_trend = df_filtrato.groupby(['mese', 'tipo'])['importo'].sum().reset_index().sort_values('mese')
     
-    fig_bar = px.bar(
-        cash_flow, 
-        x='Mese-Anno', 
-        y='importo', 
-        color='tipo',
-        barmode='group',
-        color_discrete_map={'Entrata': '#2ECC71', 'Uscita': '#E74C3C'},
-        labels={'importo': 'Totale (€)', 'Mese-Anno': 'Periodo'},
-        title="Entrate vs Uscite Mensili"
-    )
-    fig_bar.update_layout(hovermode="x unified")
-    st.plotly_chart(fig_bar, use_container_width=True)
-
-    # --- 4. VISUALIZZAZIONE COSTI (Pie Chart) ---
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        st.subheader("Distribuzione dei Costi")
-        df_uscite = df_filtered[df_filtered['tipo'] == 'Uscita']
-        
-        if not df_uscite.empty:
-            fig_pie = px.pie(
-                df_uscite, 
-                values='importo', 
-                names='categoria',
-                hole=0.4,
-                color_discrete_sequence=px.colors.sequential.Reds_r,
-                title="Scomposizione Uscite per Categoria"
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
-        else:
-            st.info("Nessuna uscita registrata per questo filtro.")
-
-    with col2:
-        st.subheader("Riepilogo Numerico")
-        tot_entrate = df_filtered[df_filtered['tipo'] == 'Entrata']['importo'].sum()
-        tot_uscite = df_filtered[df_filtered['tipo'] == 'Uscita']['importo'].sum()
-        margine = tot_entrate - tot_uscite
-        
-        st.metric("Totale Ricavi", f"{tot_entrate:,.2f} €")
-        st.metric("Totale Costi", f"{tot_uscite:,.2f} €")
-        st.metric("Margine Operativo", f"{margine:,.2f} €", delta=float(margine))
-
-    # Tabella dettagliata
-    with st.expander("Vedi i dettagli delle transazioni filtrate"):
-        st.dataframe(df_filtered.sort_values(by='data', ascending=False), use_container_width=True)
-
-if __name__ == "__main__":
-    main()
+    if not df_trend.empty:
+        fig_barre = px.bar(
+            df_trend, 
+            x='mese', 
+            y='importo', 
+            color='tipo', 
+            barmode='group',
+            labels={'importo': 'Totale (€)', 'mese': 'Mese', 'tipo': 'Flusso'},
+            color_discrete_map={'Entrata': '#2E7D32', 'Uscita': '#C62828'} # Verde vs Rosso
+        )
+        st.plotly_chart(fig_barre, use_container_width=True)
+    else:
+        st.write("Dati insufficienti per generare il grafico mensile.")
