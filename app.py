@@ -129,7 +129,36 @@ with tab4:
             df = pd.concat([df, new_row], ignore_index=True)
             if save_to_github(df, sha): st.success(f"Registrati {p_quantita} KG di Olive"); st.rerun()
 
+# --- VISUALIZZAZIONE COMPLETA E ORDINATA ---
 st.divider()
+st.subheader("📋 Registro dei Movimenti su Cloud (GitHub)")
+
+df_view, _ = get_github_file()
+
+if not df_view.empty:
+    # 1. Convertiamo la data in formato corretto per poter ordinare
+    df_view['data_dt'] = pd.to_datetime(df_view['data'], errors='coerce')
+    
+    # 2. Ordiniamo la tabella: i più recenti appariranno in alto
+    df_sorted = df_view.sort_values(by='data_dt', ascending=False).drop(columns=['data_dt'])
+    
+    # 3. Formattiamo l'importo in Euro per una lettura pulita
+    df_display = df_sorted.copy()
+    df_display['importo'] = df_display['importo'].apply(format_euro)
+    
+    # 4. Opzione per scegliere quanti vederne
+    opzione_visualizzazione = st.radio(
+        "Filtro visualizzazione:",
+        ["Mostra solo gli ultimi 20 movimenti", "Mostra l'intero archivio storico"],
+        horizontal=True
+    )
+    
+    if opzione_visualizzazione == "Mostra solo gli ultimi 20 movimenti":
+        st.dataframe(df_display.head(20), use_container_width=True)
+    else:
+        st.dataframe(df_display, use_container_width=True)
+else:
+    st.info("Nessun movimento registrato nel file centrale di GitHub.")
 df_view, _ = get_github_file()
 if not df_view.empty:
     st.dataframe(df_view.tail(10), use_container_width=True)
