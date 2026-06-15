@@ -55,7 +55,7 @@ if not df.empty:
     movimento_scelto = st.selectbox("Scegli il movimento da gestire:", lista_movimenti)
     
     # Individuiamo l'esatta riga nel database
-    idx_record = df[df['etichetta_selezione'] == movimiento_scelto].index[0]
+    idx_record = df[df['etichetta_selezione'] == movimento_scelto].index[0]
     riga_corrente = df.loc[idx_record]
     
     st.divider()
