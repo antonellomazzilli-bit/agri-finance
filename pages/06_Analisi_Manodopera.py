@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import base64
 import io
-import re
+from datetime import datetime
 
 st.set_page_config(page_title="Analisi Giornate Operai", layout="wide")
 
@@ -14,7 +14,6 @@ FILE_PATH = "database.csv"
 DRIVE_FILE_ID = st.secrets["DRIVE_FILE_ID"]
 
 def load_github_data():
-    """Scarica il database centrale da GitHub."""
     url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     r = requests.get(url, headers=headers)
@@ -23,42 +22,24 @@ def load_github_data():
         return pd.read_csv(io.StringIO(content))
     return pd.DataFrame()
 
-def load_drive_historical_giornate():
-    """Estrae il totale delle giornate pagate dallo storico di Google Drive."""
+def load_drive_data_raw():
+    """Scarica il file Excel grezzo da Drive."""
     try:
         drive_url = f"https://docs.google.com/spreadsheets/d/{DRIVE_FILE_ID}/export?format=xlsx"
         r = requests.get(drive_url)
         if r.status_code == 200:
-            # Carichiamo il file Excel
             df_excel = pd.read_excel(io.BytesIO(r.content), sheet_name=0)
-            
-            # Pulizia radicale dei nomi delle colonne (rimuove spazi e rende tutto minuscolo)
-            df_excel.columns = df_excel.columns.astype(str).str.strip().str.lower()
-            
-            # --- CERCA LA COLONNA DELLE GIORNATE ---
-            # Questo controllo intercetta quasi ogni combinazione: "giornate", "giorni", "gg", "n. giornate", "giornate spalate"
-            colonne_candidate = [col for col in df_excel.columns if 'giornat' in col or 'giorn' in col or col == 'gg']
-            
-            if colonne_candidate:
-                # Usiamo la prima colonna utile trovata
-                colonna_target = colonne_candidate[0]
-                # Convertiamo in numero per evitare errori se ci sono celle vuote o testi strani
-                return pd.to_numeric(df_excel[colonna_target], errors='coerce').sum()
-    except Exception as e:
-        # Rimuovi il commento sotto solo in fase di debug locale se necessario
-        # print(f"Errore Drive: {e}")
+            df_excel.columns = df_excel.columns.astype(str).str.strip()
+            return df_excel
+    except:
         pass
-    return 0.0
+    return pd.DataFrame()
 
 def estrai_info_operaio(descrizione):
-    """Scompone la descrizione dell'app per estrarre Nome e Numero Giornate."""
     try:
-        # Il formato dell'app è: "Nome | X gg (Y ore) | ..."
         if "|" in str(descrizione):
             parti = descrizione.split("|")
             nome = parti[0].strip()
-            
-            # Estraiamo il numero di giornate dalla seconda parte (es. "1.5 gg")
             gg_testo = parti[1].strip()
             giornate = float(gg_testo.split(" ")[0])
             return nome, giornate
@@ -66,69 +47,121 @@ def estrai_info_operaio(descrizione):
         pass
     return "Non specificato", 0.0
 
-# --- LOGICA DI ELABORAZIONE ---
-st.title("👥 Monitoraggio e Conteggio Giornate Operai")
-st.markdown("Visualizza il riepilogo complessivo delle giornate di lavoro liquidate (Olive).")
+# --- DIZIONARIO PER CONVERTIRE I MESI TESTUALI DI DRIVE IN NUMERI ---
+MESI_MAP = {
+    'gennaio': 1, 'febbraio': 2, 'marzo': 3, 'aprile': 4, 'maggio': 5, 'giugno': 6,
+    'luglio': 7, 'agosto': 8, 'settembre': 9, 'ottobre': 10, 'novembre': 11, 'dicembre': 12
+}
 
-df_git = load_github_data()
-giornate_storiche_drive = load_drive_historical_giornate()
+st.title("👥 Monitoraggio Giornate per Periodo")
+st.markdown("Seleziona un intervallo di date per filtrare lo storico delle giornate liquidate.")
 
-# Filtriamo solo le uscite legate alla Manodopera effettivamente Saldate
-if not df_git.empty:
-    df_manodopera = df_git[(df_git['categoria'] == 'Manodopera') & (df_git['stato'] == 'Saldato')].copy()
+# --- 1. CARICAMENTO DATI ---
+df_git_raw = load_github_data()
+df_drive_raw = load_drive_data_raw()
+
+# --- 2. INTERFACCIA DI FILTRO TEMPORALE (INTERVALLO DI DATE) ---
+st.sidebar.subheader("📅 Filtro Periodo")
+oggi = datetime.now().date()
+anno_corrente = oggi.year
+
+# Impostiamo di default l'inizio dell'anno corrente fino a oggi
+periodo = st.sidebar.date_input(
+    "Seleziona l'intervallo di date:",
+    value=(datetime(anno_corrente, 1, 1).date(), oggi),
+    format="DD/MM/YYYY"
+)
+
+# Gestione di sicurezza se l'utente seleziona solo una data invece di un intervallo
+if isinstance(periodo, tuple) and len(periodo) == 2:
+    start_date, end_date = periodo
+else:
+    start_date, end_date = datetime(anno_corrente, 1, 1).date(), oggi
+
+st.info(f"📊 Analisi attiva dal **{start_date.strftime('%d/%m/%Y')}** al **{end_date.strftime('%d/%m/%Y')}**")
+
+# --- 3. ELABORAZIONE DATI STORICI (DRIVE) CON FILTRO TEMPORALE ---
+giornate_storiche_filtrate = 0.0
+
+if not df_drive_raw.empty:
+    # Cerchiamo le colonne delle giornate e dei mesi nel tuo file Excel
+    col_giornate = [c for c in df_drive_raw.columns if 'Giornat' in c or 'giorn' in c or c.lower() == 'gg']
+    col_mesi = [c for c in df_drive_raw.columns if 'Mese' in c or 'mese' in c]
     
-    # Applichiamo la funzione di estrazione dati su ogni riga dell'app
-    nomi_operai = []
-    giornate_app_lista = []
-    
-    for idx, row in df_manodopera.iterrows():
-        nome, gg = estrai_info_operaio(row['descrizione'])
-        nomi_operai.append(nome)
-        giornate_app_lista.append(gg)
+    if col_giornate and col_mesi:
+        c_giornate = col_giornate[0]
+        c_mesi = col_mesi[0]
         
-    df_manodopera['Operaio'] = nomi_operai
-    df_manodopera['Giornate_Intere'] = giornate_app_lista
+        # Scorriamo le righe del foglio Excel per filtrare temporaneamente i mesi
+        for _, row in df_drive_raw.iterrows():
+            mese_testo = str(row[c_mesi]).strip().lower()
+            valore_giornate = pd.to_numeric(row[c_giornate], errors='coerce')
+            
+            if mese_testo in MESI_MAP and not pd.isna(valore_giornate):
+                num_mese = MESI_MAP[mese_testo]
+                # Creiamo una data fittizia (il primo giorno del mese) per fare il controllo di inclusione nel periodo
+                data_mese = datetime(anno_corrente, num_mese, 1).date()
+                
+                # Se il mese rientra nell'intervallo scelto dall'utente, sommiamo le giornate
+                if start_date <= data_mese <= end_date:
+                    giornate_storiche_filtrate += valore_giornate
+
+# --- 4. ELABORAZIONE NUOVI DATI (GITHUB) CON FILTRO TEMPORALE ---
+totale_giornate_app_filtrate = 0.0
+df_operai_filtrato = pd.DataFrame()
+
+if not df_git_raw.empty:
+    df_git_raw['data_dt'] = pd.to_datetime(df_git_raw['data'], errors='coerce').dt.date
+    # Applichiamo il filtro data sulle righe di GitHub
+    df_git_filtrato = df_git_raw[(df_git_raw['data_dt'] >= start_date) & (df_git_raw['data_dt'] <= end_date)].copy()
     
-    # Calcolo totali complessivi
-    totale_giornate_app = df_manodopera['Giornate_Intere'].sum()
-    grand_totale_giornate = giornate_storiche_drive + totale_giornate_app
-    costo_totale_manodopera = df_manodopera['importo'].sum()
-
-    # --- METRICHE VISIVE IN ALTO ---
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Giornate Storiche (Drive)", f"{giornate_storiche_drive:,.1f} gg".replace(".", ","))
-    c2.metric("Nuove Giornate (Da App)", f"{totale_giornate_app:,.1f} gg".replace(".", ","))
-    c3.metric("TOTALE GIORNATE PAGATE", f"{grand_totale_giornate:,.1f} gg".replace(".", ","))
-
-    st.divider()
-
-    # --- DETTAGLIO PER SINGOLO OPERAIO (DATI REGISTRATI DA APP) ---
-    st.subheader("📊 Analisi per Singolo Operaio (Nuove Registrazioni)")
-    st.write("Questo dettaglio mostra la ripartizione dei giorni e dei compensi estratti dai dati inseriti da smartphone:")
+    df_manodopera = df_git_filtrato[(df_git_filtrato['categoria'] == 'Manodopera') & (df_git_filtrato['stato'] == 'Saldato')].copy()
     
     if not df_manodopera.empty:
-        # Raggruppiamo i dati per capire quanto ha lavorato e quanto è costato ogni singolo operaio
-        report_operai = df_manodopera.groupby('Operaio').agg({
-            'Giornate_Intere': 'sum',
-            'importo': 'sum'
-        }).reset_index()
+        nomi_operai = []
+        giornate_app_lista = []
         
-        report_operai.columns = ['Nome Operaio', 'Totale Giornate Lavorate', 'Totale Pagato (€)']
-        
-        # Formattazione per la tabella finale
-        report_operai['Totale Giornate Lavorate'] = report_operai['Totale Giornate Lavorate'].map(lambda x: f"{x:,.1f} gg".replace(".", ","))
-        report_operai['Totale Pagato (€)'] = report_operai['Totale Pagato (€)'].map(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        
-        st.table(report_operai)
-        
-        # Elenco cronologico completo di riscontro
-        with st.expander("Visualizza lo storico di tutti i pagamenti manodopera"):
-            df_cronologico = df_manodopera[['data', 'Operaio', 'Giornate_Intere', 'importo']].copy()
-            df_cronologico.columns = ['Data', 'Operaio', 'Giornate', 'Importo Liquidato']
-            df_cronologico['Importo Liquidato'] = df_cronologico['Importo Liquidato'].map(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            st.dataframe(df_cronologico.sort_values(by='Data', ascending=False), use_container_width=True)
+        for idx, row in df_manodopera.iterrows():
+            nome, gg = estrai_info_operaio(row['descrizione'])
+            nomi_operai.append(nome)
+            giornate_app_lista.append(gg)
             
-    else:
-        st.info("Nessuna nuova giornata registrata tramite l'applicazione corrente. I dati storici sono inclusi nel conteggio generale in alto.")
+        df_manodopera['Operaio'] = nomi_operai
+        df_manodopera['Giornate_Intere'] = giornate_app_lista
+        
+        totale_giornate_app_filtrate = df_manodopera['Giornate_Intere'].sum()
+        df_operai_filtrato = df_manodopera
+
+# --- 5. CALCOLO FINALE E METRICHE VISIVE ---
+grand_totale_giornate = giornate_storiche_filtrate + totale_giornate_app_filtrate
+
+c1, c2, c3 = st.columns(3)
+c1.metric("Giornate Drive nel periodo", f"{giornate_storiche_filtrate:,.1f} gg".replace(".", ","))
+c2.metric("Giornate App nel periodo", f"{totale_giornate_app_filtrate:,.1f} gg".replace(".", ","))
+c3.metric("TOTALE GIORNATE PERIODO", f"{grand_totale_giornate:,.1f} gg".replace(".", ","))
+
+st.divider()
+
+# --- TABELLA DETTAGLIATA ---
+st.subheader("📊 Distribuzione del Personale nel periodo selezionato")
+
+if not df_operai_filtrato.empty:
+    report_operai = df_operai_filtrato.groupby('Operaio').agg({
+        'Giornate_Intere': 'sum',
+        'importo': 'sum'
+    }).reset_index()
+    
+    report_operai.columns = ['Nome Operaio', 'Giornate Lavorate nel Periodo', 'Costo Liquidato nel Periodo']
+    
+    report_operai['Giornate Lavorate nel Periodo'] = report_operai['Giornate Lavorate nel Periodo'].map(lambda x: f"{x:,.1f} gg".replace(".", ","))
+    report_operai['Costo Liquidato nel Periodo'] = report_operai['Costo Liquidato nel Periodo'].map(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    
+    st.table(report_operai)
+    
+    with st.expander("Vedi elenco dettagliato dei giorni inclusi in questo intervallo"):
+        df_cronologico = df_operai_filtrato[['data', 'Operaio', 'Giornate_Intere', 'importo', 'descrizione']].copy()
+        df_cronologico.columns = ['Data', 'Operaio', 'Giornate', 'Importo', 'Dettaglio Inserito']
+        df_cronologico['Importo'] = df_cronologico['Importo'].map(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        st.dataframe(df_cronologico.sort_values(by='Data', ascending=False), use_container_width=True)
 else:
-    st.info("Database centrale non raggiungibile o vuoto.")
+    st.write("Nessuna nuova registrazione manodopera presente in questo intervallo di date.")
