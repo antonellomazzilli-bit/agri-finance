@@ -32,7 +32,9 @@ def load_drive_data_raw():
         drive_url = f"https://docs.google.com/spreadsheets/d/{DRIVE_FILE_ID}/export?format=xlsx"
         r = requests.get(drive_url)
         if r.status_code == 200:
-            return pd.read_excel(io.BytesIO(r.content), sheet_name=0)
+            # Carichiamo il file Excel ignorando le intestazioni automatiche per gestirle noi a posizione
+            df_excel = pd.read_excel(io.BytesIO(r.content), sheet_name=0, header=None)
+            return df_excel
     except:
         pass
     return pd.DataFrame()
@@ -72,39 +74,31 @@ else:
 
 st.info(f"📊 Analisi attiva dal **{start_date.strftime('%d/%m/%Y')}** al **{end_date.strftime('%d/%m/%Y')}**")
 
-# --- TRATTAMENTO DATI EXCEL CON INTESTAZIONI UTENTE ---
+# --- TRATTAMENTO DATI EXCEL POSIZIONALE ---
 giornate_storiche_filtrate = 0.0
 dettaglio_righe_drive = []
 
 if not df_drive_raw.empty:
-    # Pulizia preliminare delle colonne dell'Excel per intercettare gli spazi extra
-    df_drive_raw.columns = df_drive_raw.columns.astype(str).str.strip()
-    
-    # Mappatura e localizzazione basata sulle tue intestazioni esatte
-    colonna_mesi = None
-    colonna_giornate = None
-    
-    # Individuiamo la colonna dei Mesi (cercando la parola chiave 'Mese')
-    for c in df_drive_raw.columns:
-        if 'mese' in c.lower():
-            colonna_mesi = c
+    # Cerchiamo l'indice della colonna che contiene materialmente i nomi dei mesi nelle celle
+    idx_colonna_mesi = None
+    for col_idx in range(df_drive_raw.shape[1]):
+        if df_drive_raw[col_idx].astype(str).str.lower().str.strip().isin(MESI_MAP.keys()).any():
+            idx_colonna_mesi = col_idx
             break
             
-    # Individuiamo la colonna delle Giornate (cercando la parola chiave 'Giornate Spalate')
-    for c in df_drive_raw.columns:
-        if 'giornate spalate' in c.lower() or 'giornat' in c.lower():
-            colonna_giornate = c
-            break
-
-    # Esecuzione del calcolo se i pilastri fondamentali sono agganciati
-    if colonna_mesi and colonna_giornate:
+    # Se troviamo la colonna dei mesi, applichiamo la logica posizionale specchio del tuo Excel
+    if idx_colonna_mesi is not None:
         for _, row in df_drive_raw.iterrows():
-            mese_originale = str(row[colonna_mesi]).strip()
+            mese_originale = str(row[idx_colonna_mesi]).strip()
             mese_testo = mese_originale.lower()
-            valore_giornate = pd.to_numeric(row[colonna_giornate], errors='coerce')
             
-            if mese_testo in MESI_MAP and pd.notna(valore_giornate):
+            if mese_testo in MESI_MAP:
                 num_mese = MESI_MAP[mese_testo]
+                
+                # Estrazione posizionale basata sull'ordine esatto delle tue colonne:
+                # Mese (0), Giornate (1), Ore (2), Costo (3), Spese Extra (4), Acconto (5), Saldo (6)
+                valore_giornate = pd.to_numeric(row[idx_colonna_mesi + 1], errors='coerce')
+                valore_giornate = valore_giornate if pd.notna(valore_giornate) else 0.0
                 
                 start_ym = start_date.year * 12 + start_date.month
                 end_ym = end_date.year * 12 + end_date.month
@@ -116,16 +110,16 @@ if not df_drive_raw.empty:
                 if incluso:
                     giornate_storiche_filtrate += valore_giornate
                 
-                # Cattura strutturata di tutte le colonne richieste
+                # Recuperiamo in modo sicuro i dati dalle colonne successive per posizione numerica (+1, +2, +3...)
                 dettaglio_righe_drive.append({
                     "Stato Filtro": status_visto,
                     "Mese": mese_originale,
                     "Giornate Spalate": valore_giornate,
-                    "Ore Effettive": row.get("Ore Effettive", "-"),
-                    "Costo Lavoro (€)": row.get("Costo Lavoro (€)", "-"),
-                    "Spese Extra (€)": row.get("Spese Extra (€)", "-"),
-                    "Acconto (€)": row.get("Acconto (€)", "-"),
-                    "Saldo Finale (€)": row.get("Saldo Finale (€)", "-")
+                    "Ore Effettive": row[idx_colonna_mesi + 2] if (idx_colonna_mesi + 2) < len(row) else "-",
+                    "Costo Lavoro (€)": row[idx_colonna_mesi + 3] if (idx_colonna_mesi + 3) < len(row) else "-",
+                    "Spese Extra (€)": row[idx_colonna_mesi + 4] if (idx_colonna_mesi + 4) < len(row) else "-",
+                    "Acconto (€)": row[idx_colonna_mesi + 5] if (idx_colonna_mesi + 5) < len(row) else "-",
+                    "Saldo Finale (€)": row[idx_colonna_mesi + 6] if (idx_colonna_mesi + 6) < len(row) else "-"
                 })
 
 # --- ESTRAZIONE DATI SMARTPHONE (GITHUB) ---
