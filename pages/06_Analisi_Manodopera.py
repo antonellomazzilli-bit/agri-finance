@@ -32,8 +32,7 @@ def load_drive_data_raw():
         drive_url = f"https://docs.google.com/spreadsheets/d/{DRIVE_FILE_ID}/export?format=xlsx"
         r = requests.get(drive_url)
         if r.status_code == 200:
-            df_excel = pd.read_excel(io.BytesIO(r.content), sheet_name=0)
-            return df_excel
+            return pd.read_excel(io.BytesIO(r.content), sheet_name=0)
     except:
         pass
     return pd.DataFrame()
@@ -43,8 +42,7 @@ def estrai_info_operaio(descrizione):
         if "|" in str(descrizione):
             parti = descrizione.split("|")
             nome = parti[0].strip()
-            gg_testo = parti[1].strip()
-            giornate = float(gg_testo.split(" ")[0])
+            giornate = float(parti[1].strip().split(" ")[0])
             return nome, giornate
     except:
         pass
@@ -56,7 +54,7 @@ st.markdown("Seleziona un intervallo di date per filtrare lo storico delle giorn
 df_git_raw = load_github_data()
 df_drive_raw = load_drive_data_raw()
 
-# --- INTERFACCIA CALENDARIO ---
+# --- INTERFACCIA LATERALE: CALENDARIO E MAPPATURA EXCEL ---
 st.sidebar.subheader("📅 Filtro Periodo")
 oggi = datetime.now().date()
 anno_corrente = oggi.year
@@ -72,60 +70,80 @@ if isinstance(periodo, tuple) and len(periodo) == 2:
 else:
     start_date, end_date = datetime(anno_corrente, 1, 1).date(), oggi
 
-st.info(f"📊 Analisi attiva dal **{start_date.strftime('%d/%m/%Y')}** al **{end_date.strftime('%d/%m/%Y')}**")
-
-# --- DATA HUNTER & DETTAGLIO DRIVE ---
-giornate_storiche_filtrate = 0.0
-dettaglio_righe_drive = []  # Lista per salvare il dettaglio visivo del foglio Excel
+# --- SISTEMA DI CORREZIONE MANUALE COLONNE (FAILSAFE) ---
+col_mesi_auto = None
+col_giornate_auto = None
 
 if not df_drive_raw.empty:
-    col_mesi = None
-    col_giornate = None
-    
+    # 1. Tentativo di Auto-Rilevamento Silenzioso
     for col in df_drive_raw.columns:
         if df_drive_raw[col].astype(str).str.lower().str.strip().isin(MESI_MAP.keys()).any():
-            col_mesi = col
+            col_mesi_auto = col
             break
             
     for col in df_drive_raw.columns:
         name = str(col).lower()
-        if 'giornat' in name or 'spalate' in name or 'gg' == name:
-            col_giornate = col
+        valori_iniziali = df_drive_raw[col].head(10).astype(str).str.lower()
+        # Escludiamo le colonne che palesemente parlano di soldi
+        if 'acconto' in name or 'saldo' in name or valori_iniziali.str.contains('acconto|saldo|€').any():
+            continue
+        if 'giornat' in name or 'spalate' in name or name == 'gg' or valori_iniziali.str.contains('giornat|spalate').any():
+            col_giornate_auto = col
             break
             
-    if col_giornate is None and col_mesi is not None:
-        idx_mesi = df_drive_raw.columns.get_loc(col_mesi)
-        if idx_mesi + 1 < len(df_drive_raw.columns):
-            col_giornate = df_drive_raw.columns[idx_mesi + 1]
+    # 2. Interfaccia di Controllo Utente
+    st.sidebar.divider()
+    st.sidebar.subheader("⚙️ Mappatura File Excel")
+    st.sidebar.write("Se i dati di Drive non tornano, forza le colonne corrette qui sotto:")
+    
+    # Creiamo un dizionario visivo per mostrare all'utente l'anteprima delle colonne
+    opzioni_colonne = {}
+    for col in df_drive_raw.columns:
+        valori_validi = df_drive_raw[col].dropna().astype(str).tolist()
+        anteprima = ", ".join(valori_validi[:3]) if valori_validi else "Vuota"
+        if len(anteprima) > 25: anteprima = anteprima[:25] + "..."
+        nome_pulito = str(col).replace("Unnamed: ", "Col. ")
+        opzioni_colonne[col] = f"{nome_pulito} [es: {anteprima}]"
 
-    if col_mesi is not None and col_giornate is not None:
-        for _, row in df_drive_raw.iterrows():
-            mese_originale = str(row[col_mesi]).strip()
-            mese_testo = mese_originale.lower()
-            valore_giornate = pd.to_numeric(row[col_giornate], errors='coerce')
+    idx_m = list(opzioni_colonne.keys()).index(col_mesi_auto) if col_mesi_auto in opzioni_colonne else 0
+    idx_g = list(opzioni_colonne.keys()).index(col_giornate_auto) if col_giornate_auto in opzioni_colonne else (1 if len(opzioni_colonne) > 1 else 0)
+
+    # I menu a tendina sovrascrivono l'auto-rilevamento
+    colonna_mesi_scelta = st.sidebar.selectbox("Dov'è la colonna dei Mesi?", options=list(opzioni_colonne.keys()), format_func=lambda x: opzioni_colonne[x], index=idx_m)
+    colonna_giornate_scelta = st.sidebar.selectbox("Dov'è la colonna delle Giornate?", options=list(opzioni_colonne.keys()), format_func=lambda x: opzioni_colonne[x], index=idx_g)
+
+st.info(f"📊 Analisi attiva dal **{start_date.strftime('%d/%m/%Y')}** al **{end_date.strftime('%d/%m/%Y')}**")
+
+# --- ESTRAZIONE DATI DRIVE (Usando le colonne scelte) ---
+giornate_storiche_filtrate = 0.0
+dettaglio_righe_drive = []
+
+if not df_drive_raw.empty and colonna_mesi_scelta and colonna_giornate_scelta:
+    for _, row in df_drive_raw.iterrows():
+        mese_originale = str(row[colonna_mesi_scelta]).strip()
+        mese_testo = mese_originale.lower()
+        valore_giornate = pd.to_numeric(row[colonna_giornate_scelta], errors='coerce')
+        
+        if mese_testo in MESI_MAP and pd.notna(valore_giornate):
+            num_mese = MESI_MAP[mese_testo]
             
-            if mese_testo in MESI_MAP and pd.notna(valore_giornate):
-                num_mese = MESI_MAP[mese_testo]
-                
-                start_ym = start_date.year * 12 + start_date.month
-                end_ym = end_date.year * 12 + end_date.month
-                drive_ym = anno_corrente * 12 + num_mese
-                
-                # Verifichiamo se il mese è incluso nel periodo
-                incluso = start_ym <= drive_ym <= end_ym
-                status_visto = "Incluso nel calcolo" if incluso else "Escluso dal periodo"
-                
-                if incluso:
-                    giornate_storiche_filtrate += valore_giornate
-                
-                # Salviamo la riga per mostrarla nel dettaglio richiesto
-                dettaglio_righe_drive.append({
-                    "Mese Foglio Excel": mese_originale,
-                    "Giornate Rilevate": f"{valore_giornate:,.1f} gg".replace(".", ","),
-                    "Stato Filtro": status_visto
-                })
+            start_ym = start_date.year * 12 + start_date.month
+            end_ym = end_date.year * 12 + end_date.month
+            drive_ym = anno_corrente * 12 + num_mese
+            
+            incluso = start_ym <= drive_ym <= end_ym
+            status_visto = "Incluso nel calcolo" if incluso else "Escluso dal periodo"
+            
+            if incluso:
+                giornate_storiche_filtrate += valore_giornate
+            
+            dettaglio_righe_drive.append({
+                "Mese Excel": mese_originale,
+                "Giornate Rilevate": f"{valore_giornate:,.1f} gg".replace(".", ","),
+                "Stato": status_visto
+            })
 
-# --- ELABORAZIONE APP GITHUB ---
+# --- ESTRAZIONE DATI APP ---
 totale_giornate_app_filtrate = 0.0
 df_operai_filtrato = pd.DataFrame()
 
@@ -137,7 +155,6 @@ if not df_git_raw.empty:
     if not df_manodopera.empty:
         nomi_operai = []
         giornate_app_lista = []
-        
         for idx, row in df_manodopera.iterrows():
             nome, gg = estrai_info_operaio(row['descrizione'])
             nomi_operai.append(nome)
@@ -145,7 +162,6 @@ if not df_git_raw.empty:
             
         df_manodopera['Operaio'] = nomi_operai
         df_manodopera['Giornate_Intere'] = giornate_app_lista
-        
         totale_giornate_app_filtrate = df_manodopera['Giornate_Intere'].sum()
         df_operai_filtrato = df_manodopera
 
@@ -153,48 +169,32 @@ if not df_git_raw.empty:
 grand_totale_giornate = giornate_storiche_filtrate + totale_giornate_app_filtrate
 
 c1, c2, c3 = st.columns(3)
-c1.metric("Giornate Drive nel periodo", f"{giornate_storiche_filtrate:,.1f} gg".replace(".", ","))
-c2.metric("Giornate App nel periodo", f"{totale_giornate_app_filtrate:,.1f} gg".replace(".", ","))
+c1.metric("Giornate Storiche Drive", f"{giornate_storiche_filtrate:,.1f} gg".replace(".", ","))
+c2.metric("Nuove Giornate App", f"{totale_giornate_app_filtrate:,.1f} gg".replace(".", ","))
 c3.metric("TOTALE GIORNATE PERIODO", f"{grand_totale_giornate:,.1f} gg".replace(".", ","))
 
 st.divider()
 
-# --- TABELLA 1: DETTAGLIO NUOVI OPERAI DA APP ---
-st.subheader("📊 Distribuzione del Personale (Dati inseriti da App)")
+# --- TABELLE VISUALI ---
+st.subheader("📊 Dettaglio Personale (Dati inseriti da App)")
 if not df_operai_filtrato.empty:
-    report_operai = df_operai_filtrato.groupby('Operaio').agg({
-        'Giornate_Intere': 'sum',
-        'importo': 'sum'
-    }).reset_index()
-    
+    report_operai = df_operai_filtrato.groupby('Operaio').agg({'Giornate_Intere': 'sum', 'importo': 'sum'}).reset_index()
     report_operai.columns = ['Nome Operaio', 'Giornate Lavorate', 'Costo Liquidato']
     report_operai['Giornate Lavorate'] = report_operai['Giornate Lavorate'].map(lambda x: f"{x:,.1f} gg".replace(".", ","))
     report_operai['Costo Liquidato'] = report_operai['Costo Liquidato'].map(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     st.table(report_operai)
-    
-    with st.expander("Vedi registro analitico delle singole registrazioni da smartphone"):
-        df_cronologico = df_operai_filtrato[['data', 'Operaio', 'Giornate_Intere', 'importo', 'descrizione']].copy()
-        df_cronologico.columns = ['Data', 'Operaio', 'Giornate', 'Importo', 'Dettaglio Inserito']
-        df_cronologico['Importo'] = df_cronologico['Importo'].map(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        st.dataframe(df_cronologico.sort_values(by='Data', ascending=False), use_container_width=True)
 else:
-    st.write("Nessuna nuova giornata registrata tramite l'applicazione nell'intervallo selezionato.")
+    st.write("Nessuna registrazione in questo intervallo di date sull'applicazione.")
 
 st.divider()
-
-# --- NUOVA SEZIONE: DETTAGLIO FILE EXCEL DRIVE ---
 st.subheader("📋 Foglio di Controllo: Storico Mensile da Drive")
-st.write("Di seguito trovi l'elenco esatto delle voci mensili estratte dal tuo file Excel su Google Drive in base al filtro temporale selezionato:")
 
 if dettaglio_righe_drive:
     df_dettaglio_excel = pd.DataFrame(dettaglio_righe_drive)
-    
-    # Coloriamo lo sfondo per capire al volo cosa è incluso e cosa no
     def colora_stato(val):
         color = '#E8F5E9' if 'Incluso' in val else '#FFEBEE'
         text_color = '#2E7D32' if 'Incluso' in val else '#C62828'
         return f'background-color: {color}; color: {text_color}; font-weight: bold;'
-        
-    st.table(df_dettaglio_excel.style.map(colora_stato, subset=['Stato Filtro']))
+    st.table(df_dettaglio_excel.style.map(colora_stato, subset=['Stato']))
 else:
-    st.warning("⚠️ Non è stato possibile estrarre righe valide dal file di Drive. Verifica che la struttura del foglio contenga i nomi dei mesi e i valori numerici delle giornate.")
+    st.warning("Nessun dato corrispondente trovato su Drive con queste colonne.")
