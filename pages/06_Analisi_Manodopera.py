@@ -29,14 +29,24 @@ def load_drive_historical_giornate():
         drive_url = f"https://docs.google.com/spreadsheets/d/{DRIVE_FILE_ID}/export?format=xlsx"
         r = requests.get(drive_url)
         if r.status_code == 200:
+            # Carichiamo il file Excel
             df_excel = pd.read_excel(io.BytesIO(r.content), sheet_name=0)
-            df_excel.columns = df_excel.columns.str.strip()
             
-            # Identifica la colonna delle giornate (es. 'Giornate Spalate' o simili)
-            colonna_giornate = [col for col in df_excel.columns if 'Giornate' in col]
-            if colonna_giornate:
-                return pd.to_numeric(df_excel[colonna_giornate[0]], errors='coerce').sum()
-    except:
+            # Pulizia radicale dei nomi delle colonne (rimuove spazi e rende tutto minuscolo)
+            df_excel.columns = df_excel.columns.astype(str).str.strip().str.lower()
+            
+            # --- CERCA LA COLONNA DELLE GIORNATE ---
+            # Questo controllo intercetta quasi ogni combinazione: "giornate", "giorni", "gg", "n. giornate", "giornate spalate"
+            colonne_candidate = [col for col in df_excel.columns if 'giornat' in col or 'giorn' in col or col == 'gg']
+            
+            if colonne_candidate:
+                # Usiamo la prima colonna utile trovata
+                colonna_target = colonne_candidate[0]
+                # Convertiamo in numero per evitare errori se ci sono celle vuote o testi strani
+                return pd.to_numeric(df_excel[colonna_target], errors='coerce').sum()
+    except Exception as e:
+        # Rimuovi il commento sotto solo in fase di debug locale se necessario
+        # print(f"Errore Drive: {e}")
         pass
     return 0.0
 
