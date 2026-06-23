@@ -1,9 +1,10 @@
-data,tipo,categoria,descrizione,importo,coltura_id
-2026-04-01,Entrata,Vendita,Saldo,9000.0,Olive
-2026-05-12,Uscita,Manodopera,MARZO E APRILE FELICE IANNONE GG 15+9,1700.3,oLIVE
-2026-05-18,Uscita,Altro,ONERI MESE DI APRILE,133.34,OLIVE
-2026-04-16,Uscita,Altro,ONERI MESE DI MARZO,234.47,OLIVE
-2026-06-05,Uscita,Altro,"Pagamento provvigioni apertura azienda agricola e partita IVA, infoagri",90.0,Olive 
-2026-06-07,Uscita,Altro,Ricarica scheda acqua Associazione irrigua,300.0,Olive 
-2026-06-10,Uscita,Sementi,Pagamento f24 contributi operai IV Trimestre 2025,685.11,Olive
-2026-06-20,Uscita,Altro,Bonifico per irrigazione,400.0,Olive
+data,tipo,categoria,descrizione,importo,coltura_id,stato
+2026-04-01,Entrata,Vendita,Saldo,9000.0,Olive,Saldato
+2026-05-12,Uscita,Manodopera,MARZO E APRILE FELICE IANNONE GG 15+9,1700.3,oLIVE,Saldato
+2026-05-18,Uscita,Altro,ONERI MESE DI APRILE,133.34,OLIVE,Saldato
+2026-04-16,Uscita,Altro,ONERI MESE DI MARZO,234.47,OLIVE,Saldato
+2026-06-05,Uscita,Altro,"Pagamento provvigioni apertura azienda agricola e partita IVA, infoagri",90.0,Olive ,Saldato
+2026-06-07,Uscita,Altro,Ricarica scheda acqua Associazione irrigua,300.0,Olive ,Saldato
+2026-06-10,Uscita,Sementi,Pagamento f24 contributi operai IV Trimestre 2025,685.11,Olive,Saldato
+2026-06-20,Uscita,Altro,Bonifico per irrigazione,400.0,Olive,Saldato
+2026-06-23,Uscita,Fatture Fornitori,Olive felice 2025,9000.0,Olive,Impegnato
