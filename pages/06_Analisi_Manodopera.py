@@ -13,7 +13,6 @@ REPO = "antonellomazzilli-bit/agri-finance"
 FILE_PATH = "database.csv"
 DRIVE_FILE_ID = st.secrets["DRIVE_FILE_ID"]
 
-# Mappatura per convertire i testi in indici mensili
 MESI_MAP = {
     'gennaio': 1, 'febbraio': 2, 'marzo': 3, 'aprile': 4, 'maggio': 5, 'giugno': 6,
     'luglio': 7, 'agosto': 8, 'settembre': 9, 'ottobre': 10, 'novembre': 11, 'dicembre': 12
@@ -75,48 +74,56 @@ else:
 
 st.info(f"📊 Analisi attiva dal **{start_date.strftime('%d/%m/%Y')}** al **{end_date.strftime('%d/%m/%Y')}**")
 
-# --- DATA HUNTER: ELABORAZIONE DRIVE ---
+# --- DATA HUNTER & DETTAGLIO DRIVE ---
 giornate_storiche_filtrate = 0.0
+dettaglio_righe_drive = []  # Lista per salvare il dettaglio visivo del foglio Excel
 
 if not df_drive_raw.empty:
     col_mesi = None
     col_giornate = None
     
-    # 1. Troviamo la colonna dei Mesi cercando la parola 'gennaio' dentro le celle
     for col in df_drive_raw.columns:
         if df_drive_raw[col].astype(str).str.lower().str.strip().isin(MESI_MAP.keys()).any():
             col_mesi = col
             break
             
-    # 2. Troviamo la colonna delle Giornate (tramite intestazione)
     for col in df_drive_raw.columns:
         name = str(col).lower()
         if 'giornat' in name or 'spalate' in name or 'gg' == name:
             col_giornate = col
             break
             
-    # Fallback: Se l'intestazione è vuota, prendiamo la colonna subito a destra dei mesi
     if col_giornate is None and col_mesi is not None:
         idx_mesi = df_drive_raw.columns.get_loc(col_mesi)
         if idx_mesi + 1 < len(df_drive_raw.columns):
             col_giornate = df_drive_raw.columns[idx_mesi + 1]
 
-    # 3. Estrazione e Filtro
     if col_mesi is not None and col_giornate is not None:
         for _, row in df_drive_raw.iterrows():
-            mese_testo = str(row[col_mesi]).strip().lower()
+            mese_originale = str(row[col_mesi]).strip()
+            mese_testo = mese_originale.lower()
             valore_giornate = pd.to_numeric(row[col_giornate], errors='coerce')
             
             if mese_testo in MESI_MAP and pd.notna(valore_giornate):
                 num_mese = MESI_MAP[mese_testo]
                 
-                # Calcolo infallibile per l'inclusione del mese nel periodo selezionato
                 start_ym = start_date.year * 12 + start_date.month
                 end_ym = end_date.year * 12 + end_date.month
                 drive_ym = anno_corrente * 12 + num_mese
                 
-                if start_ym <= drive_ym <= end_ym:
+                # Verifichiamo se il mese è incluso nel periodo
+                incluso = start_ym <= drive_ym <= end_ym
+                status_visto = "Incluso nel calcolo" if incluso else "Escluso dal periodo"
+                
+                if incluso:
                     giornate_storiche_filtrate += valore_giornate
+                
+                # Salviamo la riga per mostrarla nel dettaglio richiesto
+                dettaglio_righe_drive.append({
+                    "Mese Foglio Excel": mese_originale,
+                    "Giornate Rilevate": f"{valore_giornate:,.1f} gg".replace(".", ","),
+                    "Stato Filtro": status_visto
+                })
 
 # --- ELABORAZIONE APP GITHUB ---
 totale_giornate_app_filtrate = 0.0
@@ -142,7 +149,7 @@ if not df_git_raw.empty:
         totale_giornate_app_filtrate = df_manodopera['Giornate_Intere'].sum()
         df_operai_filtrato = df_manodopera
 
-# --- METRICHE E TABELLE VISIVE ---
+# --- METRICHE PRINCIPALI ---
 grand_totale_giornate = giornate_storiche_filtrate + totale_giornate_app_filtrate
 
 c1, c2, c3 = st.columns(3)
@@ -152,24 +159,42 @@ c3.metric("TOTALE GIORNATE PERIODO", f"{grand_totale_giornate:,.1f} gg".replace(
 
 st.divider()
 
-st.subheader("📊 Distribuzione del Personale nel periodo")
-
+# --- TABELLA 1: DETTAGLIO NUOVI OPERAI DA APP ---
+st.subheader("📊 Distribuzione del Personale (Dati inseriti da App)")
 if not df_operai_filtrato.empty:
     report_operai = df_operai_filtrato.groupby('Operaio').agg({
         'Giornate_Intere': 'sum',
         'importo': 'sum'
     }).reset_index()
     
-    report_operai.columns = ['Nome Operaio', 'Giornate Lavorate nel Periodo', 'Costo Liquidato nel Periodo']
-    report_operai['Giornate Lavorate nel Periodo'] = report_operai['Giornate Lavorate nel Periodo'].map(lambda x: f"{x:,.1f} gg".replace(".", ","))
-    report_operai['Costo Liquidato nel Periodo'] = report_operai['Costo Liquidato nel Periodo'].map(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-    
+    report_operai.columns = ['Nome Operaio', 'Giornate Lavorate', 'Costo Liquidato']
+    report_operai['Giornate Lavorate'] = report_operai['Giornate Lavorate'].map(lambda x: f"{x:,.1f} gg".replace(".", ","))
+    report_operai['Costo Liquidato'] = report_operai['Costo Liquidato'].map(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     st.table(report_operai)
     
-    with st.expander("Vedi elenco dettagliato dei giorni inclusi in questo intervallo"):
+    with st.expander("Vedi registro analitico delle singole registrazioni da smartphone"):
         df_cronologico = df_operai_filtrato[['data', 'Operaio', 'Giornate_Intere', 'importo', 'descrizione']].copy()
         df_cronologico.columns = ['Data', 'Operaio', 'Giornate', 'Importo', 'Dettaglio Inserito']
         df_cronologico['Importo'] = df_cronologico['Importo'].map(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         st.dataframe(df_cronologico.sort_values(by='Data', ascending=False), use_container_width=True)
 else:
-    st.write("Nessuna nuova registrazione manodopera presente in questo intervallo di date sull'applicazione.")
+    st.write("Nessuna nuova giornata registrata tramite l'applicazione nell'intervallo selezionato.")
+
+st.divider()
+
+# --- NUOVA SEZIONE: DETTAGLIO FILE EXCEL DRIVE ---
+st.subheader("📋 Foglio di Controllo: Storico Mensile da Drive")
+st.write("Di seguito trovi l'elenco esatto delle voci mensili estratte dal tuo file Excel su Google Drive in base al filtro temporale selezionato:")
+
+if dettaglio_righe_drive:
+    df_dettaglio_excel = pd.DataFrame(dettaglio_righe_drive)
+    
+    # Coloriamo lo sfondo per capire al volo cosa è incluso e cosa no
+    def colora_stato(val):
+        color = '#E8F5E9' if 'Incluso' in val else '#FFEBEE'
+        text_color = '#2E7D32' if 'Incluso' in val else '#C62828'
+        return f'background-color: {color}; color: {text_color}; font-weight: bold;'
+        
+    st.table(df_dettaglio_excel.style.applymap(colora_stato, subset=['Stato Filtro']))
+else:
+    st.warning("⚠️ Non è stato possibile estrarre righe valide dal file di Drive. Verifica che la struttura del foglio contenga i nomi dei mesi e i valori numerici delle giornate.")
