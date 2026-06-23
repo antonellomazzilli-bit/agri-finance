@@ -84,25 +84,42 @@ st.info(f"📊 Analisi attiva dal **{start_date.strftime('%d/%m/%Y')}** al **{en
 giornate_storiche_filtrate = 0.0
 
 if not df_drive_raw.empty:
-    # Cerchiamo le colonne delle giornate e dei mesi nel tuo file Excel
-    col_giornate = [c for c in df_drive_raw.columns if 'Giornat' in c or 'giorn' in c or c.lower() == 'gg']
-    col_mesi = [c for c in df_drive_raw.columns if 'Mese' in c or 'mese' in c]
+    st.sidebar.success("✅ File Drive Connesso correttamente!")
+    
+    # Mostriamo un'anteprima di debug per capire come sono scritte le colonne su Excel
+    with st.expander("🔍 Debug: Vedi cosa c'è dentro il file Excel di Drive"):
+        st.write("Colonne trovate nel tuo Excel:", list(df_drive_raw.columns))
+        st.dataframe(df_drive_raw.head(5))
+    
+    # Cerchiamo le colonne delle giornate e dei mesi nel tuo file Excel (più varianti possibili)
+    col_giornate = [c for c in df_drive_raw.columns if 'giornat' in c.lower() or 'giorn' in c.lower() or c.lower() == 'gg']
+    col_mesi = [c for c in df_drive_raw.columns if 'mese' in c.lower() or 'data' in c.lower() or 'periodo' in c.lower()]
     
     if col_giornate and col_mesi:
         c_giornate = col_giornate[0]
         c_mesi = col_mesi[0]
         
-        # Scorriamo le righe del foglio Excel per filtrare temporaneamente i mesi
         for _, row in df_drive_raw.iterrows():
-            mese_testo = str(row[c_mesi]).strip().lower()
             valore_giornate = pd.to_numeric(row[c_giornate], errors='coerce')
-            
-            if mese_testo in MESI_MAP and not pd.isna(valore_giornate):
-                num_mese = MESI_MAP[mese_testo]
-                # Creiamo una data fittizia (il primo giorno del mese) per fare il controllo di inclusione nel periodo
-                data_mese = datetime(anno_corrente, num_mese, 1).date()
+            if pd.isna(valore_giornate):
+                continue
                 
-                # Se il mese rientra nell'intervallo scelto dall'utente, sommiamo le giornate
+            cella_mese = str(row[c_mesi]).strip().lower()
+            
+            # CASO 1: Nel file Excel c'è una data vera (es. 01/01/2026 o 2026-01-15)
+            try:
+                data_letta = pd.to_datetime(row[c_mesi], errors='coerce').date()
+                if not pd.isna(data_letta):
+                    if start_date <= data_letta <= end_date:
+                        giornate_storiche_filtrate += valore_giornate
+                    continue
+            except:
+                pass
+            
+            # CASO 2: Nel file Excel c'è il nome del mese scritto a testo (es. "gennaio")
+            if cella_mese in MESI_MAP:
+                num_mese = MESI_MAP[cella_mese]
+                data_mese = datetime(anno_corrente, num_mese, 1).date()
                 if start_date <= data_mese <= end_date:
                     giornate_storiche_filtrate += valore_giornate
 
