@@ -195,6 +195,6 @@ if dettaglio_righe_drive:
         text_color = '#2E7D32' if 'Incluso' in val else '#C62828'
         return f'background-color: {color}; color: {text_color}; font-weight: bold;'
         
-    st.table(df_dettaglio_excel.style.applymap(colora_stato, subset=['Stato Filtro']))
+    st.table(df_dettaglio_excel.style.map(colora_stato, subset=['Stato Filtro']))
 else:
     st.warning("⚠️ Non è stato possibile estrarre righe valide dal file di Drive. Verifica che la struttura del foglio contenga i nomi dei mesi e i valori numerici delle giornate.")
