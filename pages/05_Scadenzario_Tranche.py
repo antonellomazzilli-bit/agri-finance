@@ -7,9 +7,14 @@ from datetime import datetime
 
 st.set_page_config(page_title="Scadenzario e Tranche", layout="wide")
 
+# --- CONFIGURAZIONE ARCHITETTURALE ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 REPO = "antonellomazzilli-bit/agri-finance"
 FILE_PATH = "database.csv"
+
+def format_euro(val):
+    """Funzione di formattazione monetaria (Mancava nel vecchio codice)"""
+    return f"€ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def get_github_data():
     url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
@@ -56,7 +61,7 @@ if not df.empty:
         
         st.divider()
         st.subheader(f"Pagamento Tranche per: {riga_selezionata['categoria']}")
-        st.info(f"Dettagli spesa originaria: {riga_selezionata['descrizione']} di complessivi {riga_selezionata['importo']} €")
+        st.info(f"Dettagli spesa originaria: {riga_selezionata['descrizione']} di complessivi {format_euro(riga_selezionata['importo'])}")
         
         with st.form("form_tranche"):
             data_pagamento = st.date_input("Data di questo pagamento", format="DD/MM/YYYY")
@@ -76,34 +81,31 @@ if not df.empty:
                 f"TRANCHE di: {riga_selezionata['descrizione']} | Note: {nota_tranche}",
                 float(importo_tranche),
                 riga_selezionata['coltura_id'],
-                "Saldato" # Questo flusso di cassa è chiuso
+                "Saldato" 
             ]], columns=df.columns)
             
             # 2. Aggiorniamo l'impegno originario
             if importo_residuo <= 0.01:
-                # Se il debito è estinto, cambiamo lo stato in Saldato
                 df.at[idx_originale, 'stato'] = 'Saldato'
                 df.at[idx_originale, 'importo'] = 0.0
                 df.at[idx_originale, 'descrizione'] = f"{riga_selezionata['descrizione']} (Estinto completamente)"
                 msg_commit = f"Estinto debito {riga_selezionata['categoria']}"
             else:
-                # Altrimenti riduciamo l'importo rimanente e aggiorniamo la nota di quanto manca
                 df.at[idx_originale, 'importo'] = importo_residuo
                 df.at[idx_originale, 'descrizione'] = f"{riga_selezionata['descrizione']} | Già versati {importo_tranche}€ il {data_pagamento.strftime('%d/%m/%Y')}"
                 msg_commit = f"Pagata tranche di {importo_tranche}€ per {riga_selezionata['categoria']}"
             
-            # Uniamo la nuova tranche al database
             df_aggiornato = pd.concat([df, nuova_tranche], ignore_index=True)
             
-            # Rimuoviamo colonne provvisorie di visualizzazione prima del salvataggio
             if 'visualizza' in df_aggiornato.columns: df_aggiornato = df_aggiornato.drop(columns=['visualizza'])
             if 'data_it' in df_aggiornato.columns: df_aggiornato = df_aggiornato.drop(columns=['data_it'])
             
             with st.spinner("Salvataggio operazione in corso..."):
                 if update_github_file(df_aggiornato, sha, msg_commit):
                     st.success(f"Tranche di {format_euro(importo_tranche)} registrata con successo! Residuo aggiornato.")
+                    # Usiamo st.rerun() in modo sicuro pulendo lo stato precedente
                     st.rerun()
                 else:
                     st.error("Errore di sincronizzazione con GitHub.")
 else:
-    st.info("Database vuoto.")
+    st.info("Database vuoto o non raggiungibile.")
