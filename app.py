@@ -56,7 +56,7 @@ with tab1:
             tipo = st.selectbox("Tipo", ["Uscita", "Entrata"], key="std_tipo")
             importo = st.number_input("Importo (€)", min_value=0.0, step=0.01, key="std_importo")
         with col2:
-            cat = st.selectbox("Categoria", ["Sementi", "Carburante", "Concimi", "Vendita", "Fatture Fornitori", "Attrezzature"], key="std_cat")
+            cat = st.selectbox("Categoria", ["Sementi", "Carburante", "Concimi", "Vendita", "Fatture Fornitori", "Attrezzature", "Altro"], key="std_cat")
             colt = st.text_input("Coltura", value="Olive", key="std_colt")
             stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato (Non ancora saldato)"])
             desc = st.text_area("Note / Descrizione", key="std_desc")
