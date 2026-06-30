@@ -57,12 +57,10 @@ def parse_descrizione_operaio(descrizione):
             info_tempo = parti[1].strip()
             giornate = float(info_tempo.split(" gg")[0].strip())
             ore = float(info_tempo.split("(")[1].split(" ore")[0].strip()) if "(" in info_tempo else 0.0
-            tipo_paga = parti[2].strip() if len(parti) > 2 else "Paga Intera"
-            note_attivita = parti[3].strip() if len(parti) > 3 else "-"
-            return nome, giornate, ore, tipo_paga, note_attivita
+            return nome, giornate, ore
     except:
         pass
-    return "Specificato da App", 0.0, 0.0, "Generale", str(descrizione)
+    return "Specificato da App", 0.0, 0.0
 
 def is_festivo_italiano(d):
     if d.weekday() in [5, 6]:
@@ -101,7 +99,6 @@ with st.spinner("Generazione prospetti in corso..."):
     df_drive_raw = load_drive_data_raw()
     
     giornate_totali_excel = 0.0
-    costo_totale_excel = 0.0
     righe_commercialista = []
     
     # 1. LETTURA POSIZIONALE EXCEL DRIVE
@@ -125,9 +122,7 @@ with st.spinner("Generazione prospetti in corso..."):
                     mese_excel_testo = str(valori_riga[idx_colonna_mesi]).strip().lower()
                     if MESI_MAP.get(mese_excel_testo) == mese_sel:
                         giornate_totali_excel = pd.to_numeric(get_sicuro(valori_riga, idx_colonna_mesi + 1), errors='coerce')
-                        costo_totale_excel = pd.to_numeric(get_sicuro(valori_riga, idx_colonna_mesi + 3), errors='coerce')
                         giornate_totali_excel = giornate_totali_excel if pd.notna(giornate_totali_excel) else 0.0
-                        costo_totale_excel = costo_totale_excel if pd.notna(costo_totale_excel) else 0.0
                         break
 
     # 2. ALGORITMO SPALMATURA FERIALE
@@ -135,7 +130,6 @@ with st.spinner("Generazione prospetti in corso..."):
         _, num_giorni_mese = calendar.monthrange(anno_sel, mese_sel)
         giorni_utili_feriali = [date(anno_sel, mese_sel, g) for g in range(1, num_giorni_mese + 1) if not is_festivo_italiano(date(anno_sel, mese_sel, g))]
         
-        tariffa_giornaliera = costo_totale_excel / giornate_totali_excel if giornate_totali_excel > 0 else 0.0
         giornate_rimanenti = giornate_totali_excel
         
         for d in giorni_utili_feriali:
@@ -148,9 +142,7 @@ with st.spinner("Generazione prospetti in corso..."):
                 "Dipendente": nome_dipendente,
                 "Giornate": quota_giorno,
                 "Ore": quota_giorno * 8.0,
-                "Tipo": "Ordinaria",
-                "Lordo (€)": tariffa_giornaliera * quota_giorno,
-                "Note": "Spalmatura automatica feriale"
+                "Note": ""  # Campo Note vuoto
             })
 
     # 3. INTEGRAZIONE INSERIMENTI APP (GITHUB)
@@ -159,15 +151,13 @@ with st.spinner("Generazione prospetti in corso..."):
         df_filtrato_app = df_git[(df_git['data_dt'].dt.year == anno_sel) & (df_git['data_dt'].dt.month == mese_sel) & (df_git['categoria'] == 'Manodopera')]
         
         for _, row in df_filtrato_app.iterrows():
-            nome, gg, ore, tipo_paga, note = parse_descrizione_operaio(row['descrizione'])
+            nome, gg, ore = parse_descrizione_operaio(row['descrizione'])
             righe_commercialista.append({
                 "Data": row['data_dt'].strftime('%d/%m/%Y'),
                 "Dipendente": nome,
                 "Giornate": gg,
                 "Ore": ore,
-                "Tipo": tipo_paga,
-                "Lordo (€)": row['importo'],
-                "Note": f"{note} (Da App)"
+                "Note": ""  # Campo Note vuoto
             })
 
     # --- GENERAZIONE OUTPUTS ---
@@ -177,29 +167,26 @@ with st.spinner("Generazione prospetti in corso..."):
         df_export = df_export.sort_values(by="dt_sort").drop(columns=['dt_sort'])
         
         # Anteprima a schermo
-        st.subheader("👀 Anteprima del Prospetto Unificato")
+        st.subheader("👀 Anteprima del Prospetto Pulito")
         
         c_inf1, c_inf2 = st.columns(2)
         c_inf1.info(f"**Azienda:** {nome_azienda}  \n**Periodo:** {nome_mese_stringa} {anno_sel}")
-        c_inf2.info(f"**Totale Giornate Rilevate:** {df_export['Giornate'].sum():,.1f} gg  \n**Competenza Totale:** € {df_export['Lordo (€)'].sum():,.2f}")
+        c_inf2.info(f"**Totale Giornate Rilevate:** {df_export['Giornate'].sum():,.1f} gg")
         
-        df_view = df_export.copy()
-        df_view['Lordo (€)'] = df_view['Lordo (€)'].map(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        st.dataframe(df_view, use_container_width=True)
+        st.dataframe(df_export, use_container_width=True)
         
         st.divider()
-        st.subheader("📥 Scarica il Report nel formato che preferisci")
+        st.subheader("📥 Scarica il Report Aggiornato")
         
         col_btn1, col_btn2 = st.columns(2)
         
-        # --- GENERAZIONE EXCEL CON INTESTAZIONE ---
+        # --- GENERAZIONE EXCEL ---
         with col_btn1:
             buffer_xl = io.BytesIO()
             with pd.ExcelWriter(buffer_xl, engine='openpyxl') as writer:
-                # Creiamo una struttura a blocco aziendale nelle prime righe di Excel
                 df_meta = pd.DataFrame([
                     ["RAGIONE SOCIALE:", nome_azienda],
-                    ["DOCUMENTO:", "Prospetto Presenze e Lavoro Dipendenti"],
+                    ["DOCUMENTO:", "Prospetto Registro Presenze Mensili"],
                     ["PERIODO:", f"{nome_mese_stringa} {anno_sel}"],
                     ["", ""]
                 ])
@@ -214,7 +201,7 @@ with st.spinner("Generazione prospetti in corso..."):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-        # --- GENERAZIONE PDF CON IMPAGINAZIONE AVANZATA ---
+        # --- GENERAZIONE PDF ---
         with col_btn2:
             buffer_pdf = io.BytesIO()
             doc = SimpleDocTemplate(buffer_pdf, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
@@ -228,18 +215,17 @@ with st.spinner("Generazione prospetti in corso..."):
             
             # Intestazione Formale PDF
             story.append(Paragraph(f"<b>{nome_azienda.upper()}</b>", style_title))
-            story.append(Paragraph(f"<b>Documento:</b> Prospetto Riepilogativo Presenze Mensili per Buste Paga", style_meta))
+            story.append(Paragraph(f"<b>Documento:</b> Prospetto Riepilogativo Presenze per Studio Commerciale", style_meta))
             story.append(Paragraph(f"<b>Periodo di Competenza:</b> {nome_mese_stringa} {anno_sel}", style_meta))
             story.append(Spacer(1, 15))
             
-            # Costruzione Tabella PDF
+            # Struttura Tabella PDF (4 Colonne Dati + Note Vuote Più Larga)
             table_data = [[
                 Paragraph("<b>Data</b>", style_th),
                 Paragraph("<b>Dipendente</b>", style_th),
                 Paragraph("<b>GG</b>", style_th),
                 Paragraph("<b>Ore</b>", style_th),
-                Paragraph("<b>Tipo</b>", style_th),
-                Paragraph("<b>Lordo (€)</b>", style_th)
+                Paragraph("<b>Note</b>", style_th)
             ]]
             
             for _, r in df_export.iterrows():
@@ -248,11 +234,11 @@ with st.spinner("Generazione prospetti in corso..."):
                     Paragraph(r['Dipendente'], style_td),
                     Paragraph(f"{r['Giornate']:.1f}", style_td),
                     Paragraph(f"{r['Ore']:.1f}", style_td),
-                    Paragraph(r['Tipo'], style_td),
-                    Paragraph(f"&euro; {r['Lordo (€)']:.2f}", style_td)
+                    Paragraph(r['Note'], style_td)  # Passa stringa vuota
                 ])
                 
-            t = Table(table_data, colWidths=[65, 120, 40, 40, 75, 75])
+            # Larghezze riproporzionate sulle 5 colonne rimaste
+            t = Table(table_data, colWidths=[70, 140, 45, 45, 145])
             t.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1A237E")),
                 ('ALIGN', (0,0), (-1,-1), 'CENTER'),
@@ -266,12 +252,12 @@ with st.spinner("Generazione prospetti in corso..."):
             ]))
             story.append(t)
             
-            # Blocco Firme di Convalida
+            # Blocco Firme
             story.append(Spacer(1, 40))
             data_firme = [
                 [Paragraph("Firma del Responsabile / Datore di Lavoro", style_td), Paragraph("Timbro Aziendale per Accettazione", style_td)]
             ]
-            t_firme = Table(data_firme, colWidths=[250, 250])
+            t_firme = Table(data_firme, colWidths=[220, 220])
             t_firme.setStyle(TableStyle([
                 ('LINEBELOW', (0,0), (0,0), 0.5, colors.HexColor("#999999")),
                 ('LINEBELOW', (1,0), (1,0), 0.5, colors.HexColor("#999999")),
