@@ -73,9 +73,9 @@ def is_festivo_italiano(d):
     return False
 
 st.title("📄 Centro Esportazione Presenze e Cedolini")
-st.markdown("Configura i dettagli anagrafici e genera il report strutturato per lo studio commerciale.")
+st.markdown("Generazione del report strutturato e ripulito per lo studio commerciale delle buste paga.")
 
-# --- SEZIONE INSERIMENTO DATI DINAMICI ---
+# --- SEZIONE INSERIMENTO DATI DINAMICI (PERSONALIZZATI) ---
 st.subheader("🏢 Informazioni Registro ed Anagrafica")
 col_az1, col_az2 = st.columns(2)
 with col_az1:
@@ -90,7 +90,7 @@ col1, col2 = st.columns(2)
 with col1:
     anno_sel = st.selectbox("Anno di riferimento:", [2026, 2025])
 with col2:
-    mese_sel = st.selectbox("Mese da elaborare:", list(MESI_NOMI.keys()), format_func=lambda x: MESI_NOMI[x], index=datetime.now().month - 1)
+    mese_sel = st.selectbox("Mese da evitare/elaborare:", list(MESI_NOMI.keys()), format_func=lambda x: MESI_NOMI[x], index=datetime.now().month - 1)
 
 nome_mese_stringa = MESI_NOMI[mese_sel]
 
@@ -142,10 +142,10 @@ with st.spinner("Generazione prospetti in corso..."):
                 "Dipendente": nome_dipendente,
                 "Giornate": quota_giorno,
                 "Ore": quota_giorno * 8.0,
-                "Note": ""  # Campo Note vuoto
+                "Note": ""  # Rimane vuoto come richiesto
             })
 
-    # 3. INTEGRAZIONE INSERIMENTI APP (GITHUB)
+    # 3. INTEGRAZIONE INSERIMENTI DA SMARTPHONE
     if not df_git.empty:
         df_git['data_dt'] = pd.to_datetime(df_git['data'], errors='coerce')
         df_filtrato_app = df_git[(df_git['data_dt'].dt.year == anno_sel) & (df_git['data_dt'].dt.month == mese_sel) & (df_git['categoria'] == 'Manodopera')]
@@ -157,30 +157,30 @@ with st.spinner("Generazione prospetti in corso..."):
                 "Dipendente": nome,
                 "Giornate": gg,
                 "Ore": ore,
-                "Note": ""  # Campo Note vuoto
+                "Note": ""  # Rimane vuoto come richiesto
             })
 
-    # --- GENERAZIONE OUTPUTS ---
+    # --- GENERAZIONE FILE E INTERFACCIA ---
     if righe_commercialista:
         df_export = pd.DataFrame(righe_commercialista)
         df_export['dt_sort'] = pd.to_datetime(df_export['Data'], format='%d/%m/%Y')
         df_export = df_export.sort_values(by="dt_sort").drop(columns=['dt_sort'])
         
         # Anteprima a schermo
-        st.subheader("👀 Anteprima del Prospetto Pulito")
+        st.subheader("👀 Anteprima del Registro Presenze")
         
         c_inf1, c_inf2 = st.columns(2)
         c_inf1.info(f"**Azienda:** {nome_azienda}  \n**Periodo:** {nome_mese_stringa} {anno_sel}")
-        c_inf2.info(f"**Totale Giornate Rilevate:** {df_export['Giornate'].sum():,.1f} gg")
+        c_inf2.info(f"**Totale Giornate Calcolate:** {df_export['Giornate'].sum():,.1f} gg")
         
         st.dataframe(df_export, use_container_width=True)
         
         st.divider()
-        st.subheader("📥 Scarica il Report Aggiornato")
+        st.subheader("📥 Scarica il Report Pratiche")
         
         col_btn1, col_btn2 = st.columns(2)
         
-        # --- GENERAZIONE EXCEL ---
+        # --- GENERAZIONE EXCEL BLINDATO ---
         with col_btn1:
             buffer_xl = io.BytesIO()
             with pd.ExcelWriter(buffer_xl, engine='openpyxl') as writer:
@@ -201,25 +201,23 @@ with st.spinner("Generazione prospetti in corso..."):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-        # --- GENERAZIONE PDF ---
+        # --- GENERAZIONE PDF IMPAGINATO ---
         with col_btn2:
             buffer_pdf = io.BytesIO()
             doc = SimpleDocTemplate(buffer_pdf, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
             story = []
             
             styles = getSampleStyleSheet()
-            style_title = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, leading=22, textColor=colors.HexColor("#1A237E"), spaceAfter=10)
+            style_title = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=16, leading=20, textColor=colors.HexColor("#1A237E"), spaceAfter=10)
             style_meta = ParagraphStyle('Meta', parent=styles['Normal'], fontSize=11, leading=16, textColor=colors.HexColor("#333333"))
             style_th = ParagraphStyle('TH', parent=styles['Normal'], fontSize=10, fontName="Helvetica-Bold", textColor=colors.white, alignment=1)
             style_td = ParagraphStyle('TD', parent=styles['Normal'], fontSize=9, alignment=1)
             
-            # Intestazione Formale PDF
             story.append(Paragraph(f"<b>{nome_azienda.upper()}</b>", style_title))
             story.append(Paragraph(f"<b>Documento:</b> Prospetto Riepilogativo Presenze per Studio Commerciale", style_meta))
             story.append(Paragraph(f"<b>Periodo di Competenza:</b> {nome_mese_stringa} {anno_sel}", style_meta))
             story.append(Spacer(1, 15))
             
-            # Struttura Tabella PDF (4 Colonne Dati + Note Vuote Più Larga)
             table_data = [[
                 Paragraph("<b>Data</b>", style_th),
                 Paragraph("<b>Dipendente</b>", style_th),
@@ -234,11 +232,10 @@ with st.spinner("Generazione prospetti in corso..."):
                     Paragraph(r['Dipendente'], style_td),
                     Paragraph(f"{r['Giornate']:.1f}", style_td),
                     Paragraph(f"{r['Ore']:.1f}", style_td),
-                    Paragraph(r['Note'], style_td)  # Passa stringa vuota
+                    Paragraph(r['Note'], style_td)
                 ])
                 
-            # Larghezze riproporzionate sulle 5 colonne rimaste
-            t = Table(table_data, colWidths=[70, 140, 45, 45, 145])
+            t = Table(table_data, colWidths=[70, 150, 45, 45, 130])
             t.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1A237E")),
                 ('ALIGN', (0,0), (-1,-1), 'CENTER'),
@@ -252,7 +249,6 @@ with st.spinner("Generazione prospetti in corso..."):
             ]))
             story.append(t)
             
-            # Blocco Firme
             story.append(Spacer(1, 40))
             data_firme = [
                 [Paragraph("Firma del Responsabile / Datore di Lavoro", style_td), Paragraph("Timbro Aziendale per Accettazione", style_td)]
