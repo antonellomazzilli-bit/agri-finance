@@ -6,6 +6,12 @@ import io
 import calendar
 from datetime import datetime, date
 
+# Per l'esportazione in PDF con layout professionale
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+
 st.set_page_config(page_title="Export Commercialista", layout="wide")
 
 # --- CONFIGURAZIONE ARCHITETTURALE ---
@@ -43,59 +49,54 @@ def load_drive_data_raw():
         pass
     return pd.DataFrame()
 
-def estrai_info_operaio(descrizione):
+def parse_descrizione_operaio(descrizione):
     try:
         if "|" in str(descrizione):
             parti = descrizione.split("|")
             nome = parti[0].strip()
-            giornate = float(parti[1].strip().split(" ")[0])
-            return nome, giornate
+            info_tempo = parti[1].strip()
+            giornate = float(info_tempo.split(" gg")[0].strip())
+            ore = float(info_tempo.split("(")[1].split(" ore")[0].strip()) if "(" in info_tempo else 0.0
+            tipo_paga = parti[2].strip() if len(parti) > 2 else "Paga Intera"
+            note_attivita = parti[3].strip() if len(parti) > 3 else "-"
+            return nome, giornate, ore, tipo_paga, note_attivita
     except:
         pass
-    return "Non specificato", 0.0
+    return "Specificato da App", 0.0, 0.0, "Generale", str(descrizione)
 
 def is_festivo_italiano(d):
-    """Rileva se una data corrisponde a un fine settimana o a una festività nazionale italiana."""
-    if d.weekday() in [5, 6]:  # Sabato o Domenica
+    if d.weekday() in [5, 6]:
         return True
-    
-    # Festività nazionali fisse italiane
-    festivita_fisse = [
-        (1, 1),   # Capodanno
-        (1, 6),   # Epifania
-        (4, 25),  # Liberazione
-        (5, 1),   # Festa del Lavoro
-        (6, 2),   # Festa della Repubblica
-        (8, 15),  # Ferragosto
-        (11, 1),  # Ognissanti
-        (12, 8),  # Immacolata
-        (12, 25), # Natale
-        (12, 26)  # Santo Stefano
-    ]
+    festivita_fisse = [(1, 1), (1, 6), (4, 25), (5, 1), (6, 2), (8, 15), (11, 1), (12, 8), (12, 25), (12, 26)]
     if (d.month, d.day) in festivita_fisse:
         return True
-        
-    # Lunedì dell'Angelo (Pasquetta) temporanea per gli anni di riferimento
-    if d.year == 2025 and d.month == 4 and d.day == 21:
+    if d.year == 2026 and d.month == 4 and d.day == 6:  # Pasquetta 2026
         return True
-    if d.year == 2026 and d.month == 4 and d.day == 6:
-        return True
-        
     return False
 
-st.title("📄 Esportazione Registro Presenze per Buste Paga")
-st.markdown("Genera un file Excel mensile unificato con la spalmatura automatica delle giornate storiche sui giorni feriali utili.")
+st.title("📄 Centro Esportazione Presenze e Cedolini")
+st.markdown("Configura i dettagli anagrafici e genera il report strutturato per lo studio commerciale.")
 
-# --- INTERFACCIA DI SELEZIONE ---
+# --- SEZIONE INSERIMENTO DATI DINAMICI ---
+st.subheader("🏢 Informazioni Registro ed Anagrafica")
+col_az1, col_az2 = st.columns(2)
+with col_az1:
+    nome_azienda = st.text_input("Ragione Sociale Azienda / Ente:", value="Ente di Formazione Professionale")
+with col_az2:
+    nome_dipendente = st.text_input("Nome e Cognome Dipendente (Per Storico Excel):", value="Dipendente Standard")
+
+st.divider()
+
+# --- FILTRI TEMPORALI ---
 col1, col2 = st.columns(2)
 with col1:
-    anno_sel = st.selectbox("Seleziona l'Anno di riferimento:", [2026, 2025])
+    anno_sel = st.selectbox("Anno di riferimento:", [2026, 2025])
 with col2:
-    mese_sel = st.selectbox("Seleziona il Mese da esportare:", list(MESI_NOMI.keys()), format_func=lambda x: MESI_NOMI[x], index=datetime.now().month - 1)
+    mese_sel = st.selectbox("Mese da elaborare:", list(MESI_NOMI.keys()), format_func=lambda x: MESI_NOMI[x], index=datetime.now().month - 1)
 
 nome_mese_stringa = MESI_NOMI[mese_sel]
 
-with st.spinner(f"Estrazione, pianificazione e spalmatura giorni per {nome_mese_stringa}..."):
+with st.spinner("Generazione prospetti in corso..."):
     df_git = load_github_data()
     df_drive_raw = load_drive_data_raw()
     
@@ -103,12 +104,11 @@ with st.spinner(f"Estrazione, pianificazione e spalmatura giorni per {nome_mese_
     costo_totale_excel = 0.0
     righe_commercialista = []
     
-    # --- PARTE 1: ESTRAZIONE TOTALI DA RIEPILOGO DRIVE (LIST-BASED) ---
+    # 1. LETTURA POSIZIONALE EXCEL DRIVE
     if not df_drive_raw.empty:
         idx_colonna_mesi = None
         for col_idx in range(df_drive_raw.shape[1]):
-            colonna_dati = df_drive_raw.iloc[:, col_idx]
-            if colonna_dati.astype(str).str.lower().str.strip().isin(MESI_MAP.keys()).any():
+            if df_drive_raw[col_idx].astype(str).str.lower().str.strip().isin(MESI_MAP.keys()).any():
                 idx_colonna_mesi = col_idx
                 break
                 
@@ -123,112 +123,170 @@ with st.spinner(f"Estrazione, pianificazione e spalmatura giorni per {nome_mese_
                 valori_riga = row.tolist()
                 if idx_colonna_mesi < len(valori_riga):
                     mese_excel_testo = str(valori_riga[idx_colonna_mesi]).strip().lower()
-                    
-                    if m_num := MESI_MAP.get(mese_excel_testo):
-                        if m_num == list(MESI_MAP.values())[mese_sel - 1]:
-                            # Estraiamo giornate totali e costo totale del lavoro dal riepilogo
-                            giornate_raw = get_sicuro(valori_riga, idx_colonna_mesi + 1, default=0.0)
-                            costo_raw = get_sicuro(valori_riga, idx_colonna_mesi + 3, default=0.0)
-                            
-                            giornate_totali_excel = pd.to_numeric(giornate_raw, errors='coerce')
-                            costo_totale_excel = pd.to_numeric(costo_raw, errors='coerce')
-                            
-                            giornate_totali_excel = giornate_totali_excel if pd.notna(giornate_totali_excel) else 0.0
-                            costo_totale_excel = costo_totale_excel if pd.notna(costo_totale_excel) else 0.0
-                            break
+                    if MESI_MAP.get(mese_excel_testo) == mese_sel:
+                        giornate_totali_excel = pd.to_numeric(get_sicuro(valori_riga, idx_colonna_mesi + 1), errors='coerce')
+                        costo_totale_excel = pd.to_numeric(get_sicuro(valori_riga, idx_colonna_mesi + 3), errors='coerce')
+                        giornate_totali_excel = giornate_totali_excel if pd.notna(giornate_totali_excel) else 0.0
+                        costo_totale_excel = costo_totale_excel if pd.notna(costo_totale_excel) else 0.0
+                        break
 
-    # --- PARTE 2: ALGORITMO DI SPALMATURA SUI GIORNI FERIALI ---
+    # 2. ALGORITMO SPALMATURA FERIALE
     if giornate_totali_excel > 0:
-        # Generiamo tutti i giorni utili del mese escludendo sabati, domeniche e feste
         _, num_giorni_mese = calendar.monthrange(anno_sel, mese_sel)
-        giorni_utili_feriali = []
-        for g in range(1, num_giorni_mese + 1):
-            data_corrente = date(anno_sel, mese_sel, g)
-            if not is_festivo_italiano(data_corrente):
-                giorni_utili_feriali.append(data_corrente)
-                
-        # Calcoliamo la paga giornaliera teorica per ripartirla correttamente
+        giorni_utili_feriali = [date(anno_sel, mese_sel, g) for g in range(1, num_giorni_mese + 1) if not is_festivo_italiano(date(anno_sel, mese_sel, g))]
+        
         tariffa_giornaliera = costo_totale_excel / giornate_totali_excel if giornate_totali_excel > 0 else 0.0
         giornate_rimanenti = giornate_totali_excel
         
-        # Distribuiamo il monte giornate sui feriali utili
         for d in giorni_utili_feriali:
-            if giornate_rimanenti <= 0:
-                break
+            if giornate_rimanenti <= 0: break
             quota_giorno = min(1.0, giornate_rimanenti)
             giornate_rimanenti -= quota_giorno
             
-            ore_effettive = quota_giorno * 8.0
-            costo_ripartito = tariffa_giornaliera * quota_giorno
-            
             righe_commercialista.append({
-                "Data Lavoro": d.strftime('%d/%m/%Y'),
-                "Nome e Cognome Dipendente": "Operaio (Da Registro Excel)",
-                "Giornate Lavorate": quota_giorno,
-                "Ore Effettive": ore_effettive,
-                "Tipologia Compenso": "Paga Ordinaria",
-                "Importo Corrisposto (€)": costo_ripartito,
-                "Stato Pagamento": "Saldato (Archivio)",
-                "Note / Attività Svolta": f"Spalmatura automatica feriale - Totale mensile Excel: {giornate_totali_excel} gg"
+                "Data": d.strftime('%d/%m/%Y'),
+                "Dipendente": nome_dipendente,
+                "Giornate": quota_giorno,
+                "Ore": quota_giorno * 8.0,
+                "Tipo": "Ordinaria",
+                "Lordo (€)": tariffa_giornaliera * quota_giorno,
+                "Note": "Spalmatura automatica feriale"
             })
 
-    # --- PARTE 3: ACCODA LE GIORNATE INSERITE IN TEMPO REALE DA SMARTPHONE ---
+    # 3. INTEGRAZIONE INSERIMENTI APP (GITHUB)
     if not df_git.empty:
         df_git['data_dt'] = pd.to_datetime(df_git['data'], errors='coerce')
-        df_git = df_git.dropna(subset=['data_dt'])
-        
-        df_filtrato_app = df_git[
-            (df_git['data_dt'].dt.year == anno_sel) & 
-            (df_git['data_dt'].dt.month == mese_sel) & 
-            (df_git['categoria'] == 'Manodopera')
-        ]
+        df_filtrato_app = df_git[(df_git['data_dt'].dt.year == anno_sel) & (df_git['data_dt'].dt.month == mese_sel) & (df_git['categoria'] == 'Manodopera')]
         
         for _, row in df_filtrato_app.iterrows():
             nome, gg, ore, tipo_paga, note = parse_descrizione_operaio(row['descrizione'])
             righe_commercialista.append({
-                "Data Lavoro": row['data_dt'].strftime('%d/%m/%Y'),
-                "Nome e Cognome Dipendente": nome,
-                "Giornate Lavorate": gg,
-                "Ore Effettive": ore,
-                "Tipologia Compenso": tipo_paga,
-                "Importo Corrisposto (€)": row['importo'],
-                "Stato Pagamento": row['stato'],
-                "Note / Attività Svolta": f"{note} (Da App - Coltura: {row['coltura_id']})"
+                "Data": row['data_dt'].strftime('%d/%m/%Y'),
+                "Dipendente": nome,
+                "Giornate": gg,
+                "Ore": ore,
+                "Tipo": tipo_paga,
+                "Lordo (€)": row['importo'],
+                "Note": f"{note} (Da App)"
             })
 
-    # --- GENERAZIONE INTERFACCIA E FILE EXCEL ---
+    # --- GENERAZIONE OUTPUTS ---
     if righe_commercialista:
         df_export = pd.DataFrame(righe_commercialista)
+        df_export['dt_sort'] = pd.to_datetime(df_export['Data'], format='%d/%m/%Y')
+        df_export = df_export.sort_values(by="dt_sort").drop(columns=['dt_sort'])
         
-        # Ordiniamo cronologicamente per data lavoro
-        df_export['data_ordinamento'] = pd.to_datetime(df_export['Data Lavoro'], format='%d/%m/%Y')
-        df_export = df_export.sort_values(by="data_ordinamento").drop(columns=['data_ordinamento'])
+        # Anteprima a schermo
+        st.subheader("👀 Anteprima del Prospetto Unificato")
         
-        st.divider()
-        st.subheader(f"👀 Anteprima Prospetto Presenze: {nome_mese_stringa} {anno_sel}")
-        st.write(f"Rilevate da Excel: **{giornate_totali_excel:,.1f}** giornate complessive spalmatede nei giorni lavorativi utili.")
+        c_inf1, c_inf2 = st.columns(2)
+        c_inf1.info(f"**Azienda:** {nome_azienda}  \n**Periodo:** {nome_mese_stringa} {anno_sel}")
+        c_inf2.info(f"**Totale Giornate Rilevate:** {df_export['Giornate'].sum():,.1f} gg  \n**Competenza Totale:** € {df_export['Lordo (€)'].sum():,.2f}")
         
-        # Visualizzazione formattata pulita delle valute
-        df_visualizzazione = df_export.copy()
-        df_visualizzazione['Importo Corrisposto (€)'] = df_visualizzazione['Importo Corrisposto (€)'].apply(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if isinstance(x, (int, float)) else x)
-        df_visualizzazione['Giornate Lavorate'] = df_visualizzazione['Giornate Lavorate'].apply(lambda x: f"{x:,.1f}".replace(".", ",") if isinstance(x, (int, float)) else x)
-        df_visualizzazione['Ore Effettive'] = df_visualizzazione['Ore Effettive'].apply(lambda x: f"{x:,.1f}".replace(".", ",") if isinstance(x, (int, float)) else x)
-        
-        st.dataframe(df_visualizzazione, use_container_width=True)
-        
-        # Generazione file binario Excel
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-            df_export.to_excel(writer, index=False, sheet_name="Presenze_Commercialista")
-        buffer.seek(0)
+        df_view = df_export.copy()
+        df_view['Lordo (€)'] = df_view['Lordo (€)'].map(lambda x: f"€ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        st.dataframe(df_view, use_container_width=True)
         
         st.divider()
-        st.download_button(
-            label="📥 Scarica il file Excel per il Commercialista",
-            data=buffer,
-            file_name=f"Presenze_Conformi_{nome_mese_stringa}_{anno_sel}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        st.success("File generato con successo. Le giornate storiche sono state ripartite escludendo festivi e fine settimana.")
+        st.subheader("📥 Scarica il Report nel formato che preferisci")
+        
+        col_btn1, col_btn2 = st.columns(2)
+        
+        # --- GENERAZIONE EXCEL CON INTESTAZIONE ---
+        with col_btn1:
+            buffer_xl = io.BytesIO()
+            with pd.ExcelWriter(buffer_xl, engine='openpyxl') as writer:
+                # Creiamo una struttura a blocco aziendale nelle prime righe di Excel
+                df_meta = pd.DataFrame([
+                    ["RAGIONE SOCIALE:", nome_azienda],
+                    ["DOCUMENTO:", "Prospetto Presenze e Lavoro Dipendenti"],
+                    ["PERIODO:", f"{nome_mese_stringa} {anno_sel}"],
+                    ["", ""]
+                ])
+                df_meta.to_excel(writer, index=False, header=False, sheet_name="Presenze")
+                df_export.to_excel(writer, index=False, startrow=5, sheet_name="Presenze")
+            buffer_xl.seek(0)
+            
+            st.download_button(
+                label="🟢 Scarica Foglio Excel (.xlsx)",
+                data=buffer_xl,
+                file_name=f"Presenze_{nome_mese_stringa}_{anno_sel}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            
+        # --- GENERAZIONE PDF CON IMPAGINAZIONE AVANZATA ---
+        with col_btn2:
+            buffer_pdf = io.BytesIO()
+            doc = SimpleDocTemplate(buffer_pdf, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+            story = []
+            
+            styles = getSampleStyleSheet()
+            style_title = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, leading=22, textColor=colors.HexColor("#1A237E"), spaceAfter=10)
+            style_meta = ParagraphStyle('Meta', parent=styles['Normal'], fontSize=11, leading=16, textColor=colors.HexColor("#333333"))
+            style_th = ParagraphStyle('TH', parent=styles['Normal'], fontSize=10, fontName="Helvetica-Bold", textColor=colors.white, alignment=1)
+            style_td = ParagraphStyle('TD', parent=styles['Normal'], fontSize=9, alignment=1)
+            
+            # Intestazione Formale PDF
+            story.append(Paragraph(f"<b>{nome_azienda.upper()}</b>", style_title))
+            story.append(Paragraph(f"<b>Documento:</b> Prospetto Riepilogativo Presenze Mensili per Buste Paga", style_meta))
+            story.append(Paragraph(f"<b>Periodo di Competenza:</b> {nome_mese_stringa} {anno_sel}", style_meta))
+            story.append(Spacer(1, 15))
+            
+            # Costruzione Tabella PDF
+            table_data = [[
+                Paragraph("<b>Data</b>", style_th),
+                Paragraph("<b>Dipendente</b>", style_th),
+                Paragraph("<b>GG</b>", style_th),
+                Paragraph("<b>Ore</b>", style_th),
+                Paragraph("<b>Tipo</b>", style_th),
+                Paragraph("<b>Lordo (€)</b>", style_th)
+            ]]
+            
+            for _, r in df_export.iterrows():
+                table_data.append([
+                    Paragraph(r['Data'], style_td),
+                    Paragraph(r['Dipendente'], style_td),
+                    Paragraph(f"{r['Giornate']:.1f}", style_td),
+                    Paragraph(f"{r['Ore']:.1f}", style_td),
+                    Paragraph(r['Tipo'], style_td),
+                    Paragraph(f"&euro; {r['Lordo (€)']:.2f}", style_td)
+                ])
+                
+            t = Table(table_data, colWidths=[65, 120, 40, 40, 75, 75])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1A237E")),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('BOTTOMPADDING', (0,0), (-1,0), 6),
+                ('TOPPADDING', (0,0), (-1,0), 6),
+                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor("#F5F5F5"), colors.white]),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#DDDDDD")),
+                ('TOPPADDING', (0,1), (-1,-1), 5),
+                ('BOTTOMPADDING', (0,1), (-1,-1), 5),
+            ]))
+            story.append(t)
+            
+            # Blocco Firme di Convalida
+            story.append(Spacer(1, 40))
+            data_firme = [
+                [Paragraph("Firma del Responsabile / Datore di Lavoro", style_td), Paragraph("Timbro Aziendale per Accettazione", style_td)]
+            ]
+            t_firme = Table(data_firme, colWidths=[250, 250])
+            t_firme.setStyle(TableStyle([
+                ('LINEBELOW', (0,0), (0,0), 0.5, colors.HexColor("#999999")),
+                ('LINEBELOW', (1,0), (1,0), 0.5, colors.HexColor("#999999")),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 40),
+            ]))
+            story.append(t_firme)
+            
+            doc.build(story)
+            buffer_pdf.seek(0)
+            
+            st.download_button(
+                label="🔴 Scarica Documento PDF (.pdf)",
+                data=buffer_pdf,
+                file_name=f"Presenze_{nome_mese_stringa}_{anno_sel}.pdf",
+                mime="application/pdf"
+            )
     else:
-        st.warning(f"Nessuna giornata di lavoro trovata per {nome_mese_stringa} {anno_sel} nel Riepilogo di Drive o sull'applicazione.")
+        st.warning(f"Nessun dato disponibile per il mese di {nome_mese_stringa} {anno_sel}.")
