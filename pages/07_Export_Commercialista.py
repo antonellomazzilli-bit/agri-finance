@@ -79,9 +79,9 @@ st.markdown("Configura i dettagli anagrafici e genera il report strutturato per 
 st.subheader("🏢 Informazioni Registro ed Anagrafica")
 col_az1, col_az2 = st.columns(2)
 with col_az1:
-    nome_azienda = st.text_input("Ragione Sociale Azienda / Ente:", value="Ente di Formazione Professionale")
+    nome_azienda = st.text_input("Ragione Sociale Azienda / Ente:", value="L'ORO DI SAN VITTORE di Mazzilli Antonio")
 with col_az2:
-    nome_dipendente = st.text_input("Nome e Cognome Dipendente (Per Storico Excel):", value="Dipendente Standard")
+    nome_dipendente = st.text_input("Nome e Cognome Dipendente (Per Storico Excel):", value="Iannone Felice")
 
 st.divider()
 
