@@ -11,3 +11,4 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato
 2026-06-25,Uscita,Altro,TRANCHE di: gestione Contabile  | Note: Bonifico da cc ingdirect,500.02,Olive,Saldato
 2026-06-29,Uscita,Altro,Ricarica scheda per irrigazione,500.0,Olive,Saldato
 2026-07-03,Uscita,Manodopera,Iannone Felice | 10.0 gg (91.45 ore) | Paga Intera | Mese di Giugno 2026,734.0,Olive,Saldato
+2026-07-03,Uscita,Sementi,,0.0,Olive,Saldato
