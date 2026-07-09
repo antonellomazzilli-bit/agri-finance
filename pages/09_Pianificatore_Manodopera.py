@@ -3,7 +3,9 @@ import pandas as pd
 import requests
 import base64
 import io
-from datetime import datetime
+import calendar
+import math
+from datetime import datetime, date
 
 st.set_page_config(page_title="Pianificatore Manodopera", layout="wide")
 
@@ -13,9 +15,7 @@ REPO = "antonellomazzilli-bit/agri-finance"
 FILE_PATH = "database.csv"
 
 # Pesi olivicoli standard (proporzione del lavoro nei vari mesi)
-# Gen, Feb(Potatura), Mar(Potatura), Apr, Mag, Giu, Lug, Ago, Set, Ott(Inizio Raccolta), Nov(Raccolta), Dic
 PESI_OLIVO = [5, 12, 12, 6, 6, 5, 4, 4, 6, 15, 20, 5]
-
 MESI = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", 
         "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
 
@@ -29,7 +29,6 @@ def load_github_data():
     return pd.DataFrame()
 
 def estrai_giornate_operaio(descrizione, nome_target):
-    """Cerca il nome esatto nella stringa e ne estrae le giornate."""
     try:
         if "|" in str(descrizione) and nome_target.lower() in str(descrizione).lower():
             parti = descrizione.split("|")
@@ -39,8 +38,30 @@ def estrai_giornate_operaio(descrizione, nome_target):
         pass
     return 0.0
 
+def is_festivo_italiano(d):
+    """Rileva fine settimana e festività fisse/mobili italiane."""
+    if d.weekday() in [5, 6]: # Sabato e Domenica
+        return True
+    festivita_fisse = [(1, 1), (1, 6), (4, 25), (5, 1), (6, 2), (8, 15), (11, 1), (12, 8), (12, 25), (12, 26)]
+    if (d.month, d.day) in festivita_fisse:
+        return True
+    # Pasquette per gli anni di riferimento
+    if d.year == 2025 and d.month == 4 and d.day == 21: return True
+    if d.year == 2026 and d.month == 4 and d.day == 6: return True
+    if d.year == 2027 and d.month == 3 and d.day == 29: return True
+    return False
+
+def calcola_giorni_lavorativi(anno, mese):
+    """Conta i giorni fertili del mese escludendo festivi."""
+    _, num_giorni = calendar.monthrange(anno, mese)
+    lavorativi = 0
+    for g in range(1, num_giorni + 1):
+        if not is_festivo_italiano(date(anno, mese, g)):
+            lavorativi += 1
+    return lavorativi
+
 st.title("📅 Pianificatore Annuale Manodopera")
-st.markdown("Imposta il tetto massimo di giornate e distribuiscile. Il sistema calcolerà le quote future adattandosi dinamicamente ai tuoi inserimenti.")
+st.markdown("Imposta il tetto e distribuisci. Il sistema ripartirà i giorni interi rispettando la capienza massima feriale di ogni mese.")
 
 # --- IMPOSTAZIONI ---
 col_set1, col_set2, col_set3 = st.columns(3)
@@ -49,14 +70,12 @@ with col_set1:
 with col_set2:
     dipendente_target = st.text_input("Dipendente sotto contratto:", value="Iannone Felice")
 with col_set3:
-    tetto_giornate = st.number_input("Target Giornate Annuali:", min_value=1.0, value=160.0, step=1.0)
+    tetto_giornate = st.number_input("Target Giornate Annuali:", min_value=1, value=160, step=1)
 
 st.divider()
 
-with st.spinner("Sincronizzazione col database per leggere i consuntivi reali..."):
+with st.spinner("Sincronizzazione calendario e lettura database..."):
     df_git = load_github_data()
-    
-    # Inizializziamo l'array dei giorni effettivi (già fatti e registrati)
     giornate_effettive = [0.0] * 12
     
     if not df_git.empty:
@@ -69,79 +88,101 @@ with st.spinner("Sincronizzazione col database per leggere i consuntivi reali...
                 mese_idx = row['data_dt'].month - 1
                 giornate_effettive[mese_idx] += gg_lavorate
 
-    # --- LOGICA DI RICALCOLO A CASCATA ---
-    # Usiamo Session State per memorizzare le "forzature manuali" dell'utente sulla tabella
     if 'pianificazioni_manuali' not in st.session_state or st.session_state.get('anno_plan') != anno_sel:
         st.session_state.pianificazioni_manuali = {i: None for i in range(12)}
         st.session_state.anno_plan = anno_sel
 
-    # Calcolo base
-    giornate_pianificate = [0.0] * 12
-    totale_consumato_finora = sum(giornate_effettive)
-    giornate_da_spalmare = tetto_giornate - totale_consumato_finora
-
-    # Assegnazione
+    # --- CALCOLO CAPIENZE MENSILI ---
+    capacita_libera = [0] * 12
+    giorni_max_calendario = [0] * 12
     for i in range(12):
-        # Se il mese è nel passato o ha già giornate effettive, la pianificazione futura è 0
+        lavorativi = calcola_giorni_lavorativi(anno_sel, i + 1)
+        giorni_max_calendario[i] = lavorativi
+        capacita_libera[i] = max(0, lavorativi - int(math.ceil(giornate_effettive[i])))
+
+    giornate_pianificate = [0] * 12
+    totale_consumato_finora = sum(giornate_effettive)
+    giornate_da_spalmare = int(round(tetto_giornate - totale_consumato_finora))
+
+    mesi_da_calcolare = []
+
+    # 1. Assegnazione Consuntivi e Forzature
+    for i in range(12):
         if giornate_effettive[i] > 0:
-            giornate_pianificate[i] = 0.0
+            giornate_pianificate[i] = 0
         else:
-            # Se l'utente ha forzato un valore a mano per questo mese, usiamo quello
             if st.session_state.pianificazioni_manuali[i] is not None:
-                valore_forzato = st.session_state.pianificazioni_manuali[i]
+                valore_forzato = int(st.session_state.pianificazioni_manuali[i])
+                # Muro di gomma: non permette di forzare più giorni di quanti ne ha il calendario
+                valore_forzato = min(valore_forzato, capacita_libera[i])
+                
                 giornate_pianificate[i] = valore_forzato
                 giornate_da_spalmare -= valore_forzato
+                capacita_libera[i] -= valore_forzato
             else:
-                # Altrimenti lasciamo il calcolo in sospeso per la spalmatura proporzionale
-                giornate_pianificate[i] = -1.0 
+                giornate_pianificate[i] = -1
+                mesi_da_calcolare.append(i)
 
-    # Ripartizione proporzionale del "Resto" sui mesi non toccati
-    mesi_da_calcolare = [i for i, val in enumerate(giornate_pianificate) if val == -1.0]
-    somma_pesi_residui = sum([PESI_OLIVO[i] for i in mesi_da_calcolare])
-
+    # 2. Inizializziamo a zero i mesi da calcolare
     for i in mesi_da_calcolare:
-        if somma_pesi_residui > 0 and giornate_da_spalmare > 0:
-            quota = (PESI_OLIVO[i] / somma_pesi_residui) * giornate_da_spalmare
-            giornate_pianificate[i] = round(quota, 1)
-        else:
-            giornate_pianificate[i] = 0.0
+        giornate_pianificate[i] = 0
 
-    # --- CREAZIONE DEL DATAFRAME INTERATTIVO ---
+    # 3. Spalmatura Algoritmica per Numeri Interi
+    # Assegna 1 giorno alla volta al mese con il rapporto più basso rispetto al suo "peso",
+    # fermandosi immediatamente se il mese raggiunge la sua capienza massima lavorativa.
+    while giornate_da_spalmare > 0 and sum([capacita_libera[i] for i in mesi_da_calcolare]) > 0:
+        best_month = None
+        lowest_ratio = float('inf')
+        
+        for i in mesi_da_calcolare:
+            if capacita_libera[i] > 0:
+                peso = PESI_OLIVO[i] if PESI_OLIVO[i] > 0 else 0.1
+                ratio = giornate_pianificate[i] / peso
+                if ratio < lowest_ratio:
+                    lowest_ratio = ratio
+                    best_month = i
+                    
+        if best_month is not None:
+            giornate_pianificate[best_month] += 1
+            capacita_libera[best_month] -= 1
+            giornate_da_spalmare -= 1
+        else:
+            break
+
+    # --- TABELLA INTERATTIVA ---
     dati_tabella = []
     for i in range(12):
         dati_tabella.append({
             "Mese": MESI[i],
+            "Capienza Calendario": giorni_max_calendario[i],
             "Consuntivate (Da DB)": giornate_effettive[i],
-            "Pianificate (Modificabili)": giornate_pianificate[i]
+            "Pianificate (Modificabili)": int(giornate_pianificate[i])
         })
         
     df_plan = pd.DataFrame(dati_tabella)
     df_plan["Totale Mese"] = df_plan["Consuntivate (Da DB)"] + df_plan["Pianificate (Modificabili)"]
 
-    st.subheader("⚙️ Regolazione Dinamica")
-    st.write("Modifica la colonna **'Pianificate'**. I mesi successivi si ricalcoleranno in automatico per farti raggiungere sempre l'obiettivo.")
+    st.subheader("⚙️ Regolazione Dinamica a Numeri Interi")
     
-    # Data Editor
     df_modificato = st.data_editor(
         df_plan,
-        disabled=["Mese", "Consuntivate (Da DB)", "Totale Mese"],
+        disabled=["Mese", "Capienza Calendario", "Consuntivate (Da DB)", "Totale Mese"],
         hide_index=True,
         use_container_width=True,
         column_config={
+            "Capienza Calendario": st.column_config.NumberColumn(format="%d gg lavorativi"),
             "Consuntivate (Da DB)": st.column_config.NumberColumn(format="%.1f gg"),
-            "Pianificate (Modificabili)": st.column_config.NumberColumn(format="%.1f gg", min_value=0.0),
+            "Pianificate (Modificabili)": st.column_config.NumberColumn(format="%d gg", min_value=0, step=1),
             "Totale Mese": st.column_config.NumberColumn(format="%.1f gg")
         }
     )
     
-    # Intercettiamo le modifiche fatte dall'utente
     cambiamenti = False
     for i in range(12):
-        vecchio_valore = giornate_pianificate[i]
-        nuovo_valore = df_modificato.at[i, "Pianificate (Modificabili)"]
+        vecchio_valore = int(giornate_pianificate[i])
+        nuovo_valore = int(df_modificato.at[i, "Pianificate (Modificabili)"])
         
-        # Se l'utente ha modificato la cella (con una tolleranza di arrotondamento)
-        if abs(vecchio_valore - nuovo_valore) > 0.01:
+        if vecchio_valore != nuovo_valore:
             st.session_state.pianificazioni_manuali[i] = nuovo_valore
             cambiamenti = True
             
@@ -158,9 +199,12 @@ with st.spinner("Sincronizzazione col database per leggere i consuntivi reali...
         if totale_generale > tetto_giornate:
             st.error(f"⚠️ ATTENZIONE: Stai sforando il tetto! Totale calcolato: **{totale_generale:,.1f} gg** (Massimo consentito: {tetto_giornate})")
         elif totale_generale < tetto_giornate:
-            st.warning(f"⚖️ Tetto non raggiunto. Totale calcolato: **{totale_generale:,.1f} gg** su {tetto_giornate}.")
+            if giornate_da_spalmare > 0:
+                st.warning(f"⚖️ Tetto non raggiunto ({totale_generale:,.1f} gg). **Il calendario feriale è completamente saturo!** Non ci sono più giorni utili nell'anno per spalmare il resto.")
+            else:
+                st.warning(f"⚖️ Tetto non raggiunto. Totale calcolato: **{totale_generale:,.1f} gg** su {tetto_giornate}.")
         else:
-            st.success(f"✅ Perfetto! L'allocazione raggiunge esattamente le **{tetto_giornate} giornate** contrattuali.")
+            st.success(f"✅ Perfetto! L'allocazione intera raggiunge esattamente le **{tetto_giornate} giornate** contrattuali.")
             
     with c_res2:
         if st.button("🔄 Ripristina Curve di Default"):
