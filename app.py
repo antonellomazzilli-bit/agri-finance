@@ -75,7 +75,20 @@ with tab2:
         c1, c2 = st.columns(2)
         with c1:
             op_data = st.date_input("Data Registrazione", format="DD/MM/YYYY", key="op_data")
-            op_nome = st.text_input("Nome Operaio", placeholder="es. Mario Rossi")
+            
+            # --- RUBRICA A TENDINA DIPENDENTI ---
+            ANAGRAFICA_DIPENDENTI = ["Iannone Felice", "--- Inserisci Altro Dipendente ---"]
+            scelta_dip = st.selectbox("Seleziona Dipendente:", ANAGRAFICA_DIPENDENTI)
+
+            if scelta_dip == "--- Inserisci Altro Dipendente ---":
+                op_nome = st.text_input("Scrivi Nome e Cognome esatti:")
+            else:
+                op_nome = scelta_dip
+
+            # Pulizia automatica spazi vuoti
+            op_nome = op_nome.strip() if op_nome else "Iannone Felice"
+            # ------------------------------------
+            
             op_giornate = st.number_input("Giornate lavorate", min_value=0.0, step=0.5, value=1.0)
             op_ore = st.number_input("Ore Effettive", min_value=0.0, step=1.0, value=8.0)
         with c2:
@@ -154,7 +167,6 @@ if not df_view.empty:
     df_display = df_filtrato.copy()
     df_display['importo'] = df_display['importo'].apply(format_euro)
     
-    # Parametro corretto applicato qui: selection_mode="single-row"
     selezione_griglia = st.dataframe(
         df_display, 
         use_container_width=True, 
