@@ -22,7 +22,6 @@ def get_github_file():
     if r.status_code == 200:
         content = base64.b64decode(r.json()["content"]).decode("utf-8")
         df = pd.read_csv(io.StringIO(content))
-        # Se manca la colonna stato (per i vecchi dati), la creiamo impostandola a 'Saldato'
         if 'stato' not in df.columns:
             df['stato'] = 'Saldato'
         return df, r.json()["sha"]
@@ -131,98 +130,102 @@ with tab4:
                 st.success("Registrato!"); st.rerun()
 
 
-# --- SEZIONE GESTIONE: MODIFICA / ELIMINA ---
-st.divider()
-with st.expander("✏️ Gestione Movimenti (Modifica o Elimina)"):
-    df_mod, sha_mod = get_github_file()
-    
-    if not df_mod.empty:
-        # Creiamo un'etichetta visiva per riconoscere facilmente la riga
-        df_mod['idx_string'] = df_mod.index.astype(str)
-        df_mod['etichetta'] = df_mod['idx_string'] + " | " + df_mod['data'] + " | " + df_mod['categoria'] + " | € " + df_mod['importo'].astype(str)
-        
-        # Ordiniamo la lista dal più recente al più vecchio
-        lista_opzioni = df_mod['etichetta'].tolist()[::-1]
-        
-        selezione = st.selectbox("Seleziona il movimento su cui operare:", lista_opzioni)
-        
-        if selezione:
-            # Estrapoliamo l'ID esatto della riga
-            id_riga = int(selezione.split(" | ")[0])
-            riga_dati = df_mod.loc[id_riga]
-            
-            with st.form("form_modifica"):
-                st.write("**Modifica i dati sottostanti o scegli di eliminare il movimento.**")
-                c_mod1, c_mod2 = st.columns(2)
-                
-                with c_mod1:
-                    try:
-                        data_corrente = datetime.strptime(str(riga_dati['data']), "%Y-%m-%d").date()
-                    except:
-                        data_corrente = datetime.today().date()
-                        
-                    mod_data = st.date_input("Nuova Data", value=data_corrente)
-                    
-                    tipi_validi = ["Uscita", "Entrata", "Resa"]
-                    idx_tipo = tipi_validi.index(riga_dati['tipo']) if riga_dati['tipo'] in tipi_validi else 0
-                    mod_tipo = st.selectbox("Nuovo Tipo", tipi_validi, index=idx_tipo)
-                    
-                    mod_importo = st.number_input("Nuovo Importo (€)", value=float(riga_dati['importo']), step=10.0)
-                    mod_colt = st.text_input("Nuova Coltura", value=str(riga_dati['coltura_id']))
-                
-                with c_mod2:
-                    categorie = ["Sementi", "Carburante", "Concimi", "Vendita", "Fatture Fornitori", "Attrezzature", "Manodopera", "Raccolta", "Altro"]
-                    idx_cat = categorie.index(riga_dati['categoria']) if riga_dati['categoria'] in categorie else 8
-                    mod_cat = st.selectbox("Nuova Categoria", categorie, index=idx_cat)
-                    
-                    stato_corrente = "Impegnato" if "Impegnato" in str(riga_dati['stato']) else "Saldato"
-                    mod_stato = st.selectbox("Nuovo Stato", ["Saldato", "Impegnato"], index=0 if stato_corrente == "Saldato" else 1)
-                    
-                    mod_desc = st.text_area("Nuova Descrizione", value=str(riga_dati['descrizione']))
-                
-                azione = st.radio("Azione da eseguire:", ["🔄 Aggiorna Movimento", "❌ Elimina Definitivamente"], index=0)
-                
-                if st.form_submit_button("Conferma Operazione"):
-                    # Rileggiamo il file un attimo prima di salvare per prevenire conflitti
-                    df_latest, sha_latest = get_github_file()
-                    
-                    if "Aggiorna" in azione:
-                        df_latest.at[id_riga, 'data'] = mod_data.strftime('%Y-%m-%d')
-                        df_latest.at[id_riga, 'tipo'] = mod_tipo
-                        df_latest.at[id_riga, 'categoria'] = mod_cat
-                        df_latest.at[id_riga, 'descrizione'] = mod_desc
-                        df_latest.at[id_riga, 'importo'] = mod_importo
-                        df_latest.at[id_riga, 'coltura_id'] = mod_colt
-                        df_latest.at[id_riga, 'stato'] = mod_stato
-                        msg_commit = f"Modificato movimento ID: {id_riga}"
-                    else:
-                        # Eliminazione della riga
-                        df_latest = df_latest.drop(id_riga)
-                        msg_commit = f"Eliminato movimento ID: {id_riga}"
-                        
-                    with st.spinner("Sincronizzazione col database in corso..."):
-                        if save_to_github(df_latest, sha_latest, msg_commit):
-                            st.success("Operazione eseguita con successo!")
-                            st.rerun()
-    else:
-        st.info("Nessun movimento presente nel database.")
-
-
-# --- VISUALIZZAZIONE COMPLETA ---
+# --- TABELLA DI SELEZIONE GENERALE INTERATTIVA ---
 st.divider()
 st.subheader("📋 Registro Generale dei Movimenti")
-df_view, _ = get_github_file()
+st.markdown("💡 *Seleziona una riga spuntando il cerchietto a sinistra per caricarla nel modulo di Modifica/Cancellazione in basso.*")
+
+df_view, sha_view = get_github_file()
+
+id_riga_selezionata = None
+
 if not df_view.empty:
-    df_view['data_dt'] = pd.to_datetime(df_view['data'], errors='coerce')
-    df_sorted = df_view.sort_values(by='data_dt', ascending=False).drop(columns=['data_dt'])
-    
+    # Preparazione filtri visivi
     opzione_visualizzazione = st.radio("Filtra tabella per stato:", ["Tutti i movimenti", "Solo Impegnati (Da pagare)", "Solo Saldati"], horizontal=True)
     
+    df_filtrato = df_view.copy()
     if opzione_visualizzazione == "Solo Impegnati (Da pagare)":
-        df_sorted = df_sorted[df_sorted['stato'] == 'Impegnato']
+        df_filtrato = df_filtrato[df_filtrato['stato'] == 'Impegnato']
     elif opzione_visualizzazione == "Solo Saldati":
-        df_sorted = df_sorted[df_sorted['stato'] == 'Saldato']
+        df_filtrato = df_filtrato[df_filtrato['stato'] == 'Saldato']
         
-    df_display = df_sorted.copy()
+    # Ordiniamo cronologicamente dal più recente per comodità visiva
+    df_filtrato['data_dt'] = pd.to_datetime(df_filtrato['data'], errors='coerce')
+    df_filtrato = df_filtrato.sort_values(by='data_dt', ascending=False).drop(columns=['data_dt'])
+    
+    df_display = df_filtrato.copy()
     df_display['importo'] = df_display['importo'].apply(format_euro)
-    st.dataframe(df_display, use_container_width=True)
+    
+    # Abilitiamo la selezione nativa a riga singola
+    selezione_griglia = st.dataframe(
+        df_display, 
+        use_container_width=True, 
+        on_select="rerun", 
+        selection_mode="single"
+    )
+    
+    # Se l'utente clicca su un cerchietto, intercettiamo l'ID originale dell'indice
+    if selezione_griglia and selezione_griglia.get("selection", {}).get("rows"):
+        indice_visualizzato = selezione_griglia["selection"]["rows"][0]
+        id_riga_selezionata = df_filtrato.index[indice_visualizzato]
+
+
+# --- SEZIONE FORM DINAMICO (APPARIRA SOLO SE SELEZIONI UNA RIGA) ---
+if id_riga_selezionata is not None:
+    st.write("")
+    riga_dati = df_view.loc[id_riga_selezionata]
+    
+    with st.expander(f"✏️ MODIFICA O ELIMINA: Riga Selezionata (ID: {id_riga_selezionata})", expanded=True):
+        with st.form("form_modifica_diretta"):
+            c_mod1, c_mod2 = st.columns(2)
+            
+            with c_mod1:
+                try:
+                    data_corrente = datetime.strptime(str(riga_dati['data']), "%Y-%m-%d").date()
+                except:
+                    data_corrente = datetime.today().date()
+                    
+                mod_data = st.date_input("Data Operazione", value=data_corrente)
+                
+                tipi_validi = ["Uscita", "Entrata", "Resa"]
+                idx_tipo = tipi_validi.index(riga_dati['tipo']) if riga_dati['tipo'] in tipi_validi else 0
+                mod_tipo = st.selectbox("Tipo", tipi_validi, index=idx_tipo)
+                
+                mod_importo = st.number_input("Importo (€)", value=float(riga_dati['importo']), step=1.0, format="%.2f")
+                mod_colt = st.text_input("Coltura", value=str(riga_dati['coltura_id']))
+            
+            with c_mod2:
+                categorie = ["Sementi", "Carburante", "Concimi", "Vendita", "Fatture Fornitori", "Attrezzature", "Manodopera", "Raccolta", "Altro"]
+                idx_cat = categorie.index(riga_dati['categoria']) if riga_dati['categoria'] in categorie else 8
+                mod_cat = st.selectbox("Categoria", categorie, index=idx_cat)
+                
+                stato_corrente = "Impegnato" if "Impegnato" in str(riga_dati['stato']) else "Saldato"
+                mod_stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato"], index=0 if stato_corrente == "Saldato" else 1)
+                
+                mod_desc = st.text_area("Note / Descrizione", value=str(riga_dati['descrizione']))
+            
+            azione = st.radio("Scegli l'operazione da effettuare:", ["🔄 Salva modifiche ed aggiorna", "❌ Elimina definitivamente questo movimento"], index=0)
+            
+            if st.form_submit_button("🚀 Esegui Operazione sul Database"):
+                # Rilettura di sicurezza anti-conflitto prima del push
+                df_latest, sha_latest = get_github_file()
+                
+                if "Salva" in azione:
+                    df_latest.at[id_riga_selezionata, 'data'] = mod_data.strftime('%Y-%m-%d')
+                    df_latest.at[id_riga_selezionata, 'tipo'] = mod_tipo
+                    df_latest.at[id_riga_selezionata, 'categoria'] = mod_cat
+                    df_latest.at[id_riga_selezionata, 'descrizione'] = mod_desc
+                    df_latest.at[id_riga_selezionata, 'importo'] = mod_importo
+                    df_latest.at[id_riga_selezionata, 'coltura_id'] = mod_colt
+                    df_latest.at[id_riga_selezionata, 'stato'] = mod_stato
+                    msg_commit = f"Modificato movimento ID: {id_riga_selezionata}"
+                else:
+                    df_latest = df_latest.drop(id_riga_selezionata)
+                    msg_commit = f"Eliminato movimento ID: {id_riga_selezionata}"
+                    
+                with st.spinner("Sincronizzazione in corso..."):
+                    if save_to_github(df_latest, sha_latest, msg_commit):
+                        st.success("Database allineato cloud!")
+                        st.rerun()
+else:
+    st.caption("ℹ️ Nessuna riga selezionata. Fai clic su un elemento della tabella sopra per aprire il pannello di controllo rapido.")
