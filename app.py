@@ -29,12 +29,12 @@ def get_github_file():
     columns = ["data", "tipo", "categoria", "descrizione", "importo", "coltura_id", "stato"]
     return pd.DataFrame(columns=columns), None
 
-def save_to_github(df, sha):
+def save_to_github(df, sha, commit_msg="Update database via AgriApp"):
     url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     content = df.to_csv(index=False)
     data = {
-        "message": "Update database con gestione stati via AgriApp",
+        "message": commit_msg,
         "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
         "branch": BRANCH
     }
@@ -66,7 +66,8 @@ with tab1:
             stato_salvato = "Impegnato" if "Impegnato" in stato else "Saldato"
             new_row = pd.DataFrame([[data.strftime('%Y-%m-%d'), tipo, cat, desc, importo, colt, stato_salvato]], columns=df.columns)
             df = pd.concat([df, new_row], ignore_index=True)
-            if save_to_github(df, sha): st.success("Registrato!"); st.rerun()
+            if save_to_github(df, sha, "Aggiunto Movimento Standard"): 
+                st.success("Registrato!"); st.rerun()
 
 # --- TAB 2: OPERAI ---
 with tab2:
@@ -90,7 +91,8 @@ with tab2:
             desc_dettagliata = f"{op_nome} | {op_giornate} gg ({op_ore} ore) | {op_tipo_paga} | {op_note}"
             new_row = pd.DataFrame([[op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera", desc_dettagliata, float(op_importo), "Olive", stato_salvato]], columns=df.columns)
             df = pd.concat([df, new_row], ignore_index=True)
-            if save_to_github(df, sha): st.success("Registrato!"); st.rerun()
+            if save_to_github(df, sha, "Aggiunto Movimento Manodopera"): 
+                st.success("Registrato!"); st.rerun()
 
 # --- TAB 3: SPESE EXTRA ---
 with tab3:
@@ -108,7 +110,8 @@ with tab3:
             df, sha = get_github_file()
             new_row = pd.DataFrame([[ex_data.strftime('%Y-%m-%d'), "Uscita", "Altro", f"EXTRA: {ex_titolo} - {ex_note}", ex_importo, "Olive", ex_stato]], columns=df.columns)
             df = pd.concat([df, new_row], ignore_index=True)
-            if save_to_github(df, sha): st.success("Registrato!"); st.rerun()
+            if save_to_github(df, sha, "Aggiunto Movimento Extra"): 
+                st.success("Registrato!"); st.rerun()
 
 # --- TAB 4: RACCOLTA ---
 with tab4:
@@ -124,7 +127,86 @@ with tab4:
             df, sha = get_github_file()
             new_row = pd.DataFrame([[p_data.strftime('%Y-%m-%d'), "Resa", "Raccolta", f"Raccolto: {p_note}", float(p_quantita), "Olive", "Saldato"]], columns=df.columns)
             df = pd.concat([df, new_row], ignore_index=True)
-            if save_to_github(df, sha): st.success("Registrato!"); st.rerun()
+            if save_to_github(df, sha, "Aggiunto Movimento Raccolta"): 
+                st.success("Registrato!"); st.rerun()
+
+
+# --- SEZIONE GESTIONE: MODIFICA / ELIMINA ---
+st.divider()
+with st.expander("✏️ Gestione Movimenti (Modifica o Elimina)"):
+    df_mod, sha_mod = get_github_file()
+    
+    if not df_mod.empty:
+        # Creiamo un'etichetta visiva per riconoscere facilmente la riga
+        df_mod['idx_string'] = df_mod.index.astype(str)
+        df_mod['etichetta'] = df_mod['idx_string'] + " | " + df_mod['data'] + " | " + df_mod['categoria'] + " | € " + df_mod['importo'].astype(str)
+        
+        # Ordiniamo la lista dal più recente al più vecchio
+        lista_opzioni = df_mod['etichetta'].tolist()[::-1]
+        
+        selezione = st.selectbox("Seleziona il movimento su cui operare:", lista_opzioni)
+        
+        if selezione:
+            # Estrapoliamo l'ID esatto della riga
+            id_riga = int(selezione.split(" | ")[0])
+            riga_dati = df_mod.loc[id_riga]
+            
+            with st.form("form_modifica"):
+                st.write("**Modifica i dati sottostanti o scegli di eliminare il movimento.**")
+                c_mod1, c_mod2 = st.columns(2)
+                
+                with c_mod1:
+                    try:
+                        data_corrente = datetime.strptime(str(riga_dati['data']), "%Y-%m-%d").date()
+                    except:
+                        data_corrente = datetime.today().date()
+                        
+                    mod_data = st.date_input("Nuova Data", value=data_corrente)
+                    
+                    tipi_validi = ["Uscita", "Entrata", "Resa"]
+                    idx_tipo = tipi_validi.index(riga_dati['tipo']) if riga_dati['tipo'] in tipi_validi else 0
+                    mod_tipo = st.selectbox("Nuovo Tipo", tipi_validi, index=idx_tipo)
+                    
+                    mod_importo = st.number_input("Nuovo Importo (€)", value=float(riga_dati['importo']), step=10.0)
+                    mod_colt = st.text_input("Nuova Coltura", value=str(riga_dati['coltura_id']))
+                
+                with c_mod2:
+                    categorie = ["Sementi", "Carburante", "Concimi", "Vendita", "Fatture Fornitori", "Attrezzature", "Manodopera", "Raccolta", "Altro"]
+                    idx_cat = categorie.index(riga_dati['categoria']) if riga_dati['categoria'] in categorie else 8
+                    mod_cat = st.selectbox("Nuova Categoria", categorie, index=idx_cat)
+                    
+                    stato_corrente = "Impegnato" if "Impegnato" in str(riga_dati['stato']) else "Saldato"
+                    mod_stato = st.selectbox("Nuovo Stato", ["Saldato", "Impegnato"], index=0 if stato_corrente == "Saldato" else 1)
+                    
+                    mod_desc = st.text_area("Nuova Descrizione", value=str(riga_dati['descrizione']))
+                
+                azione = st.radio("Azione da eseguire:", ["🔄 Aggiorna Movimento", "❌ Elimina Definitivamente"], index=0)
+                
+                if st.form_submit_button("Conferma Operazione"):
+                    # Rileggiamo il file un attimo prima di salvare per prevenire conflitti
+                    df_latest, sha_latest = get_github_file()
+                    
+                    if "Aggiorna" in azione:
+                        df_latest.at[id_riga, 'data'] = mod_data.strftime('%Y-%m-%d')
+                        df_latest.at[id_riga, 'tipo'] = mod_tipo
+                        df_latest.at[id_riga, 'categoria'] = mod_cat
+                        df_latest.at[id_riga, 'descrizione'] = mod_desc
+                        df_latest.at[id_riga, 'importo'] = mod_importo
+                        df_latest.at[id_riga, 'coltura_id'] = mod_colt
+                        df_latest.at[id_riga, 'stato'] = mod_stato
+                        msg_commit = f"Modificato movimento ID: {id_riga}"
+                    else:
+                        # Eliminazione della riga
+                        df_latest = df_latest.drop(id_riga)
+                        msg_commit = f"Eliminato movimento ID: {id_riga}"
+                        
+                    with st.spinner("Sincronizzazione col database in corso..."):
+                        if save_to_github(df_latest, sha_latest, msg_commit):
+                            st.success("Operazione eseguita con successo!")
+                            st.rerun()
+    else:
+        st.info("Nessun movimento presente nel database.")
+
 
 # --- VISUALIZZAZIONE COMPLETA ---
 st.divider()
