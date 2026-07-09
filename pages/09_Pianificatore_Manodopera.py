@@ -7,6 +7,12 @@ import calendar
 import math
 from datetime import datetime, date
 
+# Per l'esportazione in PDF
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+
 st.set_page_config(page_title="Pianificatore Manodopera", layout="wide")
 
 # --- CONFIGURAZIONE E COLLEGAMENTO ---
@@ -39,20 +45,17 @@ def estrai_giornate_operaio(descrizione, nome_target):
     return 0.0
 
 def is_festivo_italiano(d):
-    """Rileva fine settimana e festività fisse/mobili italiane."""
-    if d.weekday() in [5, 6]: # Sabato e Domenica
+    if d.weekday() in [5, 6]:
         return True
     festivita_fisse = [(1, 1), (1, 6), (4, 25), (5, 1), (6, 2), (8, 15), (11, 1), (12, 8), (12, 25), (12, 26)]
     if (d.month, d.day) in festivita_fisse:
         return True
-    # Pasquette per gli anni di riferimento
     if d.year == 2025 and d.month == 4 and d.day == 21: return True
     if d.year == 2026 and d.month == 4 and d.day == 6: return True
     if d.year == 2027 and d.month == 3 and d.day == 29: return True
     return False
 
 def calcola_giorni_lavorativi(anno, mese):
-    """Conta i giorni fertili del mese escludendo festivi."""
     _, num_giorni = calendar.monthrange(anno, mese)
     lavorativi = 0
     for g in range(1, num_giorni + 1):
@@ -61,7 +64,7 @@ def calcola_giorni_lavorativi(anno, mese):
     return lavorativi
 
 st.title("📅 Pianificatore Annuale Manodopera")
-st.markdown("Imposta il tetto e distribuisci. Il sistema ripartirà i giorni interi rispettando la capienza massima feriale di ogni mese.")
+st.markdown("Imposta il **Totale Mese** desiderato. Il sistema calcolerà i giorni restanti da lavorare e spingerà il budget avanzato sui mesi futuri.")
 
 # --- IMPOSTAZIONI ---
 col_set1, col_set2, col_set3 = st.columns(3)
@@ -88,63 +91,54 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
                 mese_idx = row['data_dt'].month - 1
                 giornate_effettive[mese_idx] += gg_lavorate
 
-    if 'pianificazioni_manuali' not in st.session_state or st.session_state.get('anno_plan') != anno_sel:
-        st.session_state.pianificazioni_manuali = {i: None for i in range(12)}
+    if 'totali_manuali' not in st.session_state or st.session_state.get('anno_plan') != anno_sel:
+        st.session_state.totali_manuali = {i: None for i in range(12)}
         st.session_state.anno_plan = anno_sel
 
-    # --- CALCOLO CAPIENZE MENSILI ---
-    capacita_libera = [0] * 12
-    giorni_max_calendario = [0] * 12
-    for i in range(12):
-        lavorativi = calcola_giorni_lavorativi(anno_sel, i + 1)
-        giorni_max_calendario[i] = lavorativi
-        capacita_libera[i] = max(0, lavorativi - int(math.ceil(giornate_effettive[i])))
-
-    giornate_pianificate = [0] * 12
-    totale_consumato_finora = sum(giornate_effettive)
-    giornate_da_spalmare = int(round(tetto_giornate - totale_consumato_finora))
-
+    # --- CALCOLO CAPIENZE E LIMITI ---
+    capienza_massima = [calcola_giorni_lavorativi(anno_sel, i + 1) for i in range(12)]
+    
+    totali_mese = [0] * 12
+    giornate_da_spalmare = tetto_giornate
     mesi_da_calcolare = []
 
-    # 1. Assegnazione Consuntivi e Forzature
+    # 1. Assegnazione Consuntivi e Forzature del Totale
     for i in range(12):
-        if giornate_effettive[i] > 0:
-            giornate_pianificate[i] = 0
+        min_giorni_possibili = int(math.ceil(giornate_effettive[i])) # Non puoi pianificare meno di quanto hai già lavorato
+        
+        if st.session_state.totali_manuali[i] is not None:
+            valore_forzato = int(st.session_state.totali_manuali[i])
+            # Blocca il valore tra il minimo già lavorato e il massimo del calendario
+            valore_forzato = max(min_giorni_possibili, min(valore_forzato, capienza_massima[i]))
+            
+            totali_mese[i] = valore_forzato
+            giornate_da_spalmare -= valore_forzato
+            
+        elif giornate_effettive[i] > 0:
+            # Se ha lavorato e tu non modifichi la cella, blocca il totale al valore attuale
+            totali_mese[i] = min_giorni_possibili
+            giornate_da_spalmare -= min_giorni_possibili
+            
         else:
-            if st.session_state.pianificazioni_manuali[i] is not None:
-                valore_forzato = int(st.session_state.pianificazioni_manuali[i])
-                # Muro di gomma: non permette di forzare più giorni di quanti ne ha il calendario
-                valore_forzato = min(valore_forzato, capacita_libera[i])
-                
-                giornate_pianificate[i] = valore_forzato
-                giornate_da_spalmare -= valore_forzato
-                capacita_libera[i] -= valore_forzato
-            else:
-                giornate_pianificate[i] = -1
-                mesi_da_calcolare.append(i)
+            # Mesi completamente vuoti in cui l'algoritmo farà il suo lavoro
+            totali_mese[i] = 0
+            mesi_da_calcolare.append(i)
 
-    # 2. Inizializziamo a zero i mesi da calcolare
-    for i in mesi_da_calcolare:
-        giornate_pianificate[i] = 0
-
-    # 3. Spalmatura Algoritmica per Numeri Interi
-    # Assegna 1 giorno alla volta al mese con il rapporto più basso rispetto al suo "peso",
-    # fermandosi immediatamente se il mese raggiunge la sua capienza massima lavorativa.
-    while giornate_da_spalmare > 0 and sum([capacita_libera[i] for i in mesi_da_calcolare]) > 0:
+    # 2. Spalmatura Algoritmica per Numeri Interi sui mesi vuoti
+    while giornate_da_spalmare > 0 and sum([(capienza_massima[i] - totali_mese[i]) for i in mesi_da_calcolare]) > 0:
         best_month = None
         lowest_ratio = float('inf')
         
         for i in mesi_da_calcolare:
-            if capacita_libera[i] > 0:
+            if totali_mese[i] < capienza_massima[i]:
                 peso = PESI_OLIVO[i] if PESI_OLIVO[i] > 0 else 0.1
-                ratio = giornate_pianificate[i] / peso
+                ratio = totali_mese[i] / peso
                 if ratio < lowest_ratio:
                     lowest_ratio = ratio
                     best_month = i
                     
         if best_month is not None:
-            giornate_pianificate[best_month] += 1
-            capacita_libera[best_month] -= 1
+            totali_mese[best_month] += 1
             giornate_da_spalmare -= 1
         else:
             break
@@ -152,67 +146,139 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
     # --- TABELLA INTERATTIVA ---
     dati_tabella = []
     for i in range(12):
+        da_fare = max(0.0, totali_mese[i] - giornate_effettive[i])
         dati_tabella.append({
             "Mese": MESI[i],
-            "Capienza Calendario": giorni_max_calendario[i],
-            "Consuntivate (Da DB)": giornate_effettive[i],
-            "Pianificate (Modificabili)": int(giornate_pianificate[i])
+            "Capienza Calendario": capienza_massima[i],
+            "Consuntivate (Fatte)": giornate_effettive[i],
+            "Da Lavorare (Restanti)": da_fare,
+            "TOTALE MESE (Modificabile)": totali_mese[i]
         })
         
     df_plan = pd.DataFrame(dati_tabella)
-    df_plan["Totale Mese"] = df_plan["Consuntivate (Da DB)"] + df_plan["Pianificate (Modificabili)"]
 
-    st.subheader("⚙️ Regolazione Dinamica a Numeri Interi")
+    st.subheader("⚙️ Regolazione Dinamica dei Totali")
+    st.write("Modifica solo l'ultima colonna (**TOTALE MESE**). Se hai fatto 10 giorni e ne vuoi 12 in tutto, scrivi 12.")
     
     df_modificato = st.data_editor(
         df_plan,
-        disabled=["Mese", "Capienza Calendario", "Consuntivate (Da DB)", "Totale Mese"],
+        disabled=["Mese", "Capienza Calendario", "Consuntivate (Fatte)", "Da Lavorare (Restanti)"],
         hide_index=True,
         use_container_width=True,
         column_config={
-            "Capienza Calendario": st.column_config.NumberColumn(format="%d gg lavorativi"),
-            "Consuntivate (Da DB)": st.column_config.NumberColumn(format="%.1f gg"),
-            "Pianificate (Modificabili)": st.column_config.NumberColumn(format="%d gg", min_value=0, step=1),
-            "Totale Mese": st.column_config.NumberColumn(format="%.1f gg")
+            "Capienza Calendario": st.column_config.NumberColumn(format="%d gg lav."),
+            "Consuntivate (Fatte)": st.column_config.NumberColumn(format="%.1f gg"),
+            "Da Lavorare (Restanti)": st.column_config.NumberColumn(format="%.1f gg"),
+            "TOTALE MESE (Modificabile)": st.column_config.NumberColumn(format="%d gg", min_value=0, step=1)
         }
     )
     
+    # Intercettiamo i cambiamenti sul Totale
     cambiamenti = False
     for i in range(12):
-        vecchio_valore = int(giornate_pianificate[i])
-        nuovo_valore = int(df_modificato.at[i, "Pianificate (Modificabili)"])
+        vecchio_valore = totali_mese[i]
+        nuovo_valore = int(df_modificato.at[i, "TOTALE MESE (Modificabile)"])
         
         if vecchio_valore != nuovo_valore:
-            st.session_state.pianificazioni_manuali[i] = nuovo_valore
+            st.session_state.totali_manuali[i] = nuovo_valore
             cambiamenti = True
             
     if cambiamenti:
         st.rerun()
 
     # --- CONTROLLO FINALE E ALERT ---
-    totale_generale = df_modificato["Totale Mese"].sum()
+    totale_generale = df_modificato["TOTALE MESE (Modificabile)"].sum()
     
     st.divider()
     c_res1, c_res2 = st.columns(2)
     
     with c_res1:
         if totale_generale > tetto_giornate:
-            st.error(f"⚠️ ATTENZIONE: Stai sforando il tetto! Totale calcolato: **{totale_generale:,.1f} gg** (Massimo consentito: {tetto_giornate})")
+            st.error(f"⚠️ ATTENZIONE: Stai sforando il tetto! Totale pianificato: **{totale_generale} gg** (Massimo: {tetto_giornate})")
         elif totale_generale < tetto_giornate:
             if giornate_da_spalmare > 0:
-                st.warning(f"⚖️ Tetto non raggiunto ({totale_generale:,.1f} gg). **Il calendario feriale è completamente saturo!** Non ci sono più giorni utili nell'anno per spalmare il resto.")
+                st.warning(f"⚖️ Tetto non raggiunto ({totale_generale} gg). **Calendario feriale pieno!** Non c'è più spazio nell'anno.")
             else:
-                st.warning(f"⚖️ Tetto non raggiunto. Totale calcolato: **{totale_generale:,.1f} gg** su {tetto_giornate}.")
+                st.warning(f"⚖️ Tetto non raggiunto. Totale calcolato: **{totale_generale} gg** su {tetto_giornate}.")
         else:
-            st.success(f"✅ Perfetto! L'allocazione intera raggiunge esattamente le **{tetto_giornate} giornate** contrattuali.")
+            st.success(f"✅ Perfetto! L'allocazione raggiunge esattamente le **{tetto_giornate} giornate** contrattuali.")
             
     with c_res2:
-        if st.button("🔄 Ripristina Curve di Default"):
-            st.session_state.pianificazioni_manuali = {i: None for i in range(12)}
+        if st.button("🔄 Ripristina Calcoli di Default"):
+            st.session_state.totali_manuali = {i: None for i in range(12)}
             st.rerun()
 
-    # --- GRAFICO VISIVO ---
-    st.subheader("📊 Andamento Annuale")
-    df_chart = df_modificato.copy()
-    df_chart = df_chart.set_index("Mese")
-    st.bar_chart(df_chart[["Consuntivate (Da DB)", "Pianificate (Modificabili)"]], color=["#1A237E", "#4CAF50"])
+
+    # --- ESPORTAZIONE PDF PER COMMERCIALISTA ---
+    st.divider()
+    st.subheader("📥 Esporta Piano Previsionale per Consulente del Lavoro")
+    
+    buffer_pdf = io.BytesIO()
+    doc = SimpleDocTemplate(buffer_pdf, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    story = []
+    
+    styles = getSampleStyleSheet()
+    style_title = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=16, leading=20, textColor=colors.HexColor("#1A237E"), spaceAfter=5)
+    style_meta = ParagraphStyle('Meta', parent=styles['Normal'], fontSize=10, leading=14, textColor=colors.HexColor("#333333"))
+    style_th = ParagraphStyle('TH', parent=styles['Normal'], fontSize=10, fontName="Helvetica-Bold", textColor=colors.white, alignment=1)
+    style_td = ParagraphStyle('TD', parent=styles['Normal'], fontSize=10, alignment=1)
+    
+    nome_azienda = "L'ORO DI SAN VITTORE di Mazzilli Antonio"
+    story.append(Paragraph(f"<b>{nome_azienda.upper()}</b>", style_title))
+    story.append(Paragraph(f"<b>Documento:</b> Piano Previsionale di Manodopera Agricola", style_meta))
+    story.append(Paragraph(f"<b>Lavoratore:</b> {dipendente_target}", style_meta))
+    story.append(Paragraph(f"<b>Anno di Competenza:</b> {anno_sel}", style_meta))
+    story.append(Paragraph(f"<b>Target Contrattuale:</b> {tetto_giornate} giornate", style_meta))
+    story.append(Spacer(1, 20))
+    
+    # Creazione Dati Tabella PDF
+    pdf_table_data = [[
+        Paragraph("<b>Mese</b>", style_th),
+        Paragraph("<b>Già Lavorate</b>", style_th),
+        Paragraph("<b>Da Lavorare</b>", style_th),
+        Paragraph("<b>TOTALE MESE</b>", style_th)
+    ]]
+    
+    for i in range(12):
+        pdf_table_data.append([
+            Paragraph(df_modificato.iloc[i]["Mese"], style_td),
+            Paragraph(f"{df_modificato.iloc[i]['Consuntivate (Fatte)']:.1f}", style_td),
+            Paragraph(f"{df_modificato.iloc[i]['Da Lavorare (Restanti)']:.1f}", style_td),
+            Paragraph(f"<b>{df_modificato.iloc[i]['TOTALE MESE (Modificabile)']}</b>", style_td)
+        ])
+        
+    totale_cons = df_modificato['Consuntivate (Fatte)'].sum()
+    totale_rest = df_modificato['Da Lavorare (Restanti)'].sum()
+    
+    pdf_table_data.append([
+        Paragraph("<b>TOTALE ANNUALE</b>", style_th),
+        Paragraph(f"<b>{totale_cons:.1f}</b>", style_th),
+        Paragraph(f"<b>{totale_rest:.1f}</b>", style_th),
+        Paragraph(f"<b>{totale_generale}</b>", style_th)
+    ])
+    
+    t = Table(pdf_table_data, colWidths=[120, 130, 130, 100])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1A237E")),
+        ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor("#4CAF50")),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#DDDDDD")),
+        ('ROWBACKGROUNDS', (0,1), (-1,-2), [colors.HexColor("#F9F9F9"), colors.white]),
+        ('TOPPADDING', (0,0), (-1,-1), 8),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(t)
+    
+    story.append(Spacer(1, 40))
+    story.append(Paragraph("<i>Il presente documento costituisce una proiezione organizzativa per la gestione del fondo agricolo e potrà subire variazioni.</i>", style_meta))
+    
+    doc.build(story)
+    buffer_pdf.seek(0)
+    
+    st.download_button(
+        label="🔴 Scarica Documento PDF (.pdf)",
+        data=buffer_pdf,
+        file_name=f"Piano_Manodopera_{dipendente_target.replace(' ', '_')}_{anno_sel}.pdf",
+        mime="application/pdf"
+    )
