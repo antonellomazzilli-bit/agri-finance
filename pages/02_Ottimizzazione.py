@@ -6,12 +6,16 @@ import io
 
 st.set_page_config(page_title="Analisi Margini e KPI", layout="wide")
 
+# --- CONFIGURAZIONE ARCHITETTURALE ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 REPO = "antonellomazzilli-bit/agri-finance"
 FILE_PATH = "database.csv"
-DRIVE_FILE_ID = st.secrets["DRIVE_FILE_ID"]
+
+def format_euro(val):
+    return f"€ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def load_github_data():
+    """Scarica il database centrale cloud."""
     url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     r = requests.get(url, headers=headers)
@@ -20,73 +24,115 @@ def load_github_data():
         return pd.read_csv(io.StringIO(content))
     return pd.DataFrame()
 
-def load_drive_historical_costs():
-    """Scarica ed estrae i costi storici aggregati dal file Excel di Google Drive."""
+def parse_descrizione_operaio(descrizione):
+    """Estrae le giornate e le ore lavorate dalla stringa dell'app."""
     try:
-        # Generazione URL export diretto per file Excel senza autenticazione obbligatoria
-        drive_url = f"https://docs.google.com/spreadsheets/d/{DRIVE_FILE_ID}/export?format=xlsx"
-        r = requests.get(drive_url)
-        if r.status_code == 200:
-            # Legge il primo foglio dell'excel (Riepilogo)
-            df_excel = pd.read_excel(io.BytesIO(r.content), sheet_name=0)
-            
-            # Pulisce i nomi delle colonne per sicurezza eliminando spazi extra
-            df_excel.columns = df_excel.columns.str.strip()
-            
-            # Somma le colonne del tuo file Excel: Costo Lavoro (€) e Spese Extra (€)
-            costo_lavoro_drive = pd.to_numeric(df_excel["Costo Lavoro (€)"], errors='coerce').sum()
-            spese_extra_drive = pd.to_numeric(df_excel["Spese Extra (€)"], errors='coerce').sum()
-            
-            return costo_lavoro_drive + spese_extra_drive
-    except Exception as e:
-        st.sidebar.error(f"Nota: Impossibile leggere lo storico da Drive. Controlla la condivisione del file. Dettaglio: {e}")
-    return 0.0
+        if "|" in str(descrizione):
+            parti = descrizione.split("|")
+            info_tempo = parti[1].strip()
+            giornate = float(info_tempo.split(" gg")[0].strip())
+            ore = float(info_tempo.split("(")[1].split(" ore")[0].strip()) if "(" in info_tempo else 0.0
+            return giornate, ore
+    except:
+        pass
+    return 0.0, 0.0
 
-def format_it(val):
-    return f"{val:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
-
-st.title("📊 Calcolo Costi di Produzione (Fusi con Drive)")
+st.title("📈 Cruscotto di Ottimizzazione e KPI")
+st.markdown("Analisi finanziaria per annata agricola. I dati sono calcolati in tempo reale esclusivamente dal database Cloud unificato.")
 
 df_git = load_github_data()
-costo_storico_drive = load_drive_historical_costs()
 
 if not df_git.empty:
-    df_git['data'] = pd.to_datetime(df_git['data'])
-    
-    # Concentriamo tutta l'analisi esclusivamente sulla coltura "Olive"
-    df_olive = df_git[df_git['coltura_id'] == 'Olive']
-    
-    # Calcolo spese inserite da App
-    spese_app = df_olive[df_olive['tipo'] == 'Uscita']['importo'].sum()
-    ricavi_app = df_olive[df_olive['tipo'] == 'Entrata']['importo'].sum()
-    
-    # SOMMA ARCHITETTURALE DEI DUE ELEMENTI (GitHub + Storico Excel Drive)
-    spese_totali_oliveto = spese_app + costo_storico_drive
-    
-    # Quantità di olive totali raccolte (tab 4)
-    kg_raccolti = df_olive[df_olive['tipo'] == 'Resa']['importo'].sum()
-    
-    # Calcolo del KPI Finale
-    costo_di_produzione_kg = (spese_totali_oliveto / kg_raccolti) if kg_raccolti > 0 else 0.0
+    # --- PRE-PROCESSING DATI ---
+    df_git['data_dt'] = pd.to_datetime(df_git['data'], errors='coerce')
+    df_git = df_git.dropna(subset=['data_dt'])
+    df_git['Anno'] = df_git['data_dt'].dt.year
 
-    # Layout Visivo
-    st.subheader("Analisi Finanziaria Coltura: Olive")
+    # --- SELEZIONE ANNATA E COLTURA ---
+    anni_disponibili = sorted(df_git['Anno'].unique(), reverse=True)
+    colture_disponibili = df_git['coltura_id'].unique().tolist()
     
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Costi Storici (Excel Drive)", format_it(costo_storico_drive))
-    c2.metric("Nuovi Costi (Da App)", format_it(spese_app))
-    c3.metric("Costo Totale Oliveto", format_it(spese_totali_oliveto))
-    
+    c_filtro1, c_filtro2 = st.columns(2)
+    with c_filtro1:
+        anno_sel = st.selectbox("📅 Seleziona l'Annata Agraria:", anni_disponibili)
+    with c_filtro2:
+        idx_olive = colture_disponibili.index('Olive') if 'Olive' in colture_disponibili else 0
+        coltura_sel = st.selectbox("🌱 Seleziona la Coltura:", colture_disponibili, index=idx_olive)
+
     st.divider()
-    
-    kpi1, kpi2 = st.columns(2)
-    with kpi1:
-        st.metric("📦 Totale Raccolto", f"{kg_raccolti:,.0f} Kg".replace(",", "."))
-    with kpi2:
-        st.metric("🎯 COSTO DI PRODUZIONE REALISTICO", f"{costo_di_produzione_kg:,.2f} €/Kg".replace(".", ","), 
-                  help="Calcolato dividendo la somma di tutti i costi (Drive + App) per i Kg totali raccolti")
 
-    if kg_raccolti == 0:
-        st.warning("💡 Inserisci i Kg totali raccolti nel Tab 'Raccolta Rese' dell'applicazione per sbloccare il costo di produzione unitario.")
+    # Filtriamo il database per la selezione corrente
+    df_anno = df_git[(df_git['Anno'] == anno_sel) & (df_git['coltura_id'] == coltura_sel)]
+
+    if df_anno.empty:
+        st.info(f"Nessun dato finanziario registrato per la coltura '{coltura_sel}' nell'anno {anno_sel}.")
+    else:
+        # --- CALCOLI AGGREGATI TOTALI ---
+        df_uscite = df_anno[df_anno['tipo'] == 'Uscita']
+        df_entrate = df_anno[df_anno['tipo'] == 'Entrata']
+        df_rese = df_anno[df_anno['tipo'] == 'Resa']
+
+        costi_totali = df_uscite['importo'].sum()
+        ricavi_totali = df_entrate['importo'].sum()
+        margine = ricavi_totali - costi_totali
+        kg_raccolti = df_rese['importo'].sum()
+
+        # --- ESTRAZIONE DATI MANODOPERA (GIORNATE/ORE) ---
+        giornate_totali = 0.0
+        ore_totali = 0.0
+        costo_manodopera = df_uscite[df_uscite['categoria'] == 'Manodopera']['importo'].sum()
+        
+        for _, row in df_uscite[df_uscite['categoria'] == 'Manodopera'].iterrows():
+            gg, ore = parse_descrizione_operaio(row['descrizione'])
+            giornate_totali += gg
+            ore_totali += ore
+
+        # --- LAYOUT: SINTESI FINANZIARIA ---
+        st.subheader(f"📊 Sintesi Economica Globale ({anno_sel})")
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("🔴 Costi Totali", format_euro(costi_totali))
+        k2.metric("🟢 Ricavi Totali", format_euro(ricavi_totali))
+        k3.metric("💶 Margine Operativo Lordo", format_euro(margine), delta=f"{margine:,.2f} €".replace(",", "X").replace(".", ",").replace("X", "."))
+        k4.metric("📦 Produzione (Resa Totale)", f"{kg_raccolti:,.0f} Kg".replace(",", "."))
+
+        st.divider()
+
+        # --- LAYOUT: METRICHE DI EFFICIENZA (KPI) ---
+        st.subheader("⚙️ Indici di Ottimizzazione Agricola")
+        c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
+        
+        with c_kpi1:
+            costo_kg = (costi_totali / kg_raccolti) if kg_raccolti > 0 else 0.0
+            st.metric("🎯 Costo di Produzione Base", f"{costo_kg:,.2f} €/Kg".replace(".", ","), help="Indica quanto ti costa fisicamente produrre 1 Kg di olive (Uscite totali / Resa totale).")
+            
+        with c_kpi2:
+            incidenza_mano = (costo_manodopera / costi_totali * 100) if costi_totali > 0 else 0.0
+            st.metric("🧑‍🌾 Incidenza Costo Lavoro", f"{incidenza_mano:,.1f} %".replace(".", ","), help="Indica la percentuale assorbita dalla manodopera rispetto al totale delle tue spese.")
+            
+        with c_kpi3:
+            costo_ora = (costo_manodopera / ore_totali) if ore_totali > 0 else 0.0
+            st.metric("⏱️ Costo Orario Medio Lavoro", format_euro(costo_ora), help="Rapporto tra l'importo totale pagato agli operai e le ore effettive lavorate estratte dal registro.")
+
+        # --- LAYOUT: RIPARTIZIONE DEI COSTI ---
+        st.divider()
+        st.subheader("🥧 Distribuzione e Analisi delle Uscite")
+        if not df_uscite.empty:
+            # Raggruppamento dinamico (Pandas Groupby)
+            costi_per_cat = df_uscite.groupby('categoria')['importo'].sum().reset_index()
+            costi_per_cat = costi_per_cat.sort_values(by='importo', ascending=False)
+            costi_per_cat = costi_per_cat.rename(columns={'categoria': 'Categoria', 'importo': 'Importo (€)'})
+            
+            col_chart, col_data = st.columns([2, 1])
+            with col_chart:
+                st.bar_chart(costi_per_cat.set_index('Categoria'), color="#B71C1C", height=350)
+            with col_data:
+                df_view = costi_per_cat.copy()
+                df_view['Importo (€)'] = df_view['Importo (€)'].apply(lambda x: format_euro(x))
+                st.dataframe(df_view, use_container_width=True, hide_index=True)
+            
+            st.info(f"💡 **Insight Forza Lavoro:** Nel corso dell'annata {anno_sel}, sono state rilevate **{giornate_totali:,.1f} giornate** lavorative, equivalenti a **{ore_totali:,.1f} ore** di fatica registrata per la coltura '{coltura_sel}'.")
+        else:
+            st.write("Nessuna uscita registrata per i filtri selezionati.")
+
 else:
-    st.info("Nessun movimento trovato su GitHub.")
+    st.warning("Il database è vuoto. Inizia a registrare movimenti e rese per attivare il motore di ottimizzazione.")
