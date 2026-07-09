@@ -20,7 +20,6 @@ GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 REPO = "antonellomazzilli-bit/agri-finance"
 FILE_PATH = "database.csv"
 
-# Pesi olivicoli standard (proporzione del lavoro nei vari mesi)
 PESI_OLIVO = [5, 12, 12, 6, 6, 5, 4, 4, 6, 15, 20, 5]
 MESI = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", 
         "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
@@ -91,9 +90,12 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
                 mese_idx = row['data_dt'].month - 1
                 giornate_effettive[mese_idx] += gg_lavorate
 
+    # Inizializzazione Memoria Manuale
     if 'totali_manuali' not in st.session_state or st.session_state.get('anno_plan') != anno_sel:
         st.session_state.totali_manuali = {i: None for i in range(12)}
         st.session_state.anno_plan = anno_sel
+        if 'editor_pianificatore' in st.session_state:
+            del st.session_state['editor_pianificatore']
 
     # --- CALCOLO CAPIENZE E LIMITI ---
     capienza_massima = [calcola_giorni_lavorativi(anno_sel, i + 1) for i in range(12)]
@@ -102,29 +104,25 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
     giornate_da_spalmare = tetto_giornate
     mesi_da_calcolare = []
 
-    # 1. Assegnazione Consuntivi e Forzature del Totale
+    # 1. Assegnazione Consuntivi e Forzature
     for i in range(12):
-        min_giorni_possibili = int(math.ceil(giornate_effettive[i])) # Non puoi pianificare meno di quanto hai già lavorato
+        min_giorni_possibili = int(math.ceil(giornate_effettive[i])) # Non si pianifica meno di quanto fatto
         
+        # Se l'utente ha forzato un valore a mano
         if st.session_state.totali_manuali[i] is not None:
             valore_forzato = int(st.session_state.totali_manuali[i])
-            # Blocca il valore tra il minimo già lavorato e il massimo del calendario
             valore_forzato = max(min_giorni_possibili, min(valore_forzato, capienza_massima[i]))
             
             totali_mese[i] = valore_forzato
             giornate_da_spalmare -= valore_forzato
             
-        elif giornate_effettive[i] > 0:
-            # Se ha lavorato e tu non modifichi la cella, blocca il totale al valore attuale
+        # Se l'utente NON ha forzato nulla, assegna i giorni fatti e lascia il mese libero di riceverne altri
+        else:
             totali_mese[i] = min_giorni_possibili
             giornate_da_spalmare -= min_giorni_possibili
-            
-        else:
-            # Mesi completamente vuoti in cui l'algoritmo farà il suo lavoro
-            totali_mese[i] = 0
             mesi_da_calcolare.append(i)
 
-    # 2. Spalmatura Algoritmica per Numeri Interi sui mesi vuoti
+    # 2. Spalmatura Algoritmica per Numeri Interi sui mesi liberi
     while giornate_da_spalmare > 0 and sum([(capienza_massima[i] - totali_mese[i]) for i in mesi_da_calcolare]) > 0:
         best_month = None
         lowest_ratio = float('inf')
@@ -157,14 +155,28 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
         
     df_plan = pd.DataFrame(dati_tabella)
 
+    # Intercettatore Selettivo (Scatta solo se premi Invio su una cella)
+    def applica_modifiche_tabella():
+        edits = st.session_state.editor_pianificatore.get("edited_rows", {})
+        for idx_str, modifiche in edits.items():
+            if "TOTALE MESE (Modificabile)" in modifiche:
+                val = modifiche["TOTALE MESE (Modificabile)"]
+                # Se l'utente cancella il numero, sblocchiamo il mese
+                if val is None:
+                    st.session_state.totali_manuali[int(idx_str)] = None
+                else:
+                    st.session_state.totali_manuali[int(idx_str)] = int(val)
+
     st.subheader("⚙️ Regolazione Dinamica dei Totali")
-    st.write("Modifica solo l'ultima colonna (**TOTALE MESE**). Se hai fatto 10 giorni e ne vuoi 12 in tutto, scrivi 12.")
+    st.write("Modifica solo l'ultima colonna (**TOTALE MESE**). L'algoritmo compenserà istantaneamente il resto per farti arrivare a 160.")
     
     df_modificato = st.data_editor(
         df_plan,
         disabled=["Mese", "Capienza Calendario", "Consuntivate (Fatte)", "Da Lavorare (Restanti)"],
         hide_index=True,
         use_container_width=True,
+        key="editor_pianificatore",
+        on_change=applica_modifiche_tabella,
         column_config={
             "Capienza Calendario": st.column_config.NumberColumn(format="%d gg lav."),
             "Consuntivate (Fatte)": st.column_config.NumberColumn(format="%.1f gg"),
@@ -172,19 +184,6 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
             "TOTALE MESE (Modificabile)": st.column_config.NumberColumn(format="%d gg", min_value=0, step=1)
         }
     )
-    
-    # Intercettiamo i cambiamenti sul Totale
-    cambiamenti = False
-    for i in range(12):
-        vecchio_valore = totali_mese[i]
-        nuovo_valore = int(df_modificato.at[i, "TOTALE MESE (Modificabile)"])
-        
-        if vecchio_valore != nuovo_valore:
-            st.session_state.totali_manuali[i] = nuovo_valore
-            cambiamenti = True
-            
-    if cambiamenti:
-        st.rerun()
 
     # --- CONTROLLO FINALE E ALERT ---
     totale_generale = df_modificato["TOTALE MESE (Modificabile)"].sum()
@@ -206,8 +205,9 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
     with c_res2:
         if st.button("🔄 Ripristina Calcoli di Default"):
             st.session_state.totali_manuali = {i: None for i in range(12)}
+            if 'editor_pianificatore' in st.session_state:
+                del st.session_state['editor_pianificatore']
             st.rerun()
-
 
     # --- ESPORTAZIONE PDF PER COMMERCIALISTA ---
     st.divider()
