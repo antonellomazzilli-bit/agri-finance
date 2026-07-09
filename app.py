@@ -140,7 +140,6 @@ df_view, sha_view = get_github_file()
 id_riga_selezionata = None
 
 if not df_view.empty:
-    # Preparazione filtri visivi
     opzione_visualizzazione = st.radio("Filtra tabella per stato:", ["Tutti i movimenti", "Solo Impegnati (Da pagare)", "Solo Saldati"], horizontal=True)
     
     df_filtrato = df_view.copy()
@@ -149,28 +148,26 @@ if not df_view.empty:
     elif opzione_visualizzazione == "Solo Saldati":
         df_filtrato = df_filtrato[df_filtrato['stato'] == 'Saldato']
         
-    # Ordiniamo cronologicamente dal più recente per comodità visiva
     df_filtrato['data_dt'] = pd.to_datetime(df_filtrato['data'], errors='coerce')
     df_filtrato = df_filtrato.sort_values(by='data_dt', ascending=False).drop(columns=['data_dt'])
     
     df_display = df_filtrato.copy()
     df_display['importo'] = df_display['importo'].apply(format_euro)
     
-    # Abilitiamo la selezione nativa a riga singola
+    # Parametro corretto applicato qui: selection_mode="single-row"
     selezione_griglia = st.dataframe(
         df_display, 
         use_container_width=True, 
         on_select="rerun", 
-        selection_mode="single"
+        selection_mode="single-row"
     )
     
-    # Se l'utente clicca su un cerchietto, intercettiamo l'ID originale dell'indice
     if selezione_griglia and selezione_griglia.get("selection", {}).get("rows"):
         indice_visualizzato = selezione_griglia["selection"]["rows"][0]
         id_riga_selezionata = df_filtrato.index[indice_visualizzato]
 
 
-# --- SEZIONE FORM DINAMICO (APPARIRA SOLO SE SELEZIONI UNA RIGA) ---
+# --- SEZIONE FORM DINAMICO ---
 if id_riga_selezionata is not None:
     st.write("")
     riga_dati = df_view.loc[id_riga_selezionata]
@@ -207,7 +204,6 @@ if id_riga_selezionata is not None:
             azione = st.radio("Scegli l'operazione da effettuare:", ["🔄 Salva modifiche ed aggiorna", "❌ Elimina definitivamente questo movimento"], index=0)
             
             if st.form_submit_button("🚀 Esegui Operazione sul Database"):
-                # Rilettura di sicurezza anti-conflitto prima del push
                 df_latest, sha_latest = get_github_file()
                 
                 if "Salva" in azione:
