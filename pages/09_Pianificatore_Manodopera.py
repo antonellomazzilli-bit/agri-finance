@@ -20,7 +20,9 @@ GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 REPO = "antonellomazzilli-bit/agri-finance"
 FILE_PATH = "database.csv"
 
-PESI_OLIVO = [5, 12, 12, 6, 6, 5, 4, 4, 6, 15, 20, 5]
+# Nuovi pesi: 85% del lavoro concentrato tra Ottobre e Marzo (Raccolta e Potatura)
+# Gen, Feb, Mar, Apr, Mag, Giu, Lug, Ago, Set, Ott, Nov, Dic
+PESI_OLIVO = [10, 15, 15, 3, 3, 2, 2, 2, 3, 15, 20, 10]
 MESI = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", 
         "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
 
