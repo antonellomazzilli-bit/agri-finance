@@ -21,7 +21,6 @@ REPO = "antonellomazzilli-bit/agri-finance"
 FILE_PATH = "database.csv"
 
 # Nuovi pesi: 85% del lavoro concentrato tra Ottobre e Marzo (Raccolta e Potatura)
-# Gen, Feb, Mar, Apr, Mag, Giu, Lug, Ago, Set, Ott, Nov, Dic
 PESI_OLIVO = [10, 15, 15, 3, 3, 2, 2, 2, 3, 15, 20, 10]
 MESI = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", 
         "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
@@ -46,9 +45,14 @@ def estrai_giornate_operaio(descrizione, nome_target):
     return 0.0
 
 def is_festivo_italiano(d):
+    # Esclude categoricamente sia il Sabato (5) che la Domenica (6)
     if d.weekday() in [5, 6]:
         return True
-    festivita_fisse = [(1, 1), (1, 6), (4, 25), (5, 1), (6, 2), (8, 15), (11, 1), (12, 8), (12, 25), (12, 26)]
+    # Elenco dei giorni rossi nazionali + San Cataldo (10 Maggio)
+    festivita_fisse = [
+        (1, 1), (1, 6), (4, 25), (5, 1), (5, 10), (6, 2), 
+        (8, 15), (11, 1), (12, 8), (12, 25), (12, 26)
+    ]
     if (d.month, d.day) in festivita_fisse:
         return True
     if d.year == 2025 and d.month == 4 and d.day == 21: return True
@@ -65,14 +69,22 @@ def calcola_giorni_lavorativi(anno, mese):
     return lavorativi
 
 st.title("📅 Pianificatore Annuale Manodopera")
-st.markdown("Imposta il **Totale Mese** desiderato. Il sistema calcolerà i giorni restanti da lavorare e spingerà il budget avanzato sui mesi futuri.")
+st.markdown("Imposta il **Totale Mese** desiderato. Il sistema spingerà in automatico i giorni avanzati sui mesi vuoti.")
 
-# --- IMPOSTAZIONI ---
+# --- IMPOSTAZIONI E RUBRICA ---
 col_set1, col_set2, col_set3 = st.columns(3)
 with col_set1:
     anno_sel = st.selectbox("Anno di Pianificazione:", [2026, 2025, 2027])
 with col_set2:
-    dipendente_target = st.text_input("Dipendente sotto contratto:", value="Iannone Felice")
+    # Nuova Rubrica Blindata
+    ANAGRAFICA_DIPENDENTI = ["Iannone Felice", "--- Inserisci Altro Dipendente ---"]
+    scelta_dip = st.selectbox("Dipendente sotto contratto:", ANAGRAFICA_DIPENDENTI)
+    if scelta_dip == "--- Inserisci Altro Dipendente ---":
+        dipendente_target = st.text_input("Scrivi Nome e Cognome esatti:")
+    else:
+        dipendente_target = scelta_dip
+    dipendente_target = dipendente_target.strip() if dipendente_target else "Iannone Felice"
+    
 with col_set3:
     tetto_giornate = st.number_input("Target Giornate Annuali:", min_value=1, value=160, step=1)
 
@@ -92,7 +104,6 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
                 mese_idx = row['data_dt'].month - 1
                 giornate_effettive[mese_idx] += gg_lavorate
 
-    # Inizializzazione Memoria Manuale
     if 'totali_manuali' not in st.session_state or st.session_state.get('anno_plan') != anno_sel:
         st.session_state.totali_manuali = {i: None for i in range(12)}
         st.session_state.anno_plan = anno_sel
@@ -106,11 +117,20 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
     giornate_da_spalmare = tetto_giornate
     mesi_da_calcolare = []
 
-    # 1. Assegnazione Consuntivi e Forzature
+    mese_corrente = datetime.today().month
+    anno_corrente = datetime.today().year
+
+    # 1. Assegnazione Consuntivi, Forzature e Mesi Bloccati
     for i in range(12):
-        min_giorni_possibili = int(math.ceil(giornate_effettive[i])) # Non si pianifica meno di quanto fatto
+        mese_num = i + 1
+        min_giorni_possibili = int(math.ceil(giornate_effettive[i])) 
         
-        # Se l'utente ha forzato un valore a mano
+        is_closed = False
+        if anno_sel < anno_corrente:
+            is_closed = True
+        elif anno_sel == anno_corrente and mese_num < mese_corrente:
+            is_closed = True
+
         if st.session_state.totali_manuali[i] is not None:
             valore_forzato = int(st.session_state.totali_manuali[i])
             valore_forzato = max(min_giorni_possibili, min(valore_forzato, capienza_massima[i]))
@@ -118,7 +138,10 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
             totali_mese[i] = valore_forzato
             giornate_da_spalmare -= valore_forzato
             
-        # Se l'utente NON ha forzato nulla, assegna i giorni fatti e lascia il mese libero di riceverne altri
+        elif is_closed:
+            totali_mese[i] = min_giorni_possibili
+            giornate_da_spalmare -= min_giorni_possibili
+            
         else:
             totali_mese[i] = min_giorni_possibili
             giornate_da_spalmare -= min_giorni_possibili
@@ -157,20 +180,18 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
         
     df_plan = pd.DataFrame(dati_tabella)
 
-    # Intercettatore Selettivo (Scatta solo se premi Invio su una cella)
     def applica_modifiche_tabella():
         edits = st.session_state.editor_pianificatore.get("edited_rows", {})
         for idx_str, modifiche in edits.items():
             if "TOTALE MESE (Modificabile)" in modifiche:
                 val = modifiche["TOTALE MESE (Modificabile)"]
-                # Se l'utente cancella il numero, sblocchiamo il mese
                 if val is None:
                     st.session_state.totali_manuali[int(idx_str)] = None
                 else:
                     st.session_state.totali_manuali[int(idx_str)] = int(val)
 
     st.subheader("⚙️ Regolazione Dinamica dei Totali")
-    st.write("Modifica solo l'ultima colonna (**TOTALE MESE**). L'algoritmo compenserà istantaneamente il resto per farti arrivare a 160.")
+    st.write("Modifica solo l'ultima colonna (**TOTALE MESE**). Se cancelli un numero lasciando la cella vuota, sbloccherai il mese permettendo all'algoritmo di lavorarci in autonomia.")
     
     df_modificato = st.data_editor(
         df_plan,
@@ -187,7 +208,6 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
         }
     )
 
-    # --- CONTROLLO FINALE E ALERT ---
     totale_generale = df_modificato["TOTALE MESE (Modificabile)"].sum()
     
     st.divider()
@@ -198,7 +218,7 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
             st.error(f"⚠️ ATTENZIONE: Stai sforando il tetto! Totale pianificato: **{totale_generale} gg** (Massimo: {tetto_giornate})")
         elif totale_generale < tetto_giornate:
             if giornate_da_spalmare > 0:
-                st.warning(f"⚖️ Tetto non raggiunto ({totale_generale} gg). **Calendario feriale pieno!** Non c'è più spazio nell'anno.")
+                st.warning(f"⚖️ Tetto non raggiunto ({totale_generale} gg). **Calendario feriale dei mesi liberi completamente saturo!** Devi cancellare/sbloccare le forzature da qualche altro mese per fare spazio.")
             else:
                 st.warning(f"⚖️ Tetto non raggiunto. Totale calcolato: **{totale_generale} gg** su {tetto_giornate}.")
         else:
@@ -233,7 +253,6 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
     story.append(Paragraph(f"<b>Target Contrattuale:</b> {tetto_giornate} giornate", style_meta))
     story.append(Spacer(1, 20))
     
-    # Creazione Dati Tabella PDF
     pdf_table_data = [[
         Paragraph("<b>Mese</b>", style_th),
         Paragraph("<b>Già Lavorate</b>", style_th),
@@ -273,7 +292,7 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
     story.append(t)
     
     story.append(Spacer(1, 40))
-    story.append(Paragraph("<i>Il presente documento costituisce una proiezione organizzativa per la gestione del fondo agricolo e potrà subire variazioni.</i>", style_meta))
+    story.append(Paragraph("<i>Il presente documento costituisce una proiezione organizzativa per la gestione del fondo agricolo e potrà subire variazioni in base alle necessità colturali reali.</i>", style_meta))
     
     doc.build(story)
     buffer_pdf.seek(0)
