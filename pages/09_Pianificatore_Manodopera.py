@@ -76,7 +76,7 @@ col_set1, col_set2, col_set3 = st.columns(3)
 with col_set1:
     anno_sel = st.selectbox("Anno di Pianificazione:", [2026, 2025, 2027])
 with col_set2:
-    # Nuova Rubrica Blindata
+    # Rubrica Blindata
     ANAGRAFICA_DIPENDENTI = ["Iannone Felice", "--- Inserisci Altro Dipendente ---"]
     scelta_dip = st.selectbox("Dipendente sotto contratto:", ANAGRAFICA_DIPENDENTI)
     if scelta_dip == "--- Inserisci Altro Dipendente ---":
@@ -208,19 +208,35 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
         }
     )
 
+    # --- NUOVO CAMPO SOMMA VISIBILE ---
     totale_generale = df_modificato["TOTALE MESE (Modificabile)"].sum()
+    
+    colore_somma = "#4CAF50" # Verde se perfetto
+    if totale_generale > tetto_giornate:
+        colore_somma = "#F44336" # Rosso se sfora
+    elif totale_generale < tetto_giornate:
+        colore_somma = "#FF9800" # Arancione se mancano giorni
+        
+    st.markdown(f"""
+        <div style="text-align: right; font-size: 18px; margin-top: 5px; padding-right: 15px; background-color: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+            <b>🧮 SOMMA TOTALE COLONNA:</b> &nbsp;&nbsp;
+            <span style="font-size: 24px; font-weight: bold; color: {colore_somma};">{totale_generale}</span> 
+            <span style="color: #666;"> / {tetto_giornate} gg</span>
+        </div>
+    """, unsafe_allow_html=True)
+    # -----------------------------------
     
     st.divider()
     c_res1, c_res2 = st.columns(2)
     
     with c_res1:
         if totale_generale > tetto_giornate:
-            st.error(f"⚠️ ATTENZIONE: Stai sforando il tetto! Totale pianificato: **{totale_generale} gg** (Massimo: {tetto_giornate})")
+            st.error(f"⚠️ ATTENZIONE: Stai sforando il tetto di {tetto_giornate} giornate!")
         elif totale_generale < tetto_giornate:
             if giornate_da_spalmare > 0:
-                st.warning(f"⚖️ Tetto non raggiunto ({totale_generale} gg). **Calendario feriale dei mesi liberi completamente saturo!** Devi cancellare/sbloccare le forzature da qualche altro mese per fare spazio.")
+                st.warning(f"⚖️ Tetto non raggiunto. **Calendario feriale dei mesi liberi completamente saturo!** Devi cancellare/sbloccare le forzature da qualche altro mese per fare spazio.")
             else:
-                st.warning(f"⚖️ Tetto non raggiunto. Totale calcolato: **{totale_generale} gg** su {tetto_giornate}.")
+                st.warning(f"⚖️ Tetto non raggiunto. Mancano ancora {tetto_giornate - totale_generale} giorni.")
         else:
             st.success(f"✅ Perfetto! L'allocazione raggiunge esattamente le **{tetto_giornate} giornate** contrattuali.")
             
