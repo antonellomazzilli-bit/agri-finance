@@ -90,7 +90,7 @@ col1, col2 = st.columns(2)
 with col1:
     anno_sel = st.selectbox("Anno di riferimento:", [2026, 2025])
 with col2:
-    mese_sel = st.selectbox("Mese da evitare/elaborare:", list(MESI_NOMI.keys()), format_func=lambda x: MESI_NOMI[x], index=datetime.now().month - 1)
+    mese_sel = st.selectbox("Mese da elaborare:", list(MESI_NOMI.keys()), format_func=lambda x: MESI_NOMI[x], index=datetime.now().month - 1)
 
 nome_mese_stringa = MESI_NOMI[mese_sel]
 
@@ -100,6 +100,9 @@ with st.spinner("Generazione prospetti in corso..."):
     
     giornate_totali_excel = 0.0
     righe_commercialista = []
+    
+    # Memoria Calendario: Traccia le date già riempite per evitare accavallamenti
+    giorni_occupati = {}
     
     # 1. LETTURA POSIZIONALE EXCEL DRIVE
     if not df_drive_raw.empty:
@@ -125,40 +128,77 @@ with st.spinner("Generazione prospetti in corso..."):
                         giornate_totali_excel = giornate_totali_excel if pd.notna(giornate_totali_excel) else 0.0
                         break
 
-    # 2. ALGORITMO SPALMATURA FERIALE
-    if giornate_totali_excel > 0:
-        _, num_giorni_mese = calendar.monthrange(anno_sel, mese_sel)
-        giorni_utili_feriali = [date(anno_sel, mese_sel, g) for g in range(1, num_giorni_mese + 1) if not is_festivo_italiano(date(anno_sel, mese_sel, g))]
-        
-        giornate_rimanenti = giornate_totali_excel
-        
-        for d in giorni_utili_feriali:
-            if giornate_rimanenti <= 0: break
-            quota_giorno = min(1.0, giornate_rimanenti)
-            giornate_rimanenti -= quota_giorno
-            
-            righe_commercialista.append({
-                "Data": d.strftime('%d/%m/%Y'),
-                "Dipendente": nome_dipendente,
-                "Giornate": quota_giorno,
-                "Ore": quota_giorno * 8.0,
-                "Note": ""  # Rimane vuoto come richiesto
-            })
-
-    # 3. INTEGRAZIONE INSERIMENTI DA SMARTPHONE
+    # 2. PREPARAZIONE CALENDARIO DEL MESE
+    _, num_giorni_mese = calendar.monthrange(anno_sel, mese_sel)
+    giorni_utili_feriali = [date(anno_sel, mese_sel, g) for g in range(1, num_giorni_mese + 1) if not is_festivo_italiano(date(anno_sel, mese_sel, g))]
+    
+    # 3. ELABORAZIONE DATI INSERITI DA APP (SMARTPHONE)
+    movimenti_bulk = []
+    
     if not df_git.empty:
         df_git['data_dt'] = pd.to_datetime(df_git['data'], errors='coerce')
         df_filtrato_app = df_git[(df_git['data_dt'].dt.year == anno_sel) & (df_git['data_dt'].dt.month == mese_sel) & (df_git['categoria'] == 'Manodopera')]
         
         for _, row in df_filtrato_app.iterrows():
             nome, gg, ore = parse_descrizione_operaio(row['descrizione'])
-            righe_commercialista.append({
-                "Data": row['data_dt'].strftime('%d/%m/%Y'),
-                "Dipendente": nome,
-                "Giornate": gg,
-                "Ore": ore,
-                "Note": ""  # Rimane vuoto come richiesto
-            })
+            if pd.notna(row['data_dt']):
+                data_app = row['data_dt'].date()
+                
+                # Fissiamo i giorni puntuali (1 giorno o mezza giornata) nella data esatta indicata
+                if 0 < gg <= 1.0:
+                    righe_commercialista.append({
+                        "Data": data_app.strftime('%d/%m/%Y'),
+                        "Dipendente": nome,
+                        "Giornate": gg,
+                        "Ore": ore,
+                        "Note": ""
+                    })
+                    giorni_occupati[data_app] = giorni_occupati.get(data_app, 0.0) + gg
+                
+                # Separiamo i blocchi aggregati (es. i 10 giorni del 3 Luglio) per lo spalmatore
+                elif gg > 1.0:
+                    movimenti_bulk.append({"nome": nome, "gg": gg, "ore": ore})
+
+    # 4. SPALMATORE INTELLIGENTE: BLOCCHI CUMULATIVI DA APP
+    for bulk in movimenti_bulk:
+        gg_rimanenti = bulk["gg"]
+        ore_rimanenti = bulk["ore"]
+        ore_per_giorno = ore_rimanenti / gg_rimanenti if gg_rimanenti > 0 else 8.0
+        
+        for d in giorni_utili_feriali:
+            if gg_rimanenti <= 0: break
+            spazio_disponibile = 1.0 - giorni_occupati.get(d, 0.0)
+            if spazio_disponibile > 0:
+                quota = min(spazio_disponibile, gg_rimanenti)
+                gg_rimanenti -= quota
+                giorni_occupati[d] = giorni_occupati.get(d, 0.0) + quota
+                
+                righe_commercialista.append({
+                    "Data": d.strftime('%d/%m/%Y'),
+                    "Dipendente": bulk["nome"],
+                    "Giornate": quota,
+                    "Ore": quota * ore_per_giorno,
+                    "Note": ""
+                })
+
+    # 5. SPALMATORE INTELLIGENTE: STORICO EXCEL DRIVE
+    if giornate_totali_excel > 0:
+        gg_rimanenti = giornate_totali_excel
+        for d in giorni_utili_feriali:
+            if gg_rimanenti <= 0: break
+            spazio_disponibile = 1.0 - giorni_occupati.get(d, 0.0)
+            if spazio_disponibile > 0:
+                quota = min(spazio_disponibile, gg_rimanenti)
+                gg_rimanenti -= quota
+                giorni_occupati[d] = giorni_occupati.get(d, 0.0) + quota
+                
+                righe_commercialista.append({
+                    "Data": d.strftime('%d/%m/%Y'),
+                    "Dipendente": nome_dipendente,
+                    "Giornate": quota,
+                    "Ore": quota * 8.0,
+                    "Note": ""
+                })
 
     # --- GENERAZIONE FILE E INTERFACCIA ---
     if righe_commercialista:
@@ -180,7 +220,7 @@ with st.spinner("Generazione prospetti in corso..."):
         
         col_btn1, col_btn2 = st.columns(2)
         
-        # --- GENERAZIONE EXCEL BLINDATO ---
+        # --- EXCEL ---
         with col_btn1:
             buffer_xl = io.BytesIO()
             with pd.ExcelWriter(buffer_xl, engine='openpyxl') as writer:
@@ -201,7 +241,7 @@ with st.spinner("Generazione prospetti in corso..."):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
-        # --- GENERAZIONE PDF IMPAGINATO ---
+        # --- PDF ---
         with col_btn2:
             buffer_pdf = io.BytesIO()
             doc = SimpleDocTemplate(buffer_pdf, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
