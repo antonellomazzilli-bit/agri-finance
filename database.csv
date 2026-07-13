@@ -12,4 +12,3 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato
 2026-06-29,Uscita,Altro,Ricarica scheda per irrigazione,500.0,Olive,Saldato
 2026-07-03,Uscita,Manodopera,"Iannone Felice | 10.0 gg (91.45 ore) | Paga Intera | Mese di Giugno 2026, dal conto Zurich",734.0,Olive,Saldato
 2026-07-03,Uscita,Altro,"F.24 dipendente mese di Giugno 2026, pagato da Zurich",160.42,Olive,Saldato
-2026-07-31,Uscita,Manodopera,Iannone Felice | 16.0 gg (8.0 ore) | Paga Intera | Manutenzione Ulivi,0.0,Olive,Impegnato
