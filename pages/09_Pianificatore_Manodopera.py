@@ -3,11 +3,11 @@ import pandas as pd
 import requests
 import base64
 import io
+import time
 import calendar
 import math
 from datetime import datetime, date
 
-# Per l'esportazione in PDF
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -15,19 +15,21 @@ from reportlab.lib import colors
 
 st.set_page_config(page_title="Pianificatore Manodopera", layout="wide")
 
-# --- CONFIGURAZIONE E COLLEGAMENTO ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 REPO = "antonellomazzilli-bit/agri-finance"
 FILE_PATH = "database.csv"
 
-# Spalmatura più dolce, che permette di riempire anche l'estate
-PESI_OLIVO = [10, 15, 15, 3, 3, 2, 8, 8, 8, 10, 10, 8]
+PESI_OLIVO = [10, 15, 15, 3, 3, 2, 2, 2, 3, 15, 20, 10]
 MESI = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", 
         "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
 
 def load_github_data():
-    url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    timestamp = int(time.time())
+    url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}?ref=main&t={timestamp}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Cache-Control": "no-cache"
+    }
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
         content = base64.b64decode(r.json()["content"]).decode("utf-8")
@@ -45,10 +47,8 @@ def estrai_giornate_operaio(descrizione, nome_target):
     return 0.0
 
 def is_festivo_italiano(d):
-    # Esclude categoricamente sia il Sabato (5) che la Domenica (6)
     if d.weekday() in [5, 6]:
         return True
-    # Elenco dei giorni rossi nazionali + San Cataldo (10 Maggio)
     festivita_fisse = [
         (1, 1), (1, 6), (4, 25), (5, 1), (5, 10), (6, 2), 
         (8, 15), (11, 1), (12, 8), (12, 25), (12, 26)
@@ -71,12 +71,10 @@ def calcola_giorni_lavorativi(anno, mese):
 st.title("📅 Pianificatore Annuale Manodopera")
 st.markdown("Imposta il **Totale Mese** desiderato. Il sistema spingerà in automatico i giorni avanzati sui mesi vuoti.")
 
-# --- IMPOSTAZIONI E RUBRICA ---
 col_set1, col_set2, col_set3 = st.columns(3)
 with col_set1:
     anno_sel = st.selectbox("Anno di Pianificazione:", [2026, 2025, 2027])
 with col_set2:
-    # Rubrica Blindata
     ANAGRAFICA_DIPENDENTI = ["Iannone Felice", "--- Inserisci Altro Dipendente ---"]
     scelta_dip = st.selectbox("Dipendente sotto contratto:", ANAGRAFICA_DIPENDENTI)
     if scelta_dip == "--- Inserisci Altro Dipendente ---":
@@ -90,7 +88,7 @@ with col_set3:
 
 st.divider()
 
-with st.spinner("Sincronizzazione calendario e lettura database..."):
+with st.spinner("Sincronizzazione calendario e lettura cloud (Senza Cache)..."):
     df_git = load_github_data()
     giornate_effettive = [0.0] * 12
     
@@ -110,7 +108,6 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
         if 'editor_pianificatore' in st.session_state:
             del st.session_state['editor_pianificatore']
 
-    # --- CALCOLO CAPIENZE E LIMITI ---
     capienza_massima = [calcola_giorni_lavorativi(anno_sel, i + 1) for i in range(12)]
     
     totali_mese = [0] * 12
@@ -120,7 +117,6 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
     mese_corrente = datetime.today().month
     anno_corrente = datetime.today().year
 
-    # 1. Assegnazione Consuntivi, Forzature e Mesi Bloccati
     for i in range(12):
         mese_num = i + 1
         min_giorni_possibili = int(math.ceil(giornate_effettive[i])) 
@@ -147,7 +143,6 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
             giornate_da_spalmare -= min_giorni_possibili
             mesi_da_calcolare.append(i)
 
-    # 2. Spalmatura Algoritmica per Numeri Interi sui mesi liberi
     while giornate_da_spalmare > 0 and sum([(capienza_massima[i] - totali_mese[i]) for i in mesi_da_calcolare]) > 0:
         best_month = None
         lowest_ratio = float('inf')
@@ -166,7 +161,6 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
         else:
             break
 
-    # --- TABELLA INTERATTIVA ---
     dati_tabella = []
     for i in range(12):
         da_fare = max(0.0, totali_mese[i] - giornate_effettive[i])
@@ -208,14 +202,13 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
         }
     )
 
-    # --- NUOVO CAMPO SOMMA VISIBILE ---
     totale_generale = df_modificato["TOTALE MESE (Modificabile)"].sum()
     
-    colore_somma = "#4CAF50" # Verde se perfetto
+    colore_somma = "#4CAF50"
     if totale_generale > tetto_giornate:
-        colore_somma = "#F44336" # Rosso se sfora
+        colore_somma = "#F44336"
     elif totale_generale < tetto_giornate:
-        colore_somma = "#FF9800" # Arancione se mancano giorni
+        colore_somma = "#FF9800"
         
     st.markdown(f"""
         <div style="text-align: right; font-size: 18px; margin-top: 5px; padding-right: 15px; background-color: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
@@ -224,7 +217,6 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
             <span style="color: #666;"> / {tetto_giornate} gg</span>
         </div>
     """, unsafe_allow_html=True)
-    # -----------------------------------
     
     st.divider()
     c_res1, c_res2 = st.columns(2)
@@ -247,7 +239,6 @@ with st.spinner("Sincronizzazione calendario e lettura database..."):
                 del st.session_state['editor_pianificatore']
             st.rerun()
 
-    # --- ESPORTAZIONE PDF PER COMMERCIALISTA ---
     st.divider()
     st.subheader("📥 Esporta Piano Previsionale per Consulente del Lavoro")
     
