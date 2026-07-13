@@ -3,6 +3,7 @@ import pandas as pd
 import base64
 import requests
 import io
+import time
 from datetime import datetime
 
 st.set_page_config(page_title="AgriFinance Cloud", layout="wide")
@@ -16,8 +17,12 @@ def format_euro(val):
     return f"€ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def get_github_file():
-    url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    timestamp = int(time.time())
+    url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}?ref={BRANCH}&t={timestamp}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Cache-Control": "no-cache"
+    }
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
         content = base64.b64decode(r.json()["content"]).decode("utf-8")
@@ -43,7 +48,6 @@ def save_to_github(df, sha, commit_msg="Update database via AgriApp"):
 
 st.title("🚜 Registro Agricolo Cloud")
 
-# Nomi dei tab aggiornati
 tab1, tab2, tab3, tab4 = st.tabs(["🛒 Movimenti Standard", "👥 Giornate Operai", "💸 Extra & Straordinari", "📦 Raccolta Rese"])
 
 # --- TAB 1: STANDARD ---
@@ -76,7 +80,6 @@ with tab2:
         c1, c2 = st.columns(2)
         with c1:
             op_data = st.date_input("Data Registrazione", format="DD/MM/YYYY", key="op_data")
-            
             ANAGRAFICA_DIPENDENTI = ["Iannone Felice", "--- Inserisci Altro Dipendente ---"]
             scelta_dip = st.selectbox("Seleziona Dipendente:", ANAGRAFICA_DIPENDENTI, key="dip_op")
             if scelta_dip == "--- Inserisci Altro Dipendente ---":
@@ -105,8 +108,6 @@ with tab2:
 # --- TAB 3: SPESE EXTRA E STRAORDINARI ---
 with tab3:
     st.subheader("💸 Spese Extra, Rimborsi e Straordinari")
-    
-    # 1. SELEZIONE DIPENDENTE 
     ANAGRAFICA_DIPENDENTI = ["Iannone Felice", "--- Inserisci Altro Dipendente ---"]
     scelta_dip_ex = st.selectbox("Seleziona Dipendente per il Quadro Riassuntivo:", ANAGRAFICA_DIPENDENTI, key="dip_ex")
     if scelta_dip_ex == "--- Inserisci Altro Dipendente ---":
@@ -115,7 +116,6 @@ with tab3:
         dip_extra = scelta_dip_ex
     dip_extra = dip_extra.strip() if dip_extra else "Iannone Felice"
     
-    # 2. QUADRO COMPLETO (MINI-DASHBOARD)
     df_dash, _ = get_github_file()
     if not df_dash.empty:
         df_dash['data_dt'] = pd.to_datetime(df_dash['data'], errors='coerce')
@@ -124,15 +124,12 @@ with tab3:
         
         mask_manod = (df_anno['categoria'] == 'Manodopera') & (df_anno['descrizione'].str.contains(dip_extra, case=False, na=False))
         tot_base = df_anno[mask_manod]['importo'].sum()
-        
         mask_stra = (df_anno['categoria'] == 'Straordinari') & (df_anno['descrizione'].str.contains(dip_extra, case=False, na=False))
         tot_strao = df_anno[mask_stra]['importo'].sum()
-        
         mask_rimb = (df_anno['categoria'] == 'Rimborsi') & (df_anno['descrizione'].str.contains(dip_extra, case=False, na=False))
         tot_rimb = df_anno[mask_rimb]['importo'].sum()
         
         tot_assoluto = tot_base + tot_strao + tot_rimb
-        
         st.markdown(f"##### 📊 Resoconto Finanziario {anno_corrente}: **{dip_extra}**")
         c_d1, c_d2, c_d3, c_d4 = st.columns(4)
         c_d1.metric("Paga Base (Giornate)", format_euro(tot_base))
@@ -142,17 +139,12 @@ with tab3:
         
     st.divider()
 
-    # 3. FORM DI INSERIMENTO
     with st.form("extra_form", clear_on_submit=True):
         st.markdown(f"**Registra un nuovo movimento per {dip_extra} (o per l'azienda)**")
         col1, col2 = st.columns(2)
         with col1:
             ex_data = st.date_input("Data Operazione", format="DD/MM/YYYY", key="ex_data")
-            tipo_op = st.selectbox("Natura dell'Operazione", [
-                "Rimborso Spesa (effettuata dal dipendente)", 
-                "Straordinario (Ore extra dipendente)", 
-                "Spesa Extra Aziendale (Slegata dal dipendente)"
-            ])
+            tipo_op = st.selectbox("Natura dell'Operazione", ["Rimborso Spesa (effettuata dal dipendente)", "Straordinario (Ore extra dipendente)", "Spesa Extra Aziendale (Slegata dal dipendente)"])
             ex_importo = st.number_input("Importo (€)", min_value=0.0, step=0.01, key="ex_importo")
             ex_stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato"], key="ex_stato")
         with col2:
@@ -162,8 +154,6 @@ with tab3:
             
         if st.form_submit_button("Registra Operazione"):
             df, sha = get_github_file()
-            
-            # Logica per instradare le spese nelle categorie corrette
             if "Straordinario" in tipo_op:
                 cat_salvataggio = "Straordinari"
                 desc_salvataggio = f"{dip_extra} | Straordinario: {ex_ore} ore | {ex_titolo} - {ex_note}"
@@ -196,19 +186,16 @@ with tab4:
             if save_to_github(df, sha, "Aggiunto Movimento Raccolta"): 
                 st.success("Registrato!"); st.rerun()
 
-
 # --- TABELLA DI SELEZIONE GENERALE INTERATTIVA ---
 st.divider()
 st.subheader("📋 Registro Generale dei Movimenti")
 st.markdown("💡 *Seleziona una riga spuntando il cerchietto a sinistra per caricarla nel modulo di Modifica/Cancellazione in basso.*")
 
 df_view, sha_view = get_github_file()
-
 id_riga_selezionata = None
 
 if not df_view.empty:
     opzione_visualizzazione = st.radio("Filtra tabella per stato:", ["Tutti i movimenti", "Solo Impegnati (Da pagare)", "Solo Saldati"], horizontal=True)
-    
     df_filtrato = df_view.copy()
     if opzione_visualizzazione == "Solo Impegnati (Da pagare)":
         df_filtrato = df_filtrato[df_filtrato['stato'] == 'Impegnato']
@@ -221,58 +208,42 @@ if not df_view.empty:
     df_display = df_filtrato.copy()
     df_display['importo'] = df_display['importo'].apply(format_euro)
     
-    selezione_griglia = st.dataframe(
-        df_display, 
-        use_container_width=True, 
-        on_select="rerun", 
-        selection_mode="single-row"
-    )
+    selezione_griglia = st.dataframe(df_display, use_container_width=True, on_select="rerun", selection_mode="single-row")
     
     if selezione_griglia and selezione_griglia.get("selection", {}).get("rows"):
         indice_visualizzato = selezione_griglia["selection"]["rows"][0]
         id_riga_selezionata = df_filtrato.index[indice_visualizzato]
 
-
 # --- SEZIONE FORM DINAMICO ---
 if id_riga_selezionata is not None:
     st.write("")
     riga_dati = df_view.loc[id_riga_selezionata]
-    
     with st.expander(f"✏️ MODIFICA O ELIMINA: Riga Selezionata (ID: {id_riga_selezionata})", expanded=True):
         with st.form("form_modifica_diretta"):
             c_mod1, c_mod2 = st.columns(2)
-            
             with c_mod1:
                 try:
                     data_corrente = datetime.strptime(str(riga_dati['data']), "%Y-%m-%d").date()
                 except:
                     data_corrente = datetime.today().date()
-                    
                 mod_data = st.date_input("Data Operazione", value=data_corrente)
-                
                 tipi_validi = ["Uscita", "Entrata", "Resa"]
                 idx_tipo = tipi_validi.index(riga_dati['tipo']) if riga_dati['tipo'] in tipi_validi else 0
                 mod_tipo = st.selectbox("Tipo", tipi_validi, index=idx_tipo)
-                
                 mod_importo = st.number_input("Importo (€)", value=float(riga_dati['importo']), step=1.0, format="%.2f")
                 mod_colt = st.text_input("Coltura", value=str(riga_dati['coltura_id']))
-            
             with c_mod2:
-                # LISTA CATEGORIE AGGIORNATA PER LE MODIFICHE
                 categorie = ["Sementi", "Carburante", "Concimi", "Vendita", "Fatture Fornitori", "Attrezzature", "Manodopera", "Straordinari", "Rimborsi", "Raccolta", "Altro"]
                 idx_cat = categorie.index(riga_dati['categoria']) if riga_dati['categoria'] in categorie else 10
                 mod_cat = st.selectbox("Categoria", categorie, index=idx_cat)
-                
                 stato_corrente = "Impegnato" if "Impegnato" in str(riga_dati['stato']) else "Saldato"
                 mod_stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato"], index=0 if stato_corrente == "Saldato" else 1)
-                
                 mod_desc = st.text_area("Note / Descrizione", value=str(riga_dati['descrizione']))
             
             azione = st.radio("Scegli l'operazione da effettuare:", ["🔄 Salva modifiche ed aggiorna", "❌ Elimina definitivamente questo movimento"], index=0)
             
             if st.form_submit_button("🚀 Esegui Operazione sul Database"):
                 df_latest, sha_latest = get_github_file()
-                
                 if "Salva" in azione:
                     df_latest.at[id_riga_selezionata, 'data'] = mod_data.strftime('%Y-%m-%d')
                     df_latest.at[id_riga_selezionata, 'tipo'] = mod_tipo
@@ -285,7 +256,6 @@ if id_riga_selezionata is not None:
                 else:
                     df_latest = df_latest.drop(id_riga_selezionata)
                     msg_commit = f"Eliminato movimento ID: {id_riga_selezionata}"
-                    
                 with st.spinner("Sincronizzazione in corso..."):
                     if save_to_github(df_latest, sha_latest, msg_commit):
                         st.success("Database allineato cloud!")
