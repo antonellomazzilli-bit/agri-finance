@@ -73,7 +73,7 @@ with tab1:
             if save_to_github(df, sha, "Aggiunto Movimento Standard"): 
                 st.success("Registrato!"); st.rerun()
 
-# --- TAB 2: OPERAI ---
+# --- TAB 2: OPERAI (IL CARTELLINO) ---
 with tab2:
     st.subheader("👥 Registro Manodopera Specializzato Olive")
     with st.form("operaio_form", clear_on_submit=True):
@@ -91,8 +91,10 @@ with tab2:
             op_giornate = st.number_input("Giornate lavorate", min_value=0.0, step=0.5, value=1.0)
             op_ore = st.number_input("Ore Effettive", min_value=0.0, step=1.0, value=8.0)
         with c2:
-            op_tipo_paga = st.selectbox("Tipo di Pagamento", ["Acconto", "Saldo Finale", "Paga Intera"])
-            op_importo = st.number_input("Importo Corrisposto (€)", min_value=0.0, step=10.0)
+            # Opzione di default per chi attende il commercialista
+            op_tipo_paga = st.selectbox("Tipo di Pagamento", ["Nessuno (Attesa Busta Paga)", "Acconto", "Saldo Finale", "Paga Intera"])
+            # Valore predefinito a 0.0
+            op_importo = st.number_input("Importo (€) - Lascia 0 se attendi busta paga", min_value=0.0, step=1.0, value=0.0)
             op_stato = st.selectbox("Stato del Costo", ["Saldato", "Impegnato (Da liquidare in futuro)"])
             op_note = st.text_area("Note Attività", placeholder="es. Raccolta Olive")
         
@@ -105,9 +107,9 @@ with tab2:
             if save_to_github(df, sha, "Aggiunto Movimento Manodopera"): 
                 st.success("Registrato!"); st.rerun()
 
-# --- TAB 3: SPESE EXTRA E STRAORDINARI ---
+# --- TAB 3: SPESE EXTRA, STRAORDINARI E BUSTE PAGA (LA CASSA) ---
 with tab3:
-    st.subheader("💸 Spese Extra, Rimborsi e Straordinari")
+    st.subheader("💸 Spese Extra, Rimborsi e Buste Paga")
     ANAGRAFICA_DIPENDENTI = ["Iannone Felice", "--- Inserisci Altro Dipendente ---"]
     scelta_dip_ex = st.selectbox("Seleziona Dipendente per il Quadro Riassuntivo:", ANAGRAFICA_DIPENDENTI, key="dip_ex")
     if scelta_dip_ex == "--- Inserisci Altro Dipendente ---":
@@ -132,7 +134,7 @@ with tab3:
         tot_assoluto = tot_base + tot_strao + tot_rimb
         st.markdown(f"##### 📊 Resoconto Finanziario {anno_corrente}: **{dip_extra}**")
         c_d1, c_d2, c_d3, c_d4 = st.columns(4)
-        c_d1.metric("Paga Base (Giornate)", format_euro(tot_base))
+        c_d1.metric("Paga Base (Giornate/Buste)", format_euro(tot_base))
         c_d2.metric("Straordinari", format_euro(tot_strao))
         c_d3.metric("Rimborsi Spese", format_euro(tot_rimb))
         c_d4.metric("TOTALE COMPLESSIVO", format_euro(tot_assoluto))
@@ -140,21 +142,35 @@ with tab3:
     st.divider()
 
     with st.form("extra_form", clear_on_submit=True):
-        st.markdown(f"**Registra un nuovo movimento per {dip_extra} (o per l'azienda)**")
+        st.markdown(f"**Registra un pagamento per {dip_extra} (o per l'azienda)**")
         col1, col2 = st.columns(2)
         with col1:
             ex_data = st.date_input("Data Operazione", format="DD/MM/YYYY", key="ex_data")
-            tipo_op = st.selectbox("Natura dell'Operazione", ["Rimborso Spesa (effettuata dal dipendente)", "Straordinario (Ore extra dipendente)", "Spesa Extra Aziendale (Slegata dal dipendente)"])
+            
+            # Nuova voce inserita nel menu a tendina
+            tipo_op = st.selectbox("Natura dell'Operazione", [
+                "Pagamento Busta Paga Mensile (Importo dal commercialista)",
+                "Rimborso Spesa (effettuata dal dipendente)", 
+                "Straordinario (Ore extra dipendente)", 
+                "Spesa Extra Aziendale (Slegata dal dipendente)"
+            ])
+            
             ex_importo = st.number_input("Importo (€)", min_value=0.0, step=0.01, key="ex_importo")
             ex_stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato"], key="ex_stato")
         with col2:
             ex_ore = st.number_input("Ore Straordinario (Solo se applicabile)", min_value=0.0, step=0.5, value=0.0)
-            ex_titolo = st.text_input("Oggetto / Motivo", placeholder="es. Riparazione Trattore / Ore serali")
+            ex_titolo = st.text_input("Oggetto / Mese", placeholder="es. Saldo Busta Paga Luglio")
             ex_note = st.text_area("Dettagli aggiuntivi", key="ex_note")
             
         if st.form_submit_button("Registra Operazione"):
             df, sha = get_github_file()
-            if "Straordinario" in tipo_op:
+            
+            # Nuova logica di smistamento
+            if "Busta Paga" in tipo_op:
+                cat_salvataggio = "Manodopera"
+                # Scriviamo 0 gg per impedire che il commercialista riceva giorni sballati
+                desc_salvataggio = f"{dip_extra} | 0 gg (0 ore) | Saldo Busta Paga | {ex_titolo} - {ex_note}"
+            elif "Straordinario" in tipo_op:
                 cat_salvataggio = "Straordinari"
                 desc_salvataggio = f"{dip_extra} | Straordinario: {ex_ore} ore | {ex_titolo} - {ex_note}"
             elif "Rimborso" in tipo_op:
@@ -166,7 +182,7 @@ with tab3:
                 
             new_row = pd.DataFrame([[ex_data.strftime('%Y-%m-%d'), "Uscita", cat_salvataggio, desc_salvataggio, ex_importo, "Olive", ex_stato]], columns=df.columns)
             df = pd.concat([df, new_row], ignore_index=True)
-            if save_to_github(df, sha, "Aggiunto Movimento Extra/Straordinario"): 
+            if save_to_github(df, sha, "Aggiunto Pagamento / Extra"): 
                 st.success("Registrato!"); st.rerun()
 
 # --- TAB 4: RACCOLTA ---
