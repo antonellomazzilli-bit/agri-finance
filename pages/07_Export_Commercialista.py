@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import base64
 import io
+import time
 import calendar
 from datetime import datetime, date
 
@@ -14,7 +15,6 @@ from reportlab.lib import colors
 
 st.set_page_config(page_title="Export Commercialista", layout="wide")
 
-# --- CONFIGURAZIONE ARCHITETTURALE (Solo GitHub) ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 REPO = "antonellomazzilli-bit/agri-finance"
 FILE_PATH = "database.csv"
@@ -29,8 +29,12 @@ GIORNI_SETTIMANA_ITA = {
 }
 
 def load_github_data():
-    url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    timestamp = int(time.time())
+    url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}?ref=main&t={timestamp}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Cache-Control": "no-cache"
+    }
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
         content = base64.b64decode(r.json()["content"]).decode("utf-8")
@@ -50,10 +54,8 @@ def parse_descrizione_operaio(descrizione):
     return "Specificato da App", 0.0
 
 def is_festivo_italiano(d):
-    # Esclude categoricamente sia il Sabato (5) che la Domenica (6)
     if d.weekday() in [5, 6]:
         return True
-    # Elenco dei giorni rossi nazionali + San Cataldo (10 Maggio)
     festivita_fisse = [
         (1, 1), (1, 6), (4, 25), (5, 1), (5, 10), (6, 2), 
         (8, 15), (11, 1), (12, 8), (12, 25), (12, 26)
@@ -68,7 +70,6 @@ def is_festivo_italiano(d):
 st.title("📄 Centro Esportazione Presenze (Busta Paga)")
 st.markdown("Generazione del registro presenze orizzontale strutturato per lo studio commerciale.")
 
-# --- SEZIONE INSERIMENTO DATI DINAMICI E RUBRICA ---
 st.subheader("🏢 Informazioni Registro ed Anagrafica")
 col_az1, col_az2 = st.columns(2)
 with col_az1:
@@ -84,7 +85,6 @@ with col_az2:
 
 st.divider()
 
-# --- FILTRI TEMPORALI ---
 col1, col2 = st.columns(2)
 with col1:
     anno_sel = st.selectbox("Anno di riferimento:", [2026, 2025, 2027])
@@ -93,16 +93,13 @@ with col2:
 
 nome_mese_stringa = MESI_NOMI[mese_sel]
 
-with st.spinner("Generazione prospetti in corso..."):
+with st.spinner("Lettura database cloud in corso (Senza Cache)..."):
     df_git = load_github_data()
-    
     giorni_occupati = {}
     
-    # 1. PREPARAZIONE CALENDARIO DEL MESE
     _, num_giorni_mese = calendar.monthrange(anno_sel, mese_sel)
     giorni_utili_feriali = [date(anno_sel, mese_sel, g) for g in range(1, num_giorni_mese + 1) if not is_festivo_italiano(date(anno_sel, mese_sel, g))]
     
-    # 2. ELABORAZIONE DATI INSERITI DA APP
     movimenti_bulk = []
     
     if not df_git.empty:
@@ -114,13 +111,11 @@ with st.spinner("Generazione prospetti in corso..."):
             if nome.lower() == nome_dipendente.lower():
                 if pd.notna(row['data_dt']):
                     data_app = row['data_dt'].date()
-                    
                     if 0 < gg <= 1.0:
                         giorni_occupati[data_app] = giorni_occupati.get(data_app, 0.0) + gg
                     elif gg > 1.0:
                         movimenti_bulk.append({"nome": nome_dipendente, "gg": gg})
 
-    # 3. SPALMATORE INTELLIGENTE: BLOCCHI CUMULATIVI DA APP
     for bulk in movimenti_bulk:
         gg_rimanenti = bulk["gg"]
         for d in giorni_utili_feriali:
@@ -131,13 +126,9 @@ with st.spinner("Generazione prospetti in corso..."):
                 gg_rimanenti -= quota
                 giorni_occupati[d] = giorni_occupati.get(d, 0.0) + quota
 
-    # --- CREAZIONE STRUTTURA MASTER ORIZZONTALE ---
-    
-    # Riga Intestazione
     riga_0 = [nome_azienda] + [""] * 32
     riga_1 = ["ANNO =", str(anno_sel)] + [""] * 31
     
-    # Costruzione Giorni e Date
     riga_giorni_sett = [""]
     riga_date = ["COGNOME E NOME"]
     
@@ -145,23 +136,17 @@ with st.spinner("Generazione prospetti in corso..."):
         if g <= num_giorni_mese:
             d = date(anno_sel, mese_sel, g)
             giorno_sett = GIORNI_SETTIMANA_ITA[d.weekday()]
-            # Formato gg-mmm (es. 1-giu)
             nome_mese_abbrev = nome_mese_stringa[:3].lower()
             data_str = f"{g}-{nome_mese_abbrev}"
-            
             riga_giorni_sett.append(giorno_sett)
             riga_date.append(data_str)
         else:
             riga_giorni_sett.append("")
             riga_date.append("")
             
-    riga_giorni_sett.append("Colonna3")
-    riga_giorni_sett.append("")
+    riga_giorni_sett.extend(["Colonna3", ""])
+    riga_date.extend(["Colonna3", "G.L"])
     
-    riga_date.append("Colonna3")
-    riga_date.append("G.L")
-    
-    # Riga Dati Dipendente
     riga_presenze = [nome_dipendente]
     totale_giorni_lavorati = 0.0
     
@@ -170,7 +155,6 @@ with st.spinner("Generazione prospetti in corso..."):
             d = date(anno_sel, mese_sel, g)
             presenza = giorni_occupati.get(d, 0.0)
             if presenza > 0:
-                # Se è un intero (1.0), mostriamo 1 per pulizia
                 val_mostrato = int(presenza) if presenza.is_integer() else presenza
                 riga_presenze.append(val_mostrato)
                 totale_giorni_lavorati += presenza
@@ -179,15 +163,12 @@ with st.spinner("Generazione prospetti in corso..."):
         else:
             riga_presenze.append("")
             
-    riga_presenze.append("") # Colonna3
-    # Totale mostrato come int se possibile
+    riga_presenze.append("")
     riga_presenze.append(int(totale_giorni_lavorati) if totale_giorni_lavorati.is_integer() else totale_giorni_lavorati)
     
-    # Creazione DataFrame per anteprima
     colonne_df = [f"Col{i}" for i in range(len(riga_date))]
     dati_export = [riga_0, riga_1, riga_giorni_sett, riga_date, riga_presenze]
     
-    # Aggiungo righe vuote per replicare il master originale
     for _ in range(5):
         dati_export.append([""] * len(riga_date))
         
@@ -198,7 +179,6 @@ with st.spinner("Generazione prospetti in corso..."):
     c_inf1.info(f"**Periodo:** {nome_mese_stringa} {anno_sel}")
     c_inf2.info(f"**Totale Giornate Lavorate:** {totale_giorni_lavorati:,.1f} gg")
     
-    # Nascondo gli header di colonna e righe nell'anteprima per simulare Excel
     st.dataframe(df_export, use_container_width=True, hide_index=True)
     st.divider()
     
@@ -207,21 +187,17 @@ with st.spinner("Generazione prospetti in corso..."):
     col_btn1, col_btn2 = st.columns(2)
     
     with col_btn1:
-        # EXCEL
         buffer_xl = io.BytesIO()
         with pd.ExcelWriter(buffer_xl, engine='openpyxl') as writer:
             df_export.to_excel(writer, index=False, header=False, sheet_name=nome_dipendente.split()[0][:31])
-            
-            # Formattazione base Excel
             workbook = writer.book
             worksheet = writer.sheets[nome_dipendente.split()[0][:31]]
             for col_num, _ in enumerate(df_export.columns):
                 col_letter = chr(65 + col_num) if col_num < 26 else chr(64 + col_num // 26) + chr(65 + col_num % 26)
                 if col_num == 0:
-                    worksheet.column_dimensions[col_letter].width = 30 # Prima colonna larga per il nome
+                    worksheet.column_dimensions[col_letter].width = 30
                 else:
-                    worksheet.column_dimensions[col_letter].width = 6  # Colonne giorni strette
-                    
+                    worksheet.column_dimensions[col_letter].width = 6
         buffer_xl.seek(0)
         st.download_button(
             label="🟢 Scarica Foglio Excel (.xlsx)",
@@ -231,7 +207,6 @@ with st.spinner("Generazione prospetti in corso..."):
         )
         
     with col_btn2:
-        # PDF ORIZZONTALE (LANDSCAPE)
         buffer_pdf = io.BytesIO()
         doc = SimpleDocTemplate(buffer_pdf, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
         story = []
@@ -246,17 +221,13 @@ with st.spinner("Generazione prospetti in corso..."):
         story.append(Spacer(1, 15))
         
         table_data = []
-        
-        # Righe Giorni e Date per PDF (omettiamo "Colonna3" per spazio, teniamo "G.L")
         pdf_riga_giorni = [""] + riga_giorni_sett[1:num_giorni_mese+1] + [""]
         pdf_riga_date = ["COGNOME E NOME"] + riga_date[1:num_giorni_mese+1] + ["G.L"]
         pdf_riga_pres = [Paragraph(nome_dipendente, style_td_nome)] + riga_presenze[1:num_giorni_mese+1] + [riga_presenze[-1]]
         
-        # Converto stringhe in Paragraph per centraggio
         pdf_riga_giorni = [Paragraph(str(x), style_th) for x in pdf_riga_giorni]
         pdf_riga_date = [Paragraph(str(x), style_th) for x in pdf_riga_date]
         
-        # Per la riga presenze, tengo i numeri centrati
         row_pres_formatted = [pdf_riga_pres[0]]
         for val in pdf_riga_pres[1:]:
             row_pres_formatted.append(Paragraph(str(val) if val != "" else "", style_td))
@@ -265,7 +236,6 @@ with st.spinner("Generazione prospetti in corso..."):
         table_data.append(pdf_riga_date)
         table_data.append(row_pres_formatted)
         
-        # Calcolo larghezze colonne PDF (780 punti disponibili)
         w_nome = 140
         w_tot = 30
         w_giorno = (780 - w_nome - w_tot) / num_giorni_mese
