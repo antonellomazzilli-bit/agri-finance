@@ -15,3 +15,5 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato
 2026-02-28,Uscita,Manodopera,Iannone Felice | 14.0 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riepilogo Febbraio,0.0,Olive,Saldato
 2026-02-28,Uscita,Manodopera Extra,Iannone Felice | 2.4549999999999983 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riepilogo Febbraio,0.0,Olive,Saldato
 2026-03-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Febbraio - ,989.2,Olive,Saldato
+2026-03-31,Uscita,Manodopera,Iannone Felice | 15.0 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riepilogo Marzo,0.0,Olive,Saldato
+2026-03-31,Uscita,Manodopera Extra,Iannone Felice | 3.1819999999999986 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riepilogo Marzo,0.0,Olive,Saldato
