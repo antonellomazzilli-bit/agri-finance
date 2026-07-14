@@ -159,17 +159,29 @@ with tab3:
         
         df_dip = df_anno[df_anno['descrizione'].str.contains(dip_extra, case=False, na=False)]
         
-        # 1. Totale Buste Paga (Solo a scopo informativo, non entra nel debito extra)
+        # 1. Totale Buste Paga (Solo info)
         tot_stipendi_ufficiali = df_dip[df_dip['descrizione'].str.contains('Saldo Busta Paga', case=False, na=False)]['importo'].sum()
         
-        # 2. Denaro versato ESCLUSIVAMENTE per i Saldi Extra
+        # 2. Denaro versato per i Saldi Extra
         tot_pagamenti_extra = df_dip[df_dip['categoria'] == 'Saldo Extra']['importo'].sum()
         
-        # 3. Valore Giornate Extra
-        gg_extra_lavorate = sum(estrai_giornate(row['descrizione'], dip_extra) for _, row in df_dip[df_dip['categoria'] == 'Manodopera Extra'].iterrows())
-        valore_gg_extra = gg_extra_lavorate * COSTO_GIORNATA_EXTRA
+        # 3. Calcolo Trasparente delle Giornate
+        # A) Somma lorda di tutti i mesi lavorati in extra (solo valori positivi)
+        gg_extra_lorde = sum(estrai_giornate(row['descrizione'], dip_extra) for _, row in df_dip[df_dip['categoria'] == 'Manodopera Extra'].iterrows() if estrai_giornate(row['descrizione'], dip_extra) > 0)
         
-        # --- NUOVA FORMULA BILANCIATA ---
+        # B) Giornate recuperate (mesi in cui ha lavorato meno del dichiarato)
+        gg_recuperate = sum(abs(estrai_giornate(row['descrizione'], dip_extra)) for _, row in df_dip[df_dip['categoria'] == 'Manodopera Extra'].iterrows() if estrai_giornate(row['descrizione'], dip_extra) < 0)
+        
+        # C) Giornate saldate/azzerate manualmente tramite pagamento
+        gg_saldate_manualmente = sum(estrai_giornate(row['descrizione'], dip_extra) for _, row in df_dip[df_dip['categoria'] == 'Saldo Extra'].iterrows())
+        
+        # LA TUA DIFFERENZA
+        gg_totali_sottratte = gg_recuperate + gg_saldate_manualmente
+        gg_netto_residuo = gg_extra_lorde - gg_totali_sottratte
+        
+        valore_gg_extra = gg_netto_residuo * COSTO_GIORNATA_EXTRA
+        
+        # --- SALDO BILANCIATO ---
         saldo_in_euro = tot_pagamenti_extra - valore_gg_extra
         
         st.markdown(f"##### 📊 Resoconto Finanziario {anno_corrente}: **{dip_extra}**")
@@ -195,14 +207,22 @@ with tab3:
 <td style="text-align: right; color: #555;">{format_euro(tot_stipendi_ufficiali)}</td>
 </tr>
 <tr style="border-top: 1px solid #ddd;">
-<td style="padding: 5px 0;">[ + ] Pagamenti Fuori Busta erogati:</td>
-<td style="text-align: right; font-weight: bold;">{format_euro(tot_pagamenti_extra)}</td>
+<td style="padding: 5px 0; color: #1565C0;">[ Info ] Somma Giornate Extra Lavorate:</td>
+<td style="text-align: right; color: #1565C0;">{gg_extra_lorde} gg</td>
 </tr>
 <tr>
-<td style="padding: 5px 0;">[ - ] Valore Giornate Extra Lavorate ({gg_extra_lavorate} gg):</td>
+<td style="padding: 5px 0; color: #1565C0;">[ Info ] Meno Differenza (Recuperi + Saldate):</td>
+<td style="text-align: right; color: #1565C0;">- {gg_totali_sottratte} gg</td>
+</tr>
+<tr style="border-top: 1px dashed #ccc;">
+<td style="padding: 5px 0;">[ - ] Valore Netto Giornate Extra Residue ({gg_netto_residuo} gg):</td>
 <td style="text-align: right;">- {format_euro(valore_gg_extra)}</td>
 </tr>
 <tr style="border-top: 1px solid #ccc;">
+<td style="padding: 5px 0;">[ + ] Pagamenti Fuori Busta (Euro) erogati:</td>
+<td style="text-align: right; font-weight: bold;">{format_euro(tot_pagamenti_extra)}</td>
+</tr>
+<tr style="border-top: 1px solid #333;">
 <td style="padding: 10px 0; font-size: 18px; color: {colore_saldo};"><b>SALDO FINALE: {etichetta_saldo}</b></td>
 <td style="text-align: right; font-size: 22px; font-weight: bold; color: {colore_saldo}; padding: 10px 0;">{segno}{format_euro(saldo_in_euro)}</td>
 </tr>
@@ -212,7 +232,7 @@ with tab3:
     st.divider()
 
     with st.form("extra_form", clear_on_submit=True):
-        st.markdown(f"**Registra un Pagamento o una Spesa per {dip_extra}**")
+        st.markdown(f"**Registra un Pagamento o un Azzeramento per {dip_extra}**")
         col1, col2 = st.columns(2)
         with col1:
             ex_data = st.date_input("Data Operazione", format="DD/MM/YYYY", key="ex_data")
@@ -226,6 +246,7 @@ with tab3:
             ex_importo = st.number_input("Importo Erogato (€)", min_value=0.0, step=0.01, key="ex_importo")
             ex_stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato"], key="ex_stato")
         with col2:
+            ex_gg_azzerare = st.number_input("Giornate extra azzerate (Lascia 0 se paghi solo in €)", min_value=0.0, step=0.5, value=0.0)
             ex_titolo = st.text_input("Oggetto / Mese", placeholder="es. Saldo Busta Paga Luglio / Saldo Extra")
             ex_note = st.text_area("Dettagli aggiuntivi", key="ex_note")
             
@@ -237,7 +258,7 @@ with tab3:
                 desc_salvataggio = f"{dip_extra} | 0 gg | Saldo Busta Paga | {ex_titolo} - {ex_note}"
             elif "Azzeramento" in tipo_op:
                 cat_salvataggio = "Saldo Extra"
-                desc_salvataggio = f"{dip_extra} | 0 gg | Azzeramento Fuori Busta | {ex_titolo} - {ex_note}"
+                desc_salvataggio = f"{dip_extra} | {ex_gg_azzerare} gg | Azzeramento Fuori Busta | {ex_titolo} - {ex_note}"
             elif "Straordinario" in tipo_op:
                 cat_salvataggio = "Straordinari"
                 desc_salvataggio = f"{dip_extra} | Straordinario | {ex_titolo} - {ex_note}"
