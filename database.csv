@@ -16,3 +16,5 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato
 2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.0 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Riassunto cumulativo Gennaio,0.0,Olive,Saldato
 2026-02-28,Uscita,Manodopera,Iannone Felice | 14.0 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riassunto cumulativo Febbraio,0.0,Olive,Saldato
 2026-02-28,Uscita,Manodopera Extra,Iannone Felice | 2.0 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riassunto cumulativo Febbraio,0.0,Olive,Saldato
+2026-03-31,Uscita,Manodopera,Iannone Felice | 15.0 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riassunto cumulativo Marzo,0.0,Olive,Saldato
+2026-03-31,Uscita,Manodopera Extra,Iannone Felice | 3.0 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riassunto cumulativo Marzo,0.0,Olive,Saldato
