@@ -9,3 +9,5 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato
 2026-06-25,Uscita,Altro,gestione Contabile  | Note: Bonifico da cc ingdirect,500.02,Olive,Saldato
 2026-06-29,Uscita,Altro,Ricarica scheda per irrigazione,500.0,Olive,Saldato
 2026-07-03,Uscita,Altro,"F.24 dipendente mese di Giugno 2026, pagato da Zurich",160.42,Olive,Saldato
+2026-01-31,Uscita,Manodopera,Iannone Felice | 13.0 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Conteggio gennaio,0.0,Olive,Saldato
+2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.455 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Conteggio gennaio,0.0,Olive,Saldato
