@@ -87,7 +87,7 @@ with tab1:
             if save_to_github(df, sha, "Aggiunto Movimento Standard"): 
                 st.success("Registrato!"); st.rerun()
 
-# --- TAB 2: OPERAI (DOPPIO BINARIO CON RECUPERO) ---
+# --- TAB 2: OPERAI (DOPPIO BINARIO CON RECUPERO E DECIMALI) ---
 with tab2:
     st.subheader("👥 Registro Manodopera (Gestione Doppio Binario)")
     with st.form("operaio_form", clear_on_submit=True):
@@ -102,7 +102,7 @@ with tab2:
                 op_nome = scelta_dip
             op_nome = op_nome.strip() if op_nome else "Iannone Felice"
             
-           st.markdown("---")
+            st.markdown("---")
             op_reali = st.number_input("🔴 Giornate REALI lavorate (Totale Effettivo)", min_value=0.0, step=0.125, value=1.0, format="%.3f")
             
             # Legenda visiva per aiutare l'inserimento
@@ -124,21 +124,19 @@ with tab2:
             op_note = st.text_area("Note Attività", placeholder="es. Raccolta Olive")
         
         if st.form_submit_button("Registra Giornate"):
-            # Rimosso il blocco di errore per consentire gli anticipi ufficiali!
             df, sha = get_github_file()
             stato_salvato = "Impegnato" if "Impegnato" in op_stato else "Saldato"
             righe_da_aggiungere = []
             
-            # Riga 1: Ufficiale (Visibile al commercialista)
+            # Riga 1: Ufficiale
             if op_ufficiali > 0:
                 desc_uff = f"{op_nome} | {op_ufficiali} gg | {op_tipo_paga} | UFFICIALE: {op_note}"
                 righe_da_aggiungere.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera", desc_uff, float(op_importo), "Olive", stato_salvato])
             
-            # Riga 2: Il Delta / Extra (Ora può essere anche negativo per il recupero)
+            # Riga 2: Extra
             gg_extra = op_reali - op_ufficiali
             
             if gg_extra != 0:
-                # Se positivo è debito azienda, se negativo è anticipo al dipendente
                 etichetta = "FUORI BUSTA" if gg_extra > 0 else "RECUPERO (Anticipo Ufficiale)"
                 desc_extra = f"{op_nome} | {gg_extra} gg | {op_tipo_paga} | {etichetta}: {op_note}"
                 righe_da_aggiungere.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera Extra", desc_extra, 0.0, "Olive", stato_salvato])
