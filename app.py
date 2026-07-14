@@ -148,13 +148,13 @@ with tab2:
                     st.success("Registrazione completata e Banca Ore aggiornata!")
                     st.rerun()
 
-# --- TAB 3: CASSA, BUSTE PAGA E ESTRATTO CONTO IN EURO ---
+# --- TAB 3: CASSA, BUSTE PAGA E ESTRATTO CONTO FINANZIARIO ---
 with tab3:
     st.subheader("💸 Cassa, Buste Paga ed Estratto Conto (Dare/Avere)")
     ANAGRAFICA_DIPENDENTI = ["Iannone Felice", "--- Inserisci Altro Dipendente ---"]
-    scelta_dip_ex = st.selectbox("Seleziona Dipendente per il Quadro Riassuntivo:", ANAGRAFICA_DIPENDENTI, key="dip_ex")
+    scelta_dip_ex = st.selectbox("Seleziona Dipendente:", ANAGRAFICA_DIPENDENTI, key="dip_ex")
     if scelta_dip_ex == "--- Inserisci Altro Dipendente ---":
-        dip_extra = st.text_input("Scrivi Nome e Cognome esatti:", key="dip_ex_txt")
+        dip_extra = st.text_input("Scrivi Nome e Cognome:", key="dip_ex_txt")
     else:
         dip_extra = scelta_dip_ex
     dip_extra = dip_extra.strip() if dip_extra else "Iannone Felice"
@@ -164,123 +164,74 @@ with tab3:
         df_dash['data_dt'] = pd.to_datetime(df_dash['data'], errors='coerce')
         anno_corrente = datetime.today().year
         df_anno = df_dash[df_dash['data_dt'].dt.year == anno_corrente]
-        
         df_dip = df_anno[df_anno['descrizione'].str.contains(dip_extra, case=False, na=False)]
         
-        # 1. Totale Buste Paga (Solo info)
-        tot_stipendi_ufficiali = df_dip[df_dip['descrizione'].str.contains('Saldo Busta Paga', case=False, na=False)]['importo'].sum()
+        # 1. TOTALE SOLDI VERSATI (Cassa)
+        # Sommiamo tutto ciò che è un pagamento reale
+        cat_pagamenti = ['Busta Paga', 'Saldo Extra', 'Straordinari', 'Rimborsi']
+        tot_versato = df_dip[df_dip['categoria'].isin(cat_pagamenti)]['importo'].sum()
         
-        # 2. Denaro versato per i Saldi Extra
-        tot_pagamenti_extra = df_dip[df_dip['categoria'] == 'Saldo Extra']['importo'].sum()
+        # 2. VALORE LAVORO SVOLTO (Giornate)
+        # Sommiamo le giornate da tutte le righe di lavoro (Manodopera + Manodopera Extra)
+        cat_lavoro = ['Manodopera', 'Manodopera Extra']
+        gg_totali = sum(estrai_giornate(row['descrizione'], dip_extra) for _, row in df_dip[df_dip['categoria'].isin(cat_lavoro)].iterrows())
+        valore_lavoro = gg_totali * COSTO_GIORNATA_EXTRA
         
-        # 3. Calcolo Trasparente delle Giornate
-        # A) Somma lorda di tutti i mesi lavorati in extra (solo valori positivi)
-        gg_extra_lorde = sum(estrai_giornate(row['descrizione'], dip_extra) for _, row in df_dip[df_dip['categoria'] == 'Manodopera Extra'].iterrows() if estrai_giornate(row['descrizione'], dip_extra) > 0)
+        # 3. SALDO FINALE (Dare/Avere)
+        saldo_in_euro = tot_versato - valore_lavoro
         
-        # B) Giornate recuperate (mesi in cui ha lavorato meno del dichiarato)
-        gg_recuperate = sum(abs(estrai_giornate(row['descrizione'], dip_extra)) for _, row in df_dip[df_dip['categoria'] == 'Manodopera Extra'].iterrows() if estrai_giornate(row['descrizione'], dip_extra) < 0)
+        # Visualizzazione Grafica
+        colore_saldo = "#388E3C" if saldo_in_euro > 0 else "#D32F2F"
+        etichetta_saldo = "CREDITO AZIENDA (Lavoro da ricevere)" if saldo_in_euro > 0 else "DEBITO AZIENDA (Da pagare)"
         
-        # C) Giornate saldate/azzerate manualmente tramite pagamento
-        gg_saldate_manualmente = sum(estrai_giornate(row['descrizione'], dip_extra) for _, row in df_dip[df_dip['categoria'] == 'Saldo Extra'].iterrows())
-        
-        # LA TUA DIFFERENZA
-        gg_totali_sottratte = gg_recuperate + gg_saldate_manualmente
-        gg_netto_residuo = gg_extra_lorde - gg_totali_sottratte
-        
-        valore_gg_extra = gg_netto_residuo * COSTO_GIORNATA_EXTRA
-        
-        # --- SALDO BILANCIATO ---
-        saldo_in_euro = tot_pagamenti_extra - valore_gg_extra
-        
-        st.markdown(f"##### 📊 Resoconto Finanziario {anno_corrente}: **{dip_extra}**")
-        
-        if saldo_in_euro < 0:
-            colore_saldo = "#D32F2F"
-            etichetta_saldo = "DEBITO AZIENDA (Da pagare)"
-            segno = ""
-        elif saldo_in_euro > 0:
-            colore_saldo = "#388E3C"
-            etichetta_saldo = "CREDITO AZIENDA (Anticipo erogato)"
-            segno = "+"
-        else:
-            colore_saldo = "#1A237E"
-            etichetta_saldo = "CONTI IN PAREGGIO"
-            segno = ""
-            
         st.markdown(f"""<div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-top: 5px solid {colore_saldo}; box-shadow: 0px 2px 4px rgba(0,0,0,0.1);">
-<h4 style="margin-top:0; color:#333;">🏦 Estratto Conto Lavoratore (In Euro)</h4>
+<h4 style="margin-top:0; color:#333;">🏦 Estratto Conto Finanziario: {dip_extra}</h4>
 <table style="width:100%; font-size: 16px; border-collapse: collapse; color: #333;">
 <tr>
-<td style="padding: 5px 0; color: #555;">[ Info ] Totale Buste Paga Ufficiali versate:</td>
-<td style="text-align: right; color: #555;">{format_euro(tot_stipendi_ufficiali)}</td>
-</tr>
-<tr style="border-top: 1px solid #ddd;">
-<td style="padding: 5px 0; color: #1565C0;">[ Info ] Somma Giornate Extra Lavorate:</td>
-<td style="text-align: right; color: #1565C0;">{gg_extra_lorde} gg</td>
+<td style="padding: 5px 0;">[ + ] Totale Euro versati al dipendente:</td>
+<td style="text-align: right; font-weight: bold;">{format_euro(tot_versato)}</td>
 </tr>
 <tr>
-<td style="padding: 5px 0; color: #1565C0;">[ Info ] Meno Differenza (Recuperi + Saldate):</td>
-<td style="text-align: right; color: #1565C0;">- {gg_totali_sottratte} gg</td>
+<td style="padding: 5px 0;">[ - ] Valore Lavoro Svolto ({gg_totali} gg x {COSTO_GIORNATA_EXTRA}€):</td>
+<td style="text-align: right; font-weight: bold;">- {format_euro(valore_lavoro)}</td>
 </tr>
-<tr style="border-top: 1px dashed #ccc;">
-<td style="padding: 5px 0;">[ - ] Valore Netto Giornate Extra Residue ({gg_netto_residuo} gg):</td>
-<td style="text-align: right;">- {format_euro(valore_gg_extra)}</td>
-</tr>
-<tr style="border-top: 1px solid #ccc;">
-<td style="padding: 5px 0;">[ + ] Pagamenti Fuori Busta (Euro) erogati:</td>
-<td style="text-align: right; font-weight: bold;">{format_euro(tot_pagamenti_extra)}</td>
-</tr>
-<tr style="border-top: 1px solid #333;">
+<tr style="border-top: 2px solid #333;">
 <td style="padding: 10px 0; font-size: 18px; color: {colore_saldo};"><b>SALDO FINALE: {etichetta_saldo}</b></td>
-<td style="text-align: right; font-size: 22px; font-weight: bold; color: {colore_saldo}; padding: 10px 0;">{segno}{format_euro(saldo_in_euro)}</td>
+<td style="text-align: right; font-size: 22px; font-weight: bold; color: {colore_saldo}; padding: 10px 0;">{format_euro(saldo_in_euro)}</td>
 </tr>
 </table>
 </div>""", unsafe_allow_html=True)
         
     st.divider()
 
+    # Form di Registrazione
     with st.form("extra_form", clear_on_submit=True):
-        st.markdown(f"**Registra un Pagamento o un Azzeramento per {dip_extra}**")
+        st.markdown(f"**Registra un Pagamento (Cassa)**")
         col1, col2 = st.columns(2)
         with col1:
             ex_data = st.date_input("Data Operazione", format="DD/MM/YYYY", key="ex_data")
             tipo_op = st.selectbox("Natura dell'Operazione", [
-                "Pagamento Busta Paga Mensile (Non entra nel debito extra)",
-                "Azzeramento Giornate Extra (Fuori Busta)",
-                "Rimborso Spesa (effettuata dal dipendente)", 
-                "Straordinario (Ore extra dipendente)", 
-                "Spesa Extra Aziendale"
+                "Busta Paga (Ufficiale)", 
+                "Saldo Extra (Fuori Busta)", 
+                "Rimborso Spesa", 
+                "Straordinario"
             ])
             ex_importo = st.number_input("Importo Erogato (€)", min_value=0.0, step=0.01, key="ex_importo")
-            ex_stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato"], key="ex_stato")
         with col2:
-            ex_gg_azzerare = st.number_input("Giornate extra azzerate (Lascia 0 se paghi solo in €)", min_value=0.0, step=0.5, value=0.0)
-            ex_titolo = st.text_input("Oggetto / Mese", placeholder="es. Saldo Busta Paga Luglio / Saldo Extra")
-            ex_note = st.text_area("Dettagli aggiuntivi", key="ex_note")
+            ex_titolo = st.text_input("Oggetto / Mese", placeholder="es. Saldo Gennaio")
+            ex_note = st.text_area("Note", key="ex_note")
             
-        if st.form_submit_button("Registra Operazione"):
+        if st.form_submit_button("Registra Pagamento"):
             df, sha = get_github_file()
+            # Mappiamo il tipo operazione alla nuova categoria
+            cat_map = {"Busta Paga (Ufficiale)": "Busta Paga", "Saldo Extra (Fuori Busta)": "Saldo Extra", "Rimborso Spesa": "Rimborsi", "Straordinario": "Straordinari"}
+            cat_salvataggio = cat_map[tipo_op]
             
-            if "Busta Paga" in tipo_op:
-                cat_salvataggio = "Manodopera"
-                desc_salvataggio = f"{dip_extra} | 0 gg | Saldo Busta Paga | {ex_titolo} - {ex_note}"
-            elif "Azzeramento" in tipo_op:
-                cat_salvataggio = "Saldo Extra"
-                desc_salvataggio = f"{dip_extra} | {ex_gg_azzerare} gg | Azzeramento Fuori Busta | {ex_titolo} - {ex_note}"
-            elif "Straordinario" in tipo_op:
-                cat_salvataggio = "Straordinari"
-                desc_salvataggio = f"{dip_extra} | Straordinario | {ex_titolo} - {ex_note}"
-            elif "Rimborso" in tipo_op:
-                cat_salvataggio = "Rimborsi"
-                desc_salvataggio = f"{dip_extra} | Rimborso Spesa | {ex_titolo} - {ex_note}"
-            else:
-                cat_salvataggio = "Altro"
-                desc_salvataggio = f"EXTRA AZIENDA: {ex_titolo} - {ex_note}"
-                
-            new_row = pd.DataFrame([[ex_data.strftime('%Y-%m-%d'), "Uscita", cat_salvataggio, desc_salvataggio, ex_importo, "Olive", ex_stato]], columns=df.columns)
+            desc_salvataggio = f"{dip_extra} | 0 gg | {tipo_op} | {ex_titolo} - {ex_note}"
+            new_row = pd.DataFrame([[ex_data.strftime('%Y-%m-%d'), "Uscita", cat_salvataggio, desc_salvataggio, ex_importo, "Olive", "Saldato"]], columns=df.columns)
             df = pd.concat([df, new_row], ignore_index=True)
-            if save_to_github(df, sha, "Aggiunto Pagamento / Extra"): 
-                st.success("Registrato!"); st.rerun()
+            if save_to_github(df, sha, "Aggiunto Pagamento Cassa"): 
+                st.success("Pagamento registrato!"); st.rerun()
 # --- TAB 4: RACCOLTA E TABELLA INFERIORE (INVARIATE) ---
 with tab4:
     st.subheader("📦 Registra i KG di Olive raccolti")
