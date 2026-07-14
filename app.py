@@ -102,9 +102,19 @@ with tab2:
                 op_nome = scelta_dip
             op_nome = op_nome.strip() if op_nome else "Iannone Felice"
             
-            st.markdown("---")
-            op_reali = st.number_input("🔴 Giornate REALI lavorate (Totale Effettivo)", min_value=0.0, step=0.5, value=1.0)
-            op_ufficiali = st.number_input("🟢 Di cui UFFICIALI (Da comunicare al Commercialista)", min_value=0.0, step=0.5, value=1.0)
+           st.markdown("---")
+            op_reali = st.number_input("🔴 Giornate REALI lavorate (Totale Effettivo)", min_value=0.0, step=0.125, value=1.0, format="%.3f")
+            
+            # Legenda visiva per aiutare l'inserimento
+            st.markdown("""
+            <div style="font-size: 13px; color: #555; background-color: #e3f2fd; padding: 8px; border-radius: 5px; margin-top: -15px; margin-bottom: 10px;">
+            ⏱️ <b>Convertitore Rapido Ore ➔ Decimali:</b><br>
+            1 ora = <b>0.125</b> | 2 ore = <b>0.250</b> | 3 ore = <b>0.375</b> | 4 ore (Mezza) = <b>0.500</b><br>
+            5 ore = <b>0.625</b> | 6 ore = <b>0.750</b> | 7 ore = <b>0.875</b> | 8 ore (Intera) = <b>1.000</b>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            op_ufficiali = st.number_input("🟢 Di cui UFFICIALI (Da comunicare al Commercialista)", min_value=0.0, step=0.125, value=1.0, format="%.3f")
             st.markdown("---")
             
         with c2:
