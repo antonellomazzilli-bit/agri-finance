@@ -189,30 +189,27 @@ with tab3:
             etichetta_saldo = "CONTI IN PAREGGIO"
             segno = ""
             
-        st.markdown(f"""
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-top: 5px solid {colore_saldo}; box-shadow: 0px 2px 4px rgba(0,0,0,0.1);">
-            <h4 style="margin-top:0; color:#333;">🏦 Estratto Conto Lavoratore (In Euro)</h4>
-            
-            <table style="width:100%; font-size: 16px; border-collapse: collapse;">
-                <tr>
-                    <td style="padding: 5px 0;">[ + ] Totale Stipendi / Pagamenti versati:</td>
-                    <td style="text-align: right; font-weight: bold;">{format_euro(tot_stipendi_pagati)}</td>
-                </tr>
-                <tr>
-                    <td style="padding: 5px 0; color: #555;">[ - ] Spese Extra / Rimborsi:</td>
-                    <td style="text-align: right; color: #555;">- {format_euro(tot_spese_extra)}</td>
-                </tr>
-                <tr>
-                    <td style="padding: 5px 0; color: #555;">[ - ] Valore Giornate Extra Lavorate ({gg_extra_lavorate} gg):</td>
-                    <td style="text-align: right; color: #555;">- {format_euro(valore_gg_extra)}</td>
-                </tr>
-                <tr style="border-top: 1px solid #ccc;">
-                    <td style="padding: 10px 0; font-size: 18px; color: {colore_saldo};"><b>SALDO FINALE: {etichetta_saldo}</b></td>
-                    <td style="text-align: right; font-size: 22px; font-weight: bold; color: {colore_saldo}; padding: 10px 0;">{segno}{format_euro(saldo_in_euro)}</td>
-                </tr>
-            </table>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"""<div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-top: 5px solid {colore_saldo}; box-shadow: 0px 2px 4px rgba(0,0,0,0.1);">
+<h4 style="margin-top:0; color:#333;">🏦 Estratto Conto Lavoratore (In Euro)</h4>
+<table style="width:100%; font-size: 16px; border-collapse: collapse; color: #333;">
+<tr>
+<td style="padding: 5px 0;">[ + ] Totale Stipendi / Pagamenti versati:</td>
+<td style="text-align: right; font-weight: bold;">{format_euro(tot_stipendi_pagati)}</td>
+</tr>
+<tr>
+<td style="padding: 5px 0; color: #555;">[ - ] Spese Extra / Rimborsi:</td>
+<td style="text-align: right; color: #555;">- {format_euro(tot_spese_extra)}</td>
+</tr>
+<tr>
+<td style="padding: 5px 0; color: #555;">[ - ] Valore Giornate Extra Lavorate ({gg_extra_lavorate} gg):</td>
+<td style="text-align: right; color: #555;">- {format_euro(valore_gg_extra)}</td>
+</tr>
+<tr style="border-top: 1px solid #ccc;">
+<td style="padding: 10px 0; font-size: 18px; color: {colore_saldo};"><b>SALDO FINALE: {etichetta_saldo}</b></td>
+<td style="text-align: right; font-size: 22px; font-weight: bold; color: {colore_saldo}; padding: 10px 0;">{segno}{format_euro(saldo_in_euro)}</td>
+</tr>
+</table>
+</div>""", unsafe_allow_html=True)
         
     st.divider()
 
