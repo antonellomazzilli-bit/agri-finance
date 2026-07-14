@@ -140,9 +140,9 @@ with tab2:
                     st.success("Registrazione completata e Banca Ore aggiornata!")
                     st.rerun()
 
-# --- TAB 3: SPESE EXTRA, BUSTE PAGA E AZZERAMENTO ---
+# --- TAB 3: CASSA, BUSTE PAGA E ESTRATTO CONTO IN EURO ---
 with tab3:
-    st.subheader("💸 Cassa, Buste Paga e Banca Ore Extra")
+    st.subheader("💸 Cassa, Buste Paga ed Estratto Conto (Dare/Avere)")
     ANAGRAFICA_DIPENDENTI = ["Iannone Felice", "--- Inserisci Altro Dipendente ---"]
     scelta_dip_ex = st.selectbox("Seleziona Dipendente per il Quadro Riassuntivo:", ANAGRAFICA_DIPENDENTI, key="dip_ex")
     if scelta_dip_ex == "--- Inserisci Altro Dipendente ---":
@@ -157,53 +157,73 @@ with tab3:
         anno_corrente = datetime.today().year
         df_anno = df_dash[df_dash['data_dt'].dt.year == anno_corrente]
         
+        # Filtro per il dipendente selezionato
         df_dip = df_anno[df_anno['descrizione'].str.contains(dip_extra, case=False, na=False)]
         
-        tot_base = df_dip[df_dip['categoria'] == 'Manodopera']['importo'].sum()
-        tot_strao = df_dip[df_dip['categoria'] == 'Straordinari']['importo'].sum()
-        tot_rimb = df_dip[df_dip['categoria'] == 'Rimborsi']['importo'].sum()
-        tot_saldo_extra = df_dip[df_dip['categoria'] == 'Saldo Extra']['importo'].sum()
-        tot_assoluto = tot_base + tot_strao + tot_rimb + tot_saldo_extra
+        # 1. Totale Denaro Erogato (Buste Paga + Azzeramenti Extra)
+        tot_stipendi_pagati = df_dip[df_dip['categoria'].isin(['Manodopera', 'Saldo Extra'])]['importo'].sum()
         
+        # 2. Spese Extra Pagate (Straordinari e Rimborsi)
+        tot_spese_extra = df_dip[df_dip['categoria'].isin(['Straordinari', 'Rimborsi'])]['importo'].sum()
+        
+        # 3. Valore Economico delle Giornate Extra lavorate
         gg_extra_lavorate = sum(estrai_giornate(row['descrizione'], dip_extra) for _, row in df_dip[df_dip['categoria'] == 'Manodopera Extra'].iterrows())
-        gg_extra_pagate = sum(estrai_giornate(row['descrizione'], dip_extra) for _, row in df_dip[df_dip['categoria'] == 'Saldo Extra'].iterrows())
-        gg_residue = gg_extra_lavorate - gg_extra_pagate
+        valore_gg_extra = gg_extra_lavorate * COSTO_GIORNATA_EXTRA
         
-        # --- CALCOLO MATEMATICO DEL DEBITO IN EURO ---
-        debito_in_euro = gg_residue * COSTO_GIORNATA_EXTRA
+        # --- LA TUA FORMULA: IL SALDO DARE/AVERE ---
+        saldo_in_euro = tot_stipendi_pagati - tot_spese_extra - valore_gg_extra
         
         st.markdown(f"##### 📊 Resoconto Finanziario {anno_corrente}: **{dip_extra}**")
-        c_d1, c_d2, c_d3, c_d4 = st.columns(4)
-        c_d1.metric("Paga Base Ufficiale", format_euro(tot_base))
-        c_d2.metric("Straordinari & Rimborsi", format_euro(tot_strao + tot_rimb))
-        c_d3.metric("Pagamenti Fuori Busta", format_euro(tot_saldo_extra))
-        c_d4.metric("USCITE TOTALI (Euro)", format_euro(tot_assoluto))
         
-        colore_debito = "#D32F2F" if gg_residue > 0 else "#388E3C"
+        # Determinazione dei colori per il bilancio
+        if saldo_in_euro < 0:
+            colore_saldo = "#D32F2F" # Rosso = Debito (L'azienda deve pagare)
+            etichetta_saldo = "DEBITO AZIENDA (Da pagare)"
+            segno = ""
+        elif saldo_in_euro > 0:
+            colore_saldo = "#388E3C" # Verde = Credito (Il dipendente ha preso anticipi)
+            etichetta_saldo = "CREDITO AZIENDA (Anticipo erogato)"
+            segno = "+"
+        else:
+            colore_saldo = "#1A237E" # Blu = Pareggio
+            etichetta_saldo = "CONTI IN PAREGGIO"
+            segno = ""
+            
         st.markdown(f"""
-        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 6px solid {colore_debito}; margin-top: 10px; box-shadow: 0px 2px 4px rgba(0,0,0,0.1);">
-            <h4 style="margin:0; color:#333;">🏦 Banca Ore Extra (Fuori Busta)</h4>
-            <p style="margin:5px 0 0 0; font-size: 16px;">
-                Giornate Lavorate: <b>{gg_extra_lavorate} gg</b> | 
-                Giornate Saldate/Azzerate: <b>{gg_extra_pagate} gg</b> <br><br>
-                <span style="font-size: 20px;"><b>DEBITO RESIDUO DA AZZERARE: 
-                <span style="color:{colore_debito};">{gg_residue} gg </span>
-                <span style="color:#555; font-size: 16px;"> (Equivalenti a circa {format_euro(debito_in_euro)})</span>
-                </b></span>
-            </p>
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-top: 5px solid {colore_saldo}; box-shadow: 0px 2px 4px rgba(0,0,0,0.1);">
+            <h4 style="margin-top:0; color:#333;">🏦 Estratto Conto Lavoratore (In Euro)</h4>
+            
+            <table style="width:100%; font-size: 16px; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 5px 0;">[ + ] Totale Stipendi / Pagamenti versati:</td>
+                    <td style="text-align: right; font-weight: bold;">{format_euro(tot_stipendi_pagati)}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 5px 0; color: #555;">[ - ] Spese Extra / Rimborsi:</td>
+                    <td style="text-align: right; color: #555;">- {format_euro(tot_spese_extra)}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 5px 0; color: #555;">[ - ] Valore Giornate Extra Lavorate ({gg_extra_lavorate} gg):</td>
+                    <td style="text-align: right; color: #555;">- {format_euro(valore_gg_extra)}</td>
+                </tr>
+                <tr style="border-top: 1px solid #ccc;">
+                    <td style="padding: 10px 0; font-size: 18px; color: {colore_saldo};"><b>SALDO FINALE: {etichetta_saldo}</b></td>
+                    <td style="text-align: right; font-size: 22px; font-weight: bold; color: {colore_saldo}; padding: 10px 0;">{segno}{format_euro(saldo_in_euro)}</td>
+                </tr>
+            </table>
         </div>
         """, unsafe_allow_html=True)
         
     st.divider()
 
     with st.form("extra_form", clear_on_submit=True):
-        st.markdown(f"**Registra un Pagamento o un Azzeramento per {dip_extra}**")
+        st.markdown(f"**Registra un Pagamento o una Spesa per {dip_extra}**")
         col1, col2 = st.columns(2)
         with col1:
             ex_data = st.date_input("Data Operazione", format="DD/MM/YYYY", key="ex_data")
             tipo_op = st.selectbox("Natura dell'Operazione", [
-                "Pagamento Busta Paga Mensile (Importo dal commercialista)",
-                "Azzeramento Giornate Extra (Pagamento Fuori Busta)",
+                "Pagamento Busta Paga Mensile (Aggiunge al calderone versato)",
+                "Azzeramento Giornate Extra (Fuori Busta)",
                 "Rimborso Spesa (effettuata dal dipendente)", 
                 "Straordinario (Ore extra dipendente)", 
                 "Spesa Extra Aziendale"
@@ -211,7 +231,6 @@ with tab3:
             ex_importo = st.number_input("Importo Erogato (€)", min_value=0.0, step=0.01, key="ex_importo")
             ex_stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato"], key="ex_stato")
         with col2:
-            ex_gg_azzerare = st.number_input("Quante giornate extra stai saldando? (Solo per azzeramento)", min_value=0.0, step=0.5, value=0.0)
             ex_titolo = st.text_input("Oggetto / Mese", placeholder="es. Saldo Busta Paga Luglio / Saldo Extra")
             ex_note = st.text_area("Dettagli aggiuntivi", key="ex_note")
             
@@ -223,7 +242,7 @@ with tab3:
                 desc_salvataggio = f"{dip_extra} | 0 gg | Saldo Busta Paga | {ex_titolo} - {ex_note}"
             elif "Azzeramento" in tipo_op:
                 cat_salvataggio = "Saldo Extra"
-                desc_salvataggio = f"{dip_extra} | {ex_gg_azzerare} gg | Azzeramento Fuori Busta | {ex_titolo} - {ex_note}"
+                desc_salvataggio = f"{dip_extra} | 0 gg | Azzeramento Fuori Busta | {ex_titolo} - {ex_note}"
             elif "Straordinario" in tipo_op:
                 cat_salvataggio = "Straordinari"
                 desc_salvataggio = f"{dip_extra} | Straordinario | {ex_titolo} - {ex_note}"
