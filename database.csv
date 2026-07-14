@@ -14,3 +14,5 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato
 2026-07-13,Uscita,Manodopera,Iannone Felice | 0 gg (0 ore) | Saldo Busta Paga | Saldo Busta Paga Giugno 2026 - conto Zurich,734.0,Olive,Saldato
 2026-01-31,Uscita,Manodopera,Iannone Felice | 13.0 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riassunto cumulativo Gennaio,0.0,Olive,Saldato
 2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -7.0 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Riassunto cumulativo Gennaio,0.0,Olive,Saldato
+2026-02-28,Uscita,Manodopera,Iannone Felice | 14.0 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riassunto cumulativo Febbraio,0.0,Olive,Saldato
+2026-02-28,Uscita,Manodopera Extra,Iannone Felice | -3.0 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Riassunto cumulativo Febbraio,0.0,Olive,Saldato
