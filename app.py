@@ -87,7 +87,7 @@ with tab1:
             if save_to_github(df, sha, "Aggiunto Movimento Standard"): 
                 st.success("Registrato!"); st.rerun()
 
-# --- TAB 2: OPERAI (DOPPIO BINARIO) ---
+# --- TAB 2: OPERAI (DOPPIO BINARIO CON RECUPERO) ---
 with tab2:
     st.subheader("👥 Registro Manodopera (Gestione Doppio Binario)")
     with st.form("operaio_form", clear_on_submit=True):
@@ -114,28 +114,31 @@ with tab2:
             op_note = st.text_area("Note Attività", placeholder="es. Raccolta Olive")
         
         if st.form_submit_button("Registra Giornate"):
-            if op_ufficiali > op_reali:
-                st.error("Errore: Le giornate ufficiali non possono superare quelle reali lavorate!")
-            else:
-                df, sha = get_github_file()
-                stato_salvato = "Impegnato" if "Impegnato" in op_stato else "Saldato"
-                righe_da_aggiungere = []
-                
-                if op_ufficiali > 0:
-                    desc_uff = f"{op_nome} | {op_ufficiali} gg | {op_tipo_paga} | UFFICIALE: {op_note}"
-                    righe_da_aggiungere.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera", desc_uff, float(op_importo), "Olive", stato_salvato])
-                
-                gg_extra = op_reali - op_ufficiali
-                if gg_extra > 0:
-                    desc_extra = f"{op_nome} | {gg_extra} gg | {op_tipo_paga} | FUORI BUSTA: {op_note}"
-                    righe_da_aggiungere.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera Extra", desc_extra, 0.0, "Olive", stato_salvato])
-                
-                if righe_da_aggiungere:
-                    df_nuove = pd.DataFrame(righe_da_aggiungere, columns=df.columns)
-                    df = pd.concat([df, df_nuove], ignore_index=True)
-                    if save_to_github(df, sha, "Aggiunto Doppio Binario Manodopera"): 
-                        st.success("Registrazione completata e smistata correttamente!")
-                        st.rerun()
+            # Rimosso il blocco di errore per consentire gli anticipi ufficiali!
+            df, sha = get_github_file()
+            stato_salvato = "Impegnato" if "Impegnato" in op_stato else "Saldato"
+            righe_da_aggiungere = []
+            
+            # Riga 1: Ufficiale (Visibile al commercialista)
+            if op_ufficiali > 0:
+                desc_uff = f"{op_nome} | {op_ufficiali} gg | {op_tipo_paga} | UFFICIALE: {op_note}"
+                righe_da_aggiungere.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera", desc_uff, float(op_importo), "Olive", stato_salvato])
+            
+            # Riga 2: Il Delta / Extra (Ora può essere anche negativo per il recupero)
+            gg_extra = op_reali - op_ufficiali
+            
+            if gg_extra != 0:
+                # Se positivo è debito azienda, se negativo è anticipo al dipendente
+                etichetta = "FUORI BUSTA" if gg_extra > 0 else "RECUPERO (Anticipo Ufficiale)"
+                desc_extra = f"{op_nome} | {gg_extra} gg | {op_tipo_paga} | {etichetta}: {op_note}"
+                righe_da_aggiungere.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera Extra", desc_extra, 0.0, "Olive", stato_salvato])
+            
+            if righe_da_aggiungere:
+                df_nuove = pd.DataFrame(righe_da_aggiungere, columns=df.columns)
+                df = pd.concat([df, df_nuove], ignore_index=True)
+                if save_to_github(df, sha, "Aggiunto Doppio Binario Manodopera"): 
+                    st.success("Registrazione completata e Banca Ore aggiornata!")
+                    st.rerun()
 
 # --- TAB 3: SPESE EXTRA, BUSTE PAGA E AZZERAMENTO ---
 with tab3:
