@@ -13,8 +13,22 @@ REPO = "antonellomazzilli-bit/agri-finance"
 FILE_PATH = "database.csv"
 BRANCH = "main"
 
+# --- NUOVA COSTANTE AZIENDALE ---
+COSTO_GIORNATA_EXTRA = 55.00  # Costo fisso per 8 ore fuori busta
+
 def format_euro(val):
     return f"€ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+def estrai_giornate(descrizione, nome_target):
+    try:
+        if "|" in str(descrizione) and nome_target.lower() in str(descrizione).lower():
+            parti = descrizione.split("|")
+            info_tempo = parti[1].strip()
+            if "gg" in info_tempo:
+                return float(info_tempo.split(" gg")[0].strip())
+    except:
+        pass
+    return 0.0
 
 def get_github_file():
     timestamp = int(time.time())
@@ -48,7 +62,7 @@ def save_to_github(df, sha, commit_msg="Update database via AgriApp"):
 
 st.title("🚜 Registro Agricolo Cloud")
 
-tab1, tab2, tab3, tab4 = st.tabs(["🛒 Movimenti Standard", "👥 Giornate Operai", "💸 Extra & Straordinari", "📦 Raccolta Rese"])
+tab1, tab2, tab3, tab4 = st.tabs(["🛒 Movimenti Standard", "👥 Giornate Operai", "💸 Extra & Buste Paga", "📦 Raccolta Rese"])
 
 # --- TAB 1: STANDARD ---
 with tab1:
@@ -73,9 +87,9 @@ with tab1:
             if save_to_github(df, sha, "Aggiunto Movimento Standard"): 
                 st.success("Registrato!"); st.rerun()
 
-# --- TAB 2: OPERAI (IL CARTELLINO) ---
+# --- TAB 2: OPERAI (DOPPIO BINARIO) ---
 with tab2:
-    st.subheader("👥 Registro Manodopera Specializzato Olive")
+    st.subheader("👥 Registro Manodopera (Gestione Doppio Binario)")
     with st.form("operaio_form", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
@@ -88,28 +102,44 @@ with tab2:
                 op_nome = scelta_dip
             op_nome = op_nome.strip() if op_nome else "Iannone Felice"
             
-            op_giornate = st.number_input("Giornate lavorate", min_value=0.0, step=0.5, value=1.0)
-            op_ore = st.number_input("Ore Effettive", min_value=0.0, step=1.0, value=8.0)
+            st.markdown("---")
+            op_reali = st.number_input("🔴 Giornate REALI lavorate (Totale Effettivo)", min_value=0.0, step=0.5, value=1.0)
+            op_ufficiali = st.number_input("🟢 Di cui UFFICIALI (Da comunicare al Commercialista)", min_value=0.0, step=0.5, value=1.0)
+            st.markdown("---")
+            
         with c2:
-            # Opzione di default per chi attende il commercialista
             op_tipo_paga = st.selectbox("Tipo di Pagamento", ["Nessuno (Attesa Busta Paga)", "Acconto", "Saldo Finale", "Paga Intera"])
-            # Valore predefinito a 0.0
             op_importo = st.number_input("Importo (€) - Lascia 0 se attendi busta paga", min_value=0.0, step=1.0, value=0.0)
             op_stato = st.selectbox("Stato del Costo", ["Saldato", "Impegnato (Da liquidare in futuro)"])
             op_note = st.text_area("Note Attività", placeholder="es. Raccolta Olive")
         
-        if st.form_submit_button("Registra Manodopera"):
-            df, sha = get_github_file()
-            stato_salvato = "Impegnato" if "Impegnato" in op_stato else "Saldato"
-            desc_dettagliata = f"{op_nome} | {op_giornate} gg ({op_ore} ore) | {op_tipo_paga} | {op_note}"
-            new_row = pd.DataFrame([[op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera", desc_dettagliata, float(op_importo), "Olive", stato_salvato]], columns=df.columns)
-            df = pd.concat([df, new_row], ignore_index=True)
-            if save_to_github(df, sha, "Aggiunto Movimento Manodopera"): 
-                st.success("Registrato!"); st.rerun()
+        if st.form_submit_button("Registra Giornate"):
+            if op_ufficiali > op_reali:
+                st.error("Errore: Le giornate ufficiali non possono superare quelle reali lavorate!")
+            else:
+                df, sha = get_github_file()
+                stato_salvato = "Impegnato" if "Impegnato" in op_stato else "Saldato"
+                righe_da_aggiungere = []
+                
+                if op_ufficiali > 0:
+                    desc_uff = f"{op_nome} | {op_ufficiali} gg | {op_tipo_paga} | UFFICIALE: {op_note}"
+                    righe_da_aggiungere.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera", desc_uff, float(op_importo), "Olive", stato_salvato])
+                
+                gg_extra = op_reali - op_ufficiali
+                if gg_extra > 0:
+                    desc_extra = f"{op_nome} | {gg_extra} gg | {op_tipo_paga} | FUORI BUSTA: {op_note}"
+                    righe_da_aggiungere.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera Extra", desc_extra, 0.0, "Olive", stato_salvato])
+                
+                if righe_da_aggiungere:
+                    df_nuove = pd.DataFrame(righe_da_aggiungere, columns=df.columns)
+                    df = pd.concat([df, df_nuove], ignore_index=True)
+                    if save_to_github(df, sha, "Aggiunto Doppio Binario Manodopera"): 
+                        st.success("Registrazione completata e smistata correttamente!")
+                        st.rerun()
 
-# --- TAB 3: SPESE EXTRA, STRAORDINARI E BUSTE PAGA (LA CASSA) ---
+# --- TAB 3: SPESE EXTRA, BUSTE PAGA E AZZERAMENTO ---
 with tab3:
-    st.subheader("💸 Spese Extra, Rimborsi e Buste Paga")
+    st.subheader("💸 Cassa, Buste Paga e Banca Ore Extra")
     ANAGRAFICA_DIPENDENTI = ["Iannone Felice", "--- Inserisci Altro Dipendente ---"]
     scelta_dip_ex = st.selectbox("Seleziona Dipendente per il Quadro Riassuntivo:", ANAGRAFICA_DIPENDENTI, key="dip_ex")
     if scelta_dip_ex == "--- Inserisci Altro Dipendente ---":
@@ -124,55 +154,76 @@ with tab3:
         anno_corrente = datetime.today().year
         df_anno = df_dash[df_dash['data_dt'].dt.year == anno_corrente]
         
-        mask_manod = (df_anno['categoria'] == 'Manodopera') & (df_anno['descrizione'].str.contains(dip_extra, case=False, na=False))
-        tot_base = df_anno[mask_manod]['importo'].sum()
-        mask_stra = (df_anno['categoria'] == 'Straordinari') & (df_anno['descrizione'].str.contains(dip_extra, case=False, na=False))
-        tot_strao = df_anno[mask_stra]['importo'].sum()
-        mask_rimb = (df_anno['categoria'] == 'Rimborsi') & (df_anno['descrizione'].str.contains(dip_extra, case=False, na=False))
-        tot_rimb = df_anno[mask_rimb]['importo'].sum()
+        df_dip = df_anno[df_anno['descrizione'].str.contains(dip_extra, case=False, na=False)]
         
-        tot_assoluto = tot_base + tot_strao + tot_rimb
+        tot_base = df_dip[df_dip['categoria'] == 'Manodopera']['importo'].sum()
+        tot_strao = df_dip[df_dip['categoria'] == 'Straordinari']['importo'].sum()
+        tot_rimb = df_dip[df_dip['categoria'] == 'Rimborsi']['importo'].sum()
+        tot_saldo_extra = df_dip[df_dip['categoria'] == 'Saldo Extra']['importo'].sum()
+        tot_assoluto = tot_base + tot_strao + tot_rimb + tot_saldo_extra
+        
+        gg_extra_lavorate = sum(estrai_giornate(row['descrizione'], dip_extra) for _, row in df_dip[df_dip['categoria'] == 'Manodopera Extra'].iterrows())
+        gg_extra_pagate = sum(estrai_giornate(row['descrizione'], dip_extra) for _, row in df_dip[df_dip['categoria'] == 'Saldo Extra'].iterrows())
+        gg_residue = gg_extra_lavorate - gg_extra_pagate
+        
+        # --- CALCOLO MATEMATICO DEL DEBITO IN EURO ---
+        debito_in_euro = gg_residue * COSTO_GIORNATA_EXTRA
+        
         st.markdown(f"##### 📊 Resoconto Finanziario {anno_corrente}: **{dip_extra}**")
         c_d1, c_d2, c_d3, c_d4 = st.columns(4)
-        c_d1.metric("Paga Base (Giornate/Buste)", format_euro(tot_base))
-        c_d2.metric("Straordinari", format_euro(tot_strao))
-        c_d3.metric("Rimborsi Spese", format_euro(tot_rimb))
-        c_d4.metric("TOTALE COMPLESSIVO", format_euro(tot_assoluto))
+        c_d1.metric("Paga Base Ufficiale", format_euro(tot_base))
+        c_d2.metric("Straordinari & Rimborsi", format_euro(tot_strao + tot_rimb))
+        c_d3.metric("Pagamenti Fuori Busta", format_euro(tot_saldo_extra))
+        c_d4.metric("USCITE TOTALI (Euro)", format_euro(tot_assoluto))
+        
+        colore_debito = "#D32F2F" if gg_residue > 0 else "#388E3C"
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 6px solid {colore_debito}; margin-top: 10px; box-shadow: 0px 2px 4px rgba(0,0,0,0.1);">
+            <h4 style="margin:0; color:#333;">🏦 Banca Ore Extra (Fuori Busta)</h4>
+            <p style="margin:5px 0 0 0; font-size: 16px;">
+                Giornate Lavorate: <b>{gg_extra_lavorate} gg</b> | 
+                Giornate Saldate/Azzerate: <b>{gg_extra_pagate} gg</b> <br><br>
+                <span style="font-size: 20px;"><b>DEBITO RESIDUO DA AZZERARE: 
+                <span style="color:{colore_debito};">{gg_residue} gg </span>
+                <span style="color:#555; font-size: 16px;"> (Equivalenti a circa {format_euro(debito_in_euro)})</span>
+                </b></span>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
         
     st.divider()
 
     with st.form("extra_form", clear_on_submit=True):
-        st.markdown(f"**Registra un pagamento per {dip_extra} (o per l'azienda)**")
+        st.markdown(f"**Registra un Pagamento o un Azzeramento per {dip_extra}**")
         col1, col2 = st.columns(2)
         with col1:
             ex_data = st.date_input("Data Operazione", format="DD/MM/YYYY", key="ex_data")
-            
-            # Nuova voce inserita nel menu a tendina
             tipo_op = st.selectbox("Natura dell'Operazione", [
                 "Pagamento Busta Paga Mensile (Importo dal commercialista)",
+                "Azzeramento Giornate Extra (Pagamento Fuori Busta)",
                 "Rimborso Spesa (effettuata dal dipendente)", 
                 "Straordinario (Ore extra dipendente)", 
-                "Spesa Extra Aziendale (Slegata dal dipendente)"
+                "Spesa Extra Aziendale"
             ])
-            
-            ex_importo = st.number_input("Importo (€)", min_value=0.0, step=0.01, key="ex_importo")
+            ex_importo = st.number_input("Importo Erogato (€)", min_value=0.0, step=0.01, key="ex_importo")
             ex_stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato"], key="ex_stato")
         with col2:
-            ex_ore = st.number_input("Ore Straordinario (Solo se applicabile)", min_value=0.0, step=0.5, value=0.0)
-            ex_titolo = st.text_input("Oggetto / Mese", placeholder="es. Saldo Busta Paga Luglio")
+            ex_gg_azzerare = st.number_input("Quante giornate extra stai saldando? (Solo per azzeramento)", min_value=0.0, step=0.5, value=0.0)
+            ex_titolo = st.text_input("Oggetto / Mese", placeholder="es. Saldo Busta Paga Luglio / Saldo Extra")
             ex_note = st.text_area("Dettagli aggiuntivi", key="ex_note")
             
         if st.form_submit_button("Registra Operazione"):
             df, sha = get_github_file()
             
-            # Nuova logica di smistamento
             if "Busta Paga" in tipo_op:
                 cat_salvataggio = "Manodopera"
-                # Scriviamo 0 gg per impedire che il commercialista riceva giorni sballati
-                desc_salvataggio = f"{dip_extra} | 0 gg (0 ore) | Saldo Busta Paga | {ex_titolo} - {ex_note}"
+                desc_salvataggio = f"{dip_extra} | 0 gg | Saldo Busta Paga | {ex_titolo} - {ex_note}"
+            elif "Azzeramento" in tipo_op:
+                cat_salvataggio = "Saldo Extra"
+                desc_salvataggio = f"{dip_extra} | {ex_gg_azzerare} gg | Azzeramento Fuori Busta | {ex_titolo} - {ex_note}"
             elif "Straordinario" in tipo_op:
                 cat_salvataggio = "Straordinari"
-                desc_salvataggio = f"{dip_extra} | Straordinario: {ex_ore} ore | {ex_titolo} - {ex_note}"
+                desc_salvataggio = f"{dip_extra} | Straordinario | {ex_titolo} - {ex_note}"
             elif "Rimborso" in tipo_op:
                 cat_salvataggio = "Rimborsi"
                 desc_salvataggio = f"{dip_extra} | Rimborso Spesa | {ex_titolo} - {ex_note}"
@@ -185,7 +236,7 @@ with tab3:
             if save_to_github(df, sha, "Aggiunto Pagamento / Extra"): 
                 st.success("Registrato!"); st.rerun()
 
-# --- TAB 4: RACCOLTA ---
+# --- TAB 4: RACCOLTA E TABELLA INFERIORE (INVARIATE) ---
 with tab4:
     st.subheader("📦 Registra i KG di Olive raccolti")
     with st.form("resa_form", clear_on_submit=True):
@@ -202,7 +253,6 @@ with tab4:
             if save_to_github(df, sha, "Aggiunto Movimento Raccolta"): 
                 st.success("Registrato!"); st.rerun()
 
-# --- TABELLA DI SELEZIONE GENERALE INTERATTIVA ---
 st.divider()
 st.subheader("📋 Registro Generale dei Movimenti")
 st.markdown("💡 *Seleziona una riga spuntando il cerchietto a sinistra per caricarla nel modulo di Modifica/Cancellazione in basso.*")
@@ -230,7 +280,6 @@ if not df_view.empty:
         indice_visualizzato = selezione_griglia["selection"]["rows"][0]
         id_riga_selezionata = df_filtrato.index[indice_visualizzato]
 
-# --- SEZIONE FORM DINAMICO ---
 if id_riga_selezionata is not None:
     st.write("")
     riga_dati = df_view.loc[id_riga_selezionata]
@@ -249,8 +298,8 @@ if id_riga_selezionata is not None:
                 mod_importo = st.number_input("Importo (€)", value=float(riga_dati['importo']), step=1.0, format="%.2f")
                 mod_colt = st.text_input("Coltura", value=str(riga_dati['coltura_id']))
             with c_mod2:
-                categorie = ["Sementi", "Carburante", "Concimi", "Vendita", "Fatture Fornitori", "Attrezzature", "Manodopera", "Straordinari", "Rimborsi", "Raccolta", "Altro"]
-                idx_cat = categorie.index(riga_dati['categoria']) if riga_dati['categoria'] in categorie else 10
+                categorie = ["Sementi", "Carburante", "Concimi", "Vendita", "Fatture Fornitori", "Attrezzature", "Manodopera", "Manodopera Extra", "Saldo Extra", "Straordinari", "Rimborsi", "Raccolta", "Altro"]
+                idx_cat = categorie.index(riga_dati['categoria']) if riga_dati['categoria'] in categorie else len(categorie)-1
                 mod_cat = st.selectbox("Categoria", categorie, index=idx_cat)
                 stato_corrente = "Impegnato" if "Impegnato" in str(riga_dati['stato']) else "Saldato"
                 mod_stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato"], index=0 if stato_corrente == "Saldato" else 1)
