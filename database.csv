@@ -15,3 +15,5 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato
 2026-05-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Aprile - ,641.63,Olive,Saldato
 2026-01-31,Uscita,Manodopera,Iannone Felice | 13.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Totale Gennaio 2026,0.0,Olive,Saldato
 2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.364 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Totale Gennaio 2026,0.0,Olive,Saldato
+2026-02-28,Uscita,Manodopera,Iannone Felice | 14.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riepilogo Febbraio 2026,0.0,Olive,Saldato
+2026-02-28,Uscita,Manodopera Extra,Iannone Felice | 9.454 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riepilogo Febbraio 2026,0.0,Olive,Saldato
