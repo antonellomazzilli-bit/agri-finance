@@ -87,9 +87,9 @@ with tab1:
             if save_to_github(df, sha, "Aggiunto Movimento Standard"): 
                 st.success("Registrato!"); st.rerun()
 
-# --- TAB 2: OPERAI (DOPPIO BINARIO CON RECUPERO E DECIMALI) ---
+# --- TAB 2: OPERAI (DOPPIO BINARIO - GIORNATA DA 6 ORE) ---
 with tab2:
-    st.subheader("👥 Registro Manodopera (Gestione Doppio Binario)")
+    st.subheader("👥 Registro Manodopera (Giornata standard: 6 ore)")
     with st.form("operaio_form", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
@@ -103,18 +103,19 @@ with tab2:
             op_nome = op_nome.strip() if op_nome else "Iannone Felice"
             
             st.markdown("---")
-            op_reali = st.number_input("🔴 Giornate REALI lavorate (Totale Effettivo)", min_value=0.0, step=0.125, value=1.0, format="%.3f")
+            # Step aggiornato a 0.167 (1/6 di giornata)
+            op_reali = st.number_input("🔴 Giornate REALI lavorate", min_value=0.0, step=0.167, value=1.0, format="%.3f")
             
-            # Legenda visiva per aiutare l'inserimento
+            # Tabella di conversione aggiornata per 6 ore
             st.markdown("""
-            <div style="font-size: 13px; color: #555; background-color: #e3f2fd; padding: 8px; border-radius: 5px; margin-top: -15px; margin-bottom: 10px;">
-            ⏱️ <b>Convertitore Rapido Ore ➔ Decimali:</b><br>
-            1 ora = <b>0.125</b> | 2 ore = <b>0.250</b> | 3 ore = <b>0.375</b> | 4 ore (Mezza) = <b>0.500</b><br>
-            5 ore = <b>0.625</b> | 6 ore = <b>0.750</b> | 7 ore = <b>0.875</b> | 8 ore (Intera) = <b>1.000</b>
+            <div style="font-size: 13px; color: #555; background-color: #fff3e0; padding: 8px; border-radius: 5px; margin-top: -15px; margin-bottom: 10px;">
+            ⏱️ <b>Convertitore (Giornata = 6 ore):</b><br>
+            1h = <b>0.167</b> | 2h = <b>0.333</b> | 3h = <b>0.500</b> (Mezza)<br>
+            4h = <b>0.667</b> | 5h = <b>0.833</b> | 6h = <b>1.000</b> (Intera)
             </div>
             """, unsafe_allow_html=True)
             
-            op_ufficiali = st.number_input("🟢 Di cui UFFICIALI (Da comunicare al Commercialista)", min_value=0.0, step=0.125, value=1.0, format="%.3f")
+            op_ufficiali = st.number_input("🟢 Di cui UFFICIALI (per Commercialista)", min_value=0.0, step=0.167, value=1.0, format="%.3f")
             st.markdown("---")
             
         with c2:
@@ -130,22 +131,22 @@ with tab2:
             
             # Riga 1: Ufficiale
             if op_ufficiali > 0:
-                desc_uff = f"{op_nome} | {op_ufficiali} gg | {op_tipo_paga} | UFFICIALE: {op_note}"
+                desc_uff = f"{op_nome} | {op_ufficiali:.3f} gg | {op_tipo_paga} | UFFICIALE: {op_note}"
                 righe_da_aggiungere.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera", desc_uff, float(op_importo), "Olive", stato_salvato])
             
             # Riga 2: Extra
             gg_extra = op_reali - op_ufficiali
             
-            if gg_extra != 0:
+            if abs(gg_extra) > 0.001: # Tolleranza minima per decimali
                 etichetta = "FUORI BUSTA" if gg_extra > 0 else "RECUPERO (Anticipo Ufficiale)"
-                desc_extra = f"{op_nome} | {gg_extra} gg | {op_tipo_paga} | {etichetta}: {op_note}"
+                desc_extra = f"{op_nome} | {gg_extra:.3f} gg | {op_tipo_paga} | {etichetta}: {op_note}"
                 righe_da_aggiungere.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera Extra", desc_extra, 0.0, "Olive", stato_salvato])
             
             if righe_da_aggiungere:
                 df_nuove = pd.DataFrame(righe_da_aggiungere, columns=df.columns)
                 df = pd.concat([df, df_nuove], ignore_index=True)
-                if save_to_github(df, sha, "Aggiunto Doppio Binario Manodopera"): 
-                    st.success("Registrazione completata e Banca Ore aggiornata!")
+                if save_to_github(df, sha, "Aggiunto Doppio Binario (6h)"): 
+                    st.success("Registrazione completata!")
                     st.rerun()
 
 # --- TAB 3: CASSA, BUSTE PAGA E ESTRATTO CONTO FINANZIARIO ---
