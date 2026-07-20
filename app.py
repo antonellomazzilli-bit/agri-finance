@@ -9,6 +9,86 @@ import time
 
 # --- CONFIGURAZIONE INIZIALE ---
 st.set_page_config(page_title="AgriFinance Cloud", layout="wide")
+# --- MANUALE OPERATIVO (Sidebar) ---
+with st.sidebar:
+    st.header("📚 Supporto")
+    
+    testo_manuale = """
+    MANUALE OPERATIVO: AGRIFINANCE CLOUD
+    ... (Versione: 2.0 (Architettura a Doppio Binario e Database Cloud)
+
+🎯 Obiettivo del Sistema
+Il software centralizza la gestione amministrativa, finanziaria e operativa dell'impresa agricola. Il cuore logico è la separazione netta tra i movimenti fisici (il lavoro sui campi in giornate da 6 ore) e i movimenti finanziari (cassa, fatture e bonifici).
+
+Moduli Operativi (Le 6 Aree del Gestionale)
+1. Tab 1: Home (Registro Generale / Editor Diviso)
+Questo è il pannello di controllo diretto sul database. L'interfaccia è divisa in due colonne: 🟢 Entrate e 🔴 Uscite.
+
+Come Analizzare: Clicca sull'intestazione di qualsiasi colonna (es. "Importo" o "Data") per ordinare i dati.
+
+Come Modificare: Fai doppio clic su una cella qualsiasi per correggere un refuso (es. una categoria assegnata per sbaglio). Premi Invio per confermare la digitazione.
+
+Come Eliminare: Seleziona la riga cliccando sul quadratino alla sua estrema sinistra e premi il tasto Canc (o clicca sull'icona a cestino in alto a destra).
+
+⚠️ PASSAGGIO OBBLIGATORIO: Nessuna modifica è definitiva finché non clicchi il pulsante blu in basso "💾 SALVA MODIFICHE NEL DATABASE".
+
+2. Tab 2: Manodopera (Gestione Ore e Forza Lavoro)
+Modulo dedicato esclusivamente al tracciamento del tempo fisico speso sugli uliveti. Non movimenta Euro in questa fase.
+
+Logica di Base: La giornata lavorativa standard è impostata rigidamente su 6 ore (1.000 = 6 ore).
+
+Come Registrare:
+
+Seleziona il lavoratore (es. Iannone Felice).
+
+Inserisci il totale delle giornate REALI lavorate (es. 2.000 per 12 ore totali).
+
+Inserisci la quota da dichiarare come UFFICIALE (es. 1.000).
+
+Il sistema calcola automaticamente la differenza (1.000 gg Extra) e crea due registrazioni separate per mantenere in perfetto equilibrio il doppio binario (Busta Paga vs. Fuori Busta).
+
+Nota Strategica: Usa il campo note per specificare l'attività (es. "Potatura uliveto", "Raccolta").
+
+3. Tab 3: Cassa (Estratto Conto Dipendenti)
+Questo modulo traduce il tempo lavorato (Tab 2) in valuta, incrociandolo con i pagamenti reali effettuati.
+
+Indicatore Dare/Avere: Il sistema moltiplica le giornate totali estratte dalla Tab 2 per la tariffa fissa (55 €) e sottrae tutti i versamenti registrati.
+
+Verde: L'azienda ha erogato più di quanto strettamente dovuto (Credito).
+
+Rosso: Ci sono giornate lavorate ancora da saldare (Debito).
+
+Registrazione: Usa il form in basso per inserire i bonifici o gli anticipi. Scegli se si tratta di "Busta Paga" o "Saldo Extra" per mantenere l'allineamento con la contabilità della manodopera.
+
+4. Tab 4: Rese
+Modulo attualmente in fase di predisposizione per incrociare i quintali raccolti con la resa in olio.
+
+5. Tab 5: Bilancio e Controllo di Gestione
+È il cruscotto direzionale. Filtra i dati per anno e restituisce 4 livelli di analisi finanziaria:
+
+Sintesi Finanziaria: L'utile o la perdita reale calcolando tutte le Entrate contro tutte le Uscite (incluse fatture e stipendi).
+
+Analisi dei Costi (Dove vanno i soldi): Divide le uscite in due categorie. Da una parte la Cassa Personale (quanto è costato il lavoratore), dall'altra i Costi Operativi puri (acquisto attrezzature, gasolio, ecc.).
+
+Forza Lavoro: Un contatore che riassume l'impegno fisico (giornate totali) e mostra il debito potenziale generato dal lavoro ancor prima che venga pagato.
+
+Grafico Andamento: Permette di visualizzare picchi di spesa in determinati mesi (es. picco di acquisti carburante durante la raccolta).
+
+6. Tab 6: Fatture e Commercializzazione
+Il modulo per la contabilità generale e le operazioni commerciali dell'azienda.
+
+Flusso di lavoro:
+
+Seleziona in alto se è un'Uscita o un'Entrata. Questa scelta è reattiva e modificherà le categorie disponibili nel passo successivo.
+
+Compila Data, Fornitore (es. Consorzio Agrario) e Descrizione (es. "Acquisto Concime").
+
+Assegna la categoria, inserisci l'importo e clicca su Registra. Questi dati andranno ad alimentare istantaneamente i grafici della Tab 5.
+) ...
+    """
+    
+    st.divider()
+    st.info("Utilizza il manuale per orientarti nel flusso di cassa e nella gestione delle fatture.")
 COSTO_GIORNATA_EXTRA = 55.0
 
 # --- FUNZIONI DI CONNESSIONE GITHUB ---
@@ -98,76 +178,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Home", "Manodopera", "Cassa", "Re
 # Testo del manuale incorporato nell'app
 testo_manuale = """
 📖 MANUALE OPERATIVO: AGRIFINANCE CLOUD
-Versione: 2.0 (Architettura a Doppio Binario e Database Cloud)
 
-🎯 Obiettivo del Sistema
-Il software centralizza la gestione amministrativa, finanziaria e operativa dell'impresa agricola. Il cuore logico è la separazione netta tra i movimenti fisici (il lavoro sui campi in giornate da 6 ore) e i movimenti finanziari (cassa, fatture e bonifici).
-
-Moduli Operativi (Le 6 Aree del Gestionale)
-1. Tab 1: Home (Registro Generale / Editor Diviso)
-Questo è il pannello di controllo diretto sul database. L'interfaccia è divisa in due colonne: 🟢 Entrate e 🔴 Uscite.
-
-Come Analizzare: Clicca sull'intestazione di qualsiasi colonna (es. "Importo" o "Data") per ordinare i dati.
-
-Come Modificare: Fai doppio clic su una cella qualsiasi per correggere un refuso (es. una categoria assegnata per sbaglio). Premi Invio per confermare la digitazione.
-
-Come Eliminare: Seleziona la riga cliccando sul quadratino alla sua estrema sinistra e premi il tasto Canc (o clicca sull'icona a cestino in alto a destra).
-
-⚠️ PASSAGGIO OBBLIGATORIO: Nessuna modifica è definitiva finché non clicchi il pulsante blu in basso "💾 SALVA MODIFICHE NEL DATABASE".
-
-2. Tab 2: Manodopera (Gestione Ore e Forza Lavoro)
-Modulo dedicato esclusivamente al tracciamento del tempo fisico speso sugli uliveti. Non movimenta Euro in questa fase.
-
-Logica di Base: La giornata lavorativa standard è impostata rigidamente su 6 ore (1.000 = 6 ore).
-
-Come Registrare:
-
-Seleziona il lavoratore (es. Iannone Felice).
-
-Inserisci il totale delle giornate REALI lavorate (es. 2.000 per 12 ore totali).
-
-Inserisci la quota da dichiarare come UFFICIALE (es. 1.000).
-
-Il sistema calcola automaticamente la differenza (1.000 gg Extra) e crea due registrazioni separate per mantenere in perfetto equilibrio il doppio binario (Busta Paga vs. Fuori Busta).
-
-Nota Strategica: Usa il campo note per specificare l'attività (es. "Potatura uliveto", "Raccolta").
-
-3. Tab 3: Cassa (Estratto Conto Dipendenti)
-Questo modulo traduce il tempo lavorato (Tab 2) in valuta, incrociandolo con i pagamenti reali effettuati.
-
-Indicatore Dare/Avere: Il sistema moltiplica le giornate totali estratte dalla Tab 2 per la tariffa fissa (55 €) e sottrae tutti i versamenti registrati.
-
-Verde: L'azienda ha erogato più di quanto strettamente dovuto (Credito).
-
-Rosso: Ci sono giornate lavorate ancora da saldare (Debito).
-
-Registrazione: Usa il form in basso per inserire i bonifici o gli anticipi. Scegli se si tratta di "Busta Paga" o "Saldo Extra" per mantenere l'allineamento con la contabilità della manodopera.
-
-4. Tab 4: Rese
-Modulo attualmente in fase di predisposizione per incrociare i quintali raccolti con la resa in olio.
-
-5. Tab 5: Bilancio e Controllo di Gestione
-È il cruscotto direzionale. Filtra i dati per anno e restituisce 4 livelli di analisi finanziaria:
-
-Sintesi Finanziaria: L'utile o la perdita reale calcolando tutte le Entrate contro tutte le Uscite (incluse fatture e stipendi).
-
-Analisi dei Costi (Dove vanno i soldi): Divide le uscite in due categorie. Da una parte la Cassa Personale (quanto è costato il lavoratore), dall'altra i Costi Operativi puri (acquisto attrezzature, gasolio, ecc.).
-
-Forza Lavoro: Un contatore che riassume l'impegno fisico (giornate totali) e mostra il debito potenziale generato dal lavoro ancor prima che venga pagato.
-
-Grafico Andamento: Permette di visualizzare picchi di spesa in determinati mesi (es. picco di acquisti carburante durante la raccolta).
-
-6. Tab 6: Fatture e Commercializzazione
-Il modulo per la contabilità generale e le operazioni commerciali dell'azienda.
-
-Flusso di lavoro:
-
-Seleziona in alto se è un'Uscita o un'Entrata. Questa scelta è reattiva e modificherà le categorie disponibili nel passo successivo.
-
-Compila Data, Fornitore (es. Consorzio Agrario) e Descrizione (es. "Acquisto Concime").
-
-Assegna la categoria, inserisci l'importo e clicca su Registra. Questi dati andranno ad alimentare istantaneamente i grafici della Tab 5.
-"""
 
 # Bottone per il download immediato
 st.download_button(
