@@ -9,6 +9,7 @@ import time
 
 # --- CONFIGURAZIONE INIZIALE ---
 st.set_page_config(page_title="AgriFinance Cloud", layout="wide")
+COSTO_GIORNATA_EXTRA = 55.0
 # --- MANUALE OPERATIVO (Sidebar) ---
 with st.sidebar:
     st.header("📚 Supporto")
@@ -84,12 +85,12 @@ Seleziona in alto se è un'Uscita o un'Entrata. Questa scelta è reattiva e modi
 Compila Data, Fornitore (es. Consorzio Agrario) e Descrizione (es. "Acquisto Concime").
 
 Assegna la categoria, inserisci l'importo e clicca su Registra. Questi dati andranno ad alimentare istantaneamente i grafici della Tab 5.
-) ...
+
     """
     
     st.divider()
     st.info("Utilizza il manuale per orientarti nel flusso di cassa e nella gestione delle fatture.")
-COSTO_GIORNATA_EXTRA = 55.0
+
 
 # --- FUNZIONI DI CONNESSIONE GITHUB ---
 @st.cache_data(ttl=0) # Forza Streamlit a scaricare dati sempre freschissimi aggirando la cache
@@ -175,18 +176,6 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Home", "Manodopera", "Cassa", "Re
 # --- TAB 1: HOME (Editor Diviso) ---
 # ==========================================
 
-# Testo del manuale incorporato nell'app
-testo_manuale = """
-📖 MANUALE OPERATIVO: AGRIFINANCE CLOUD
-
-
-# Bottone per il download immediato
-st.download_button(
-    label="📥 Scarica Manuale Operativo",
-    data=testo_manuale,
-    file_name="Manuale_AgriFinance.txt",
-    mime="text/plain"
-)
 with tab1:
     st.header("🏠 Registro Generale (Editor Diviso)")
     st.markdown("💡 Fai doppio clic sulle celle per modificare e premi Canc per eliminare. Salva per confermare.")
