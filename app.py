@@ -8,34 +8,55 @@ import os
 st.set_page_config(page_title="AgriFinance Cloud", layout="wide")
 COSTO_GIORNATA_EXTRA = 55.0
 
-# --- FUNZIONI DI SISTEMA (GitHub & Helpers) ---
-# Queste sono le funzioni che mancavano e che fanno parlare l'app con il cloud
-def get_github_file():
-    # Inserisci qui il tuo codice esistente per leggere da GitHub
-    # Se hai dei token o configurazioni specifiche, devono stare qui
-    # Esempio semplificato:
-    try:
-        return pd.read_csv("database.csv"), "sha_mock" 
-    except:
-        return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'prodotto', 'stato']), "new"
+import requests
+import base64
+import json
 
 def save_to_github(df, sha, message):
-    # Inserisci qui il tuo codice esistente per salvare su GitHub
-    df.to_csv("database.csv", index=False)
-    return True
+    """
+    Salva il dataframe su GitHub e restituisce True SOLO se l'operazione ha reale successo.
+    """
+    # 1. Recupero credenziali (Assicurati che i nomi corrispondano ai tuoi secrets)
+    # Sostituisci "TUO_NOME_UTENTE" e "agri-finance" con i tuoi dati reali se non usi i secrets per questi campi
+    token = st.secrets["GITHUB_TOKEN"] 
+    repo = "TUO_NOME_UTENTE/agri-finance" 
+    path = "database.csv"
+    
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
 
-def format_euro(valore):
-    return f"€ {valore:,.2f}"
-
-def estrai_giornate(descrizione, dipendente):
     try:
-        if dipendente in descrizione:
-            parti = descrizione.split('|')
-            for p in parti:
-                if 'gg' in p:
-                    return float(p.replace('gg', '').strip())
-        return 0.0
-    except: return 0.0
+        # 2. Conversione sicura in CSV senza indici
+        csv_data = df.to_csv(index=False)
+        
+        # 3. Codifica obbligatoria in Base64 per l'API di GitHub
+        encoded_data = base64.b64encode(csv_data.encode('utf-8')).decode('utf-8')
+
+        # 4. Preparazione del pacchetto di invio
+        data = {
+            "message": message,
+            "content": encoded_data,
+            "sha": sha
+        }
+
+        # 5. Esecuzione dell'invio (Richiesta PUT)
+        response = requests.put(url, headers=headers, data=json.dumps(data))
+
+        # 6. VERITÀ ASSOLUTA: Controlliamo la risposta di GitHub
+        if response.status_code in [200, 201]:
+            # Successo reale
+            return True
+        else:
+            # Fallimento reale. Stampiamo il motivo esatto del blocco.
+            st.error(f"❌ Errore Server GitHub (Codice {response.status_code}): {response.text}")
+            return False
+
+    except Exception as e:
+        st.error(f"❌ Errore di Sistema durante il salvataggio: {e}")
+        return False
 
 # --- INTERFACCIA PRINCIPALE ---
 st.title("AgriFinance Cloud")
