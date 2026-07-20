@@ -39,7 +39,7 @@ def estrai_giornate(descrizione, dipendente):
 
 # --- INTERFACCIA PRINCIPALE ---
 st.title("AgriFinance Cloud")
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Home", "Manodopera", "Cassa", "Rese", "Bilancio"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Home", "Manodopera", "Cassa", "Rese", "Bilancio", "Fatture"])
 
 # --- TAB 1: HOME E REGISTRO GENERALE MODIFICABILE ---
 with tab1:
@@ -231,3 +231,51 @@ with tab5:
             st.info("Nessuna data valida trovata per generare il bilancio.")
     else:
         st.info("Nessun dato registrato al momento nel database.")
+
+# --- TAB 6: REGISTRAZIONE FATTURE E SPESE OPERATIVE ---
+with tab6:
+    st.header("🧾 Registrazione Fatture e Operazioni Commerciali")
+    
+    with st.form("form_fatture", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            fat_data = st.date_input("Data Fattura / Operazione", format="DD/MM/YYYY")
+            fat_tipo = st.selectbox("Tipo di Operazione", ["Uscita (Acquisto / Spesa)", "Entrata (Vendita / Ricavo)"])
+            fat_soggetto = st.text_input("Fornitore / Cliente (es. Consorzio Agrario)", placeholder="Nome azienda o persona")
+            fat_descrizione = st.text_input("Descrizione e Numero Fattura", placeholder="es. Fatt. 15/2026 - Acquisto Concime")
+            
+        with c2:
+            # Scegliamo dinamicamente le categorie in base al tipo di operazione
+            categorie_uscite = ["Carburante e Mezzi", "Attrezzature", "Materiale Agricolo (Concimi/Piante)", "Manutenzione", "Consulenze/Tasse", "Altro"]
+            categorie_entrate = ["Vendita Olio", "Vendita Olive", "Contributi/Aiuti", "Altro"]
+            
+            fat_categoria = st.selectbox("Categoria Bilancio", categorie_uscite + categorie_entrate)
+            fat_importo = st.number_input("Importo Totale (€)", min_value=0.0, step=1.0, format="%.2f")
+            fat_stato = st.selectbox("Stato Pagamento", ["Saldato", "Da Saldare (A credito/debito)"])
+            
+        if st.form_submit_button("Registra Operazione nel Database"):
+            df, sha = get_github_file()
+            
+            # Pulizia e formattazione dei dati per il salvataggio
+            tipo_db = "Uscita" if "Uscita" in fat_tipo else "Entrata"
+            descrizione_completa = f"{fat_soggetto.strip()} | {fat_descrizione.strip()}"
+            stato_db = "Saldato" if "Saldato" in fat_stato else "Impegnato"
+            
+            # Creazione della nuova riga
+            nuova_riga = [
+                fat_data.strftime('%Y-%m-%d'), 
+                tipo_db, 
+                fat_categoria, 
+                descrizione_completa, 
+                float(fat_importo), 
+                "Azienda Generale", # Prodotto di default
+                stato_db
+            ]
+            
+            df_nuova = pd.DataFrame([nuova_riga], columns=df.columns)
+            df = pd.concat([df, df_nuova], ignore_index=True)
+            
+            if save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}"): 
+                st.success(f"✅ Operazione da {fat_importo} € registrata con successo!")
+                st.rerun()
