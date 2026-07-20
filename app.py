@@ -43,39 +43,61 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Home", "Manodopera", "Cassa", "Re
 
 # --- TAB 1: HOME E REGISTRO GENERALE MODIFICABILE ---
 with tab1:
-    st.header("🏠 Registro Generale (Editor)")
-    st.markdown("💡 Clicca sull'intestazione della colonna **Data** per ordinare i movimenti. Fai doppio clic sulle celle per modificarle.")
+    st.header("🏠 Registro Generale (Editor Diviso)")
+    st.markdown("💡 Le operazioni sono separate. Fai doppio clic sulle celle per modificare e premi Canc per eliminare una riga.")
     
     df, sha = get_github_file()
     
     if not df.empty:
-        # 1. Trasformiamo il testo del database in una VERA data di calendario
+        # 1. Preparazione della Data come Oggetto Calendario
         df['data'] = pd.to_datetime(df['data'], errors='coerce')
-        
-        # 2. Ordine cronologico iniziale (mostra i più recenti in cima)
-        df = df.sort_values(by='data', ascending=False).reset_index(drop=True)
+        df = df.sort_values(by='data', ascending=False)
 
-        # 3. Applichiamo la maschera visiva GG/MM/AAAA tramite column_config
-        df_modificato = st.data_editor(
-            df, 
-            column_config={
-                "data": st.column_config.DateColumn(
-                    "Data",
-                    format="DD/MM/YYYY",
-                )
-            },
-            num_rows="dynamic", 
-            use_container_width=True, 
-            key="editor_database"
-        )
+        # 2. Separazione chirurgica dei dati
+        # Creiamo due dataframe separati in base alla colonna "tipo"
+        df_entrate = df[df['tipo'] == 'Entrata'].reset_index(drop=True)
+        df_uscite = df[df['tipo'] == 'Uscita'].reset_index(drop=True)
         
+        # Paracadute: salviamo in memoria eventuali righe anomale per non perderle
+        df_altri = df[(df['tipo'] != 'Entrata') & (df['tipo'] != 'Uscita')].reset_index(drop=True)
+
+        # 3. Creazione delle Colonne Visive
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("🟢 Entrate")
+            df_entrate_mod = st.data_editor(
+                df_entrate, 
+                column_config={"data": st.column_config.DateColumn("Data", format="DD/MM/YYYY")},
+                num_rows="dynamic", 
+                use_container_width=True, 
+                key="editor_entrate"
+            )
+
+        with col2:
+            st.subheader("🔴 Uscite")
+            df_uscite_mod = st.data_editor(
+                df_uscite, 
+                column_config={"data": st.column_config.DateColumn("Data", format="DD/MM/YYYY")},
+                num_rows="dynamic", 
+                use_container_width=True, 
+                key="editor_uscite"
+            )
+            
         st.divider()
-        if st.button("💾 SALVA MODIFICHE NEL DATABASE", type="primary"):
-            # MISURA DI SICUREZZA: Riconvertiamo nel formato standard prima di salvare
-            # per non corrompere la lettura delle altre Tab
+        
+        # 4. Pulsante di Salvataggio e Fusione dei Dati
+        if st.button("💾 SALVA MODIFICHE NEL DATABASE", type="primary", use_container_width=True):
+            
+            # Ricuciamo le tabelle modificate insieme al paracadute delle righe anomale
+            df_modificato = pd.concat([df_entrate_mod, df_uscite_mod, df_altri], ignore_index=True)
+            
+            # Formattiamo e riordiniamo per il salvataggio sicuro
+            df_modificato['data'] = pd.to_datetime(df_modificato['data'], errors='coerce')
+            df_modificato = df_modificato.sort_values(by='data', ascending=False).reset_index(drop=True)
             df_modificato['data'] = df_modificato['data'].dt.strftime('%Y-%m-%d')
             
-            if save_to_github(df_modificato, sha, "Ordinamento e Formato Data Europeo (Tab 1)"):
+            if save_to_github(df_modificato, sha, "Modifica da Editor Diviso (Tab 1)"):
                 st.success("✅ Modifiche salvate con successo!")
                 st.rerun()
     else:
