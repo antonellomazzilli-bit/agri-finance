@@ -378,7 +378,11 @@ with tab5:
                 st.markdown("Isolamento e impaginazione automatica delle fatture e degli stipendi con stato **'Impegnato'** o **'Da Saldare'**.")
                 
                 # Filtro rigoroso: solo spese in uscita non saldate
-                df_impegnate = df_anno[(df_anno['stato'] == 'Impegnato') & (df_anno['tipo'] == 'Uscita')].sort_values(by='data_dt')
+               # Filtro inclusivo: accetta "Impegnato", "Da Saldare" o qualsiasi variazione del vecchio codice
+df_impegnate = df_anno[
+    (df_anno['tipo'] == 'Uscita') & 
+    (df_anno['stato'].isin(['Impegnato', 'Da Saldare', 'Da Saldare (A credito/debito)']))
+].sort_values(by='data_dt')
                 
                 if not df_impegnate.empty:
                     totale_debito = df_impegnate['importo'].sum()
