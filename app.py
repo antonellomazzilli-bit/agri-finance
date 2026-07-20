@@ -301,11 +301,64 @@ with tab3:
                     st.warning("L'importo deve essere maggiore di zero.")
 
 # ==========================================
-# --- TAB 4: RESE ---
+# --- TAB 4: RESE (Modulo Calcolo Resa) ---
 # ==========================================
 with tab4:
     st.header("🚜 Registro Rese e Produzione")
-    st.info("Modulo di calcolo rese olive/olio in fase di sviluppo.")
+    st.markdown("Inserisci i dati della molitura per calcolare la resa in percentuale.")
+    
+    with st.form("form_rese", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            resa_data = st.date_input("Data Molitura", format="DD/MM/YYYY")
+            q_olive = st.number_input("Quintali Olive (q)", min_value=0.0, step=0.1, format="%.2f")
+            q_olio = st.number_input("Litri Olio prodotti (L)", min_value=0.0, step=0.1, format="%.2f")
+        
+        with c2:
+            st.write("### Risultato Resa")
+            if q_olive > 0:
+                resa_perc = (q_olio / (q_olive * 100)) * 100 # Calcolo semplificato resa L/q
+                st.metric("Resa Percentuale", f"{resa_perc:.2f} %")
+            else:
+                st.info("Inserisci i valori per vedere la resa.")
+            
+            note_resa = st.text_input("Note (es. Frantoio di provenienza)")
+
+        if st.form_submit_button("Salva Resa nel Database"):
+            if q_olive > 0 and q_olio > 0:
+                df, sha = get_github_file()
+                
+                descrizione = f"Resa: {q_olive} q Olive -> {q_olio} L Olio | {note_resa}"
+                # Salviamo la resa percentuale come 'importo' per poterla graficare in futuro
+                resa_perc = (q_olio / (q_olive * 100)) * 100
+                
+                nuova_riga = [
+                    resa_data.strftime('%Y-%m-%d'), 
+                    "Entrata", 
+                    "Resa Olive", 
+                    descrizione, 
+                    float(resa_perc), # Salvo la % nel campo importo
+                    "Olio", 
+                    "Saldato"
+                ]
+                
+                df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
+                
+                if save_to_github(df, sha, f"Registrata Resa: {q_olive}q"): 
+                    st.success("✅ Resa salvata correttamente!")
+                    time.sleep(1)
+                    st.rerun()
+            else:
+                st.error("Inserisci valori validi per Olive e Olio.")
+
+    # Visualizzazione storico rese
+    st.divider()
+    st.subheader("📊 Storico Rese")
+    df_storico, _ = get_github_file()
+    df_rese = df_storico[df_storico['categoria'] == 'Resa Olive'].sort_values(by='data', ascending=False)
+    
+    if not df_rese.empty:
+        st.dataframe(df_rese[['data', 'descrizione', 'importo']], use_container_width=True, hide_index=True)
 
 # ==========================================
 # --- TAB 5: BILANCIO E CONTROLLO ---
