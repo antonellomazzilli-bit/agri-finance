@@ -290,26 +290,43 @@ with tab6:
             fat_stato = st.selectbox("Stato Pagamento", ["Saldato", "Da Saldare (A credito/debito)"])
             
         if st.form_submit_button("Registra Operazione nel Database"):
-            df, sha = get_github_file()
-            
-            # Formattazione per il database
-            descrizione_completa = f"{fat_soggetto.strip()} | {fat_descrizione.strip()}"
-            stato_db = "Saldato" if "Saldato" in fat_stato else "Impegnato"
-            
-            # Creazione della riga
-            nuova_riga = [
-                fat_data.strftime('%Y-%m-%d'), 
-                tipo_db, 
-                fat_categoria, 
-                descrizione_completa, 
-                float(fat_importo), 
-                "Azienda Generale", 
-                stato_db
-            ]
-            
-            df_nuova = pd.DataFrame([nuova_riga], columns=df.columns)
-            df = pd.concat([df, df_nuova], ignore_index=True)
-            
-            if save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}"): 
-                st.success(f"✅ Operazione da {fat_importo} € registrata con successo!")
-                st.rerun()
+            try:
+                df, sha = get_github_file()
+                
+                tipo_db = "Uscita" if "Uscita" in fat_tipo else "Entrata"
+                descrizione_completa = f"{fat_soggetto.strip()} | {fat_descrizione.strip()}"
+                stato_db = "Saldato" if "Saldato" in fat_stato else "Impegnato"
+                
+                # Creazione della nuova riga
+                nuova_riga = [
+                    fat_data.strftime('%Y-%m-%d'), 
+                    tipo_db, 
+                    fat_categoria, 
+                    descrizione_completa, 
+                    float(fat_importo), 
+                    "Azienda Generale", 
+                    stato_db
+                ]
+                
+                # CONTROLLO DI SICUREZZA COLONNE
+                if len(nuova_riga) != len(df.columns):
+                    st.error(f"❌ ERRORE STRUTTURALE: Stai cercando di inserire {len(nuova_riga)} dati, ma il tuo database ha {len(df.columns)} colonne. Colonne del database: {list(df.columns)}")
+                else:
+                    df_nuova = pd.DataFrame([nuova_riga], columns=df.columns)
+                    df = pd.concat([df, df_nuova], ignore_index=True)
+                    
+                    # TENTATIVO DI SALVATAGGIO CON SEGNALAZIONE
+                    esito_salvataggio = save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}")
+                    
+                    if esito_salvataggio: 
+                        st.success(f"✅ Operazione da {fat_importo} € registrata con successo!")
+                        # Mettiamo in pausa 2 secondi prima di ricaricare per permettere a GitHub di allinearsi
+                        import time
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.error("❌ ERRORE GITHUB: Il sistema non è riuscito a scrivere sul file. Verifica i permessi del Token GitHub.")
+
+            except Exception as e:
+                # Questo intercetta qualsiasi altro errore Python o Pandas
+                st.error(f"❌ ERRORE TECNICO BLOCCANTE: {e}")
