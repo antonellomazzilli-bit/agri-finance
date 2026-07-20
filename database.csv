@@ -25,3 +25,4 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato
 2026-06-30,Uscita,Manodopera,Iannone Felice | 10.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato
 2026-06-30,Uscita,Manodopera Extra,Iannone Felice | 1.090 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato
 2026-07-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Pagamento Busta Paga Giugno 2026 - ,734.0,Olive,Saldato
+2026-01-01,Entrata,Vendita Olive,Mazzilli Nunzio | Vendite Olive 2025,9000.0,Azienda Generale,Saldato
