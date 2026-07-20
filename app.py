@@ -87,7 +87,14 @@ Compila Data, Fornitore (es. Consorzio Agrario) e Descrizione (es. "Acquisto Con
 Assegna la categoria, inserisci l'importo e clicca su Registra. Questi dati andranno ad alimentare istantaneamente i grafici della Tab 5.
 
     """
-    
+   
+    st.download_button(
+        label="📥 Scarica Manuale Operativo",
+        data=testo_manuale,
+        file_name="Manuale_AgriFinance.txt",
+        mime="text/plain",
+        use_container_width=True
+    )
     st.divider()
     st.info("Utilizza il manuale per orientarti nel flusso di cassa e nella gestione delle fatture.")
 
