@@ -27,3 +27,4 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato
 2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.364 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Totale Gennaio 2026,0.0,Olive,Saldato
 2026-01-01,Entrata,Vendita Olive,Mazzilli Nunzio | Vendite Olive 2025,9000.0,Olive,Saldato
 ,,,,,,
+2026-06-29,Uscita,Materiale Agricolo (Concimi/Piante),L'Agraria di raimondo G. & C. s.n.c. | fattura Proforma n. 39,1315.55,Azienda Generale,Impegnato
