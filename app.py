@@ -67,7 +67,14 @@ def save_to_github(df, sha, message):
 
 # --- FUNZIONI DI UTILITA' ---
 def format_euro(valore):
-    return f"€ {valore:,.2f}"
+    """Formatta i numeri in stile italiano: 1.000,50 €"""
+    # 1. Formatta il numero in stile anglosassone (1,234.56)
+    importo_str = f"{valore:,.2f}"
+    
+    # 2. Inverte punto e virgola tramite un carattere temporaneo (X)
+    importo_str = importo_str.replace(",", "X").replace(".", ",").replace("X", ".")
+    
+    return f"€ {importo_str}"
 
 def estrai_giornate(descrizione, dipendente):
     try:
