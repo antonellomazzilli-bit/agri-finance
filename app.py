@@ -306,6 +306,7 @@ with tab4:
 with tab5:
     st.header("📊 Bilancio e Controllo di Gestione")
     df_dash, _ = get_github_file()
+    
     if not df_dash.empty:
         df_dash['data_dt'] = pd.to_datetime(df_dash['data'], errors='coerce')
         anni_disponibili = df_dash['data_dt'].dt.year.dropna().unique()
@@ -314,58 +315,135 @@ with tab5:
             anno_selezionato = st.selectbox("Seleziona Anno di Esercizio:", sorted(anni_disponibili, reverse=True))
             df_anno = df_dash[df_dash['data_dt'].dt.year == anno_selezionato].copy()
             
-            st.subheader("1. Sintesi Finanziaria (Cassa)")
-            tot_entrate = df_anno[df_anno['tipo'] == 'Entrata']['importo'].sum()
-            tot_uscite = df_anno[df_anno['tipo'] == 'Uscita']['importo'].sum()
-            utile_netto = tot_entrate - tot_uscite
+            # --- CREAZIONE SOTTO-SCHEDE ---
+            sub_tab1, sub_tab2 = st.tabs(["📈 Cruscotto Interattivo", "🖨️ Fascicolo Debiti (Stampa Civile)"])
             
-            c1, c2, c3 = st.columns(3)
-            c1.metric("🟢 Totale Entrate", format_euro(tot_entrate))
-            c2.metric("🔴 Totale Uscite", format_euro(tot_uscite))
-            c3.metric("⚖️ Flusso di Cassa", format_euro(utile_netto), delta=f"{utile_netto:.2f} €", delta_color="normal")
-            
-            st.divider()
-            st.subheader("2. Analisi dei Costi")
-            cat_personale_cassa = ['Busta Paga', 'Saldo Extra', 'Straordinari', 'Rimborsi']
-            df_uscite = df_anno[df_anno['tipo'] == 'Uscita'].copy()
-            costo_personale = df_uscite[df_uscite['categoria'].isin(cat_personale_cassa)]['importo'].sum()
-            costo_operativo = tot_uscite - costo_personale
-            
-            col_p, col_o = st.columns(2)
-            with col_p:
-                st.info(f"**Cassa Personale:** {format_euro(costo_personale)}")
-                st.dataframe(df_uscite[df_uscite['categoria'].isin(cat_personale_cassa)].groupby('categoria')['importo'].sum().reset_index(), hide_index=True, use_container_width=True)
-            with col_o:
-                st.warning(f"**Costi Operativi:** {format_euro(costo_operativo)}")
-                st.dataframe(df_uscite[~df_uscite['categoria'].isin(cat_personale_cassa) & ~df_uscite['categoria'].str.contains('Manodopera')].groupby('categoria')['importo'].sum().reset_index().sort_values(by='importo', ascending=False), hide_index=True, use_container_width=True)
+            # --- PRIMA SOTTO-SCHEDA: IL TUO VECCHIO CRUSCOTTO ---
+            with sub_tab1:
+                st.subheader("1. Sintesi Finanziaria (Cassa)")
+                tot_entrate = df_anno[df_anno['tipo'] == 'Entrata']['importo'].sum()
+                tot_uscite = df_anno[df_anno['tipo'] == 'Uscita']['importo'].sum()
+                utile_netto = tot_entrate - tot_uscite
+                
+                c1, c2, c3 = st.columns(3)
+                c1.metric("🟢 Totale Entrate", format_euro(tot_entrate))
+                c2.metric("🔴 Totale Uscite", format_euro(tot_uscite))
+                c3.metric("⚖️ Flusso di Cassa", format_euro(utile_netto), delta=f"{utile_netto:.2f} €", delta_color="normal")
+                
+                st.divider()
+                st.subheader("2. Analisi dei Costi")
+                cat_personale_cassa = ['Busta Paga', 'Saldo Extra', 'Straordinari', 'Rimborsi']
+                df_uscite = df_anno[df_anno['tipo'] == 'Uscita'].copy()
+                costo_personale = df_uscite[df_uscite['categoria'].isin(cat_personale_cassa)]['importo'].sum()
+                costo_operativo = tot_uscite - costo_personale
+                
+                col_p, col_o = st.columns(2)
+                with col_p:
+                    st.info(f"**Cassa Personale:** {format_euro(costo_personale)}")
+                    st.dataframe(df_uscite[df_uscite['categoria'].isin(cat_personale_cassa)].groupby('categoria')['importo'].sum().reset_index(), hide_index=True, use_container_width=True)
+                with col_o:
+                    st.warning(f"**Costi Operativi:** {format_euro(costo_operativo)}")
+                    st.dataframe(df_uscite[~df_uscite['categoria'].isin(cat_personale_cassa) & ~df_uscite['categoria'].str.contains('Manodopera')].groupby('categoria')['importo'].sum().reset_index().sort_values(by='importo', ascending=False), hide_index=True, use_container_width=True)
 
-            st.divider()
-            st.subheader("3. Statistiche Forza Lavoro")
-            df_lavoro = df_anno[df_anno['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
-            gg_ufficiali, gg_extra = 0.0, 0.0
-            
-            for _, row in df_lavoro.iterrows():
-                match = re.search(r'([\d\.]+)\s*gg', str(row['descrizione']))
-                if match:
-                    valore = float(match.group(1))
-                    if row['categoria'] == 'Manodopera':
-                        gg_ufficiali += valore
-                    else:
-                        gg_extra += valore
-                        
-            valore_generato = (gg_ufficiali + gg_extra) * COSTO_GIORNATA_EXTRA
-            c_lav1, c_lav2, c_lav3 = st.columns(3)
-            c_lav1.metric("🚜 Giornate Ufficiali", f"{gg_ufficiali:.3f} gg")
-            c_lav2.metric("⏱️ Giornate Fuori Busta", f"{gg_extra:.3f} gg")
-            c_lav3.metric("💸 Valore Lavoro Generato", format_euro(valore_generato))
-            
-            st.divider()
-            st.subheader("4. Andamento Uscite Mensili")
-            df_uscite['mese'] = df_uscite['data_dt'].dt.month
-            df_uscite_grafico = df_uscite[~df_uscite['categoria'].str.contains('Manodopera')]
-            if not df_uscite_grafico.empty:
-                st.bar_chart(df_uscite_grafico.groupby(['mese', 'categoria'])['importo'].sum().unstack().fillna(0))
-
+                st.divider()
+                st.subheader("3. Statistiche Forza Lavoro")
+                df_lavoro = df_anno[df_anno['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
+                gg_ufficiali, gg_extra = 0.0, 0.0
+                
+                for _, row in df_lavoro.iterrows():
+                    match = re.search(r'([\d\.]+)\s*gg', str(row['descrizione']))
+                    if match:
+                        valore = float(match.group(1))
+                        if row['categoria'] == 'Manodopera':
+                            gg_ufficiali += valore
+                        else:
+                            gg_extra += valore
+                            
+                valore_generato = (gg_ufficiali + gg_extra) * COSTO_GIORNATA_EXTRA
+                c_lav1, c_lav2, c_lav3 = st.columns(3)
+                c_lav1.metric("🚜 Giornate Ufficiali", f"{gg_ufficiali:.3f} gg")
+                c_lav2.metric("⏱️ Giornate Fuori Busta", f"{gg_extra:.3f} gg")
+                c_lav3.metric("💸 Valore Lavoro Generato", format_euro(valore_generato))
+                
+                st.divider()
+                st.subheader("4. Andamento Uscite Mensili")
+                df_uscite['mese'] = df_uscite['data_dt'].dt.month
+                df_uscite_grafico = df_uscite[~df_uscite['categoria'].str.contains('Manodopera')]
+                if not df_uscite_grafico.empty:
+                    st.bar_chart(df_uscite_grafico.groupby(['mese', 'categoria'])['importo'].sum().unstack().fillna(0))
+                    
+            # --- SECONDA SOTTO-SCHEDA: DOCUMENTO STAMPABILE ---
+            with sub_tab2:
+                st.subheader("Fascicolo Civile: Debiti e Spese Impegnate")
+                st.markdown("Isolamento e impaginazione automatica delle fatture e degli stipendi con stato **'Impegnato'** o **'Da Saldare'**.")
+                
+                # Filtro rigoroso: solo spese in uscita non saldate
+                df_impegnate = df_anno[(df_anno['stato'] == 'Impegnato') & (df_anno['tipo'] == 'Uscita')].sort_values(by='data_dt')
+                
+                if not df_impegnate.empty:
+                    totale_debito = df_impegnate['importo'].sum()
+                    
+                    # Costruzione delle righe del documento HTML
+                    righe_html = ""
+                    for _, row in df_impegnate.iterrows():
+                        data_f = row['data_dt'].strftime('%d/%m/%Y')
+                        imp_f = format_euro(row['importo'])
+                        righe_html += f"<tr><td>{data_f}</td><td>{row['descrizione']}</td><td>{row['categoria']}</td><td class='right'>{imp_f}</td></tr>"
+                    
+                    # Template A4 Isolato
+                    html_template = f"""
+                    <html>
+                    <head>
+                    <style>
+                        body {{ font-family: 'Arial', sans-serif; background-color: #f4f4f9; padding: 20px; }}
+                        .foglio-a4 {{ background-color: white; color: black; padding: 40px; max-width: 800px; margin: auto; box-shadow: 0 0 15px rgba(0,0,0,0.2); }}
+                        h2, h3, h4 {{ text-align: center; margin: 5px 0; }}
+                        .header-doc {{ border-bottom: 2px solid black; padding-bottom: 15px; margin-bottom: 25px; }}
+                        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }}
+                        th, td {{ border: 1px solid #000; padding: 10px; text-align: left; }}
+                        th {{ background-color: #e9e9e9; font-weight: bold; }}
+                        .right {{ text-align: right; }}
+                        .bold {{ font-weight: bold; }}
+                        @media print {{
+                            body {{ background-color: white; padding: 0; }}
+                            .foglio-a4 {{ box-shadow: none; max-width: 100%; padding: 0; margin: 0; }}
+                            button {{ display: none; }}
+                        }}
+                    </style>
+                    </head>
+                    <body>
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background-color: #008CBA; color: white; border: none; border-radius: 5px; font-weight: bold;">🖨️ Stampa PDF Formale</button>
+                        </div>
+                        <div class="foglio-a4">
+                            <div class="header-doc">
+                                <h2>AZIENDA AGRICOLA ANTONELLO MAZZILLI</h2>
+                                <h4>Produzione Olio ed Esercizio Agricolo</h4>
+                                <h3>ALLEGATO BILANCIO: PROSPETTO DEBITI E SPESE IMPEGNATE</h3>
+                                <p style="text-align:center; font-size: 12px;">Esercizio Fiscale: {anno_selezionato} | Redatto ai sensi dell'Art. 2424 c.c. (Passivo, Sez. D)</p>
+                            </div>
+                            <table>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Creditore / Descrizione</th>
+                                    <th>Natura Spesa</th>
+                                    <th class="right">Importo</th>
+                                </tr>
+                                {righe_html}
+                                <tr>
+                                    <td colspan="3" class="bold right" style="background-color: #e9e9e9;">TOTALE DEBITI VERSO FORNITORI E PERSONALE</td>
+                                    <td class="bold right" style="background-color: #e9e9e9;">{format_euro(totale_debito)}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </body>
+                    </html>
+                    """
+                    import streamlit.components.v1 as components
+                    # Incapsuliamo il documento in un riquadro visuale
+                    components.html(html_template, height=800, scrolling=True)
+                else:
+                    st.success("✅ Nessuna spesa impegnata o debito in sospeso per questo esercizio. Situazione contabile pulita!")
 # ==========================================
 # --- TAB 6: FATTURE E COMMERCIALIZZAZIONE ---
 # ==========================================
