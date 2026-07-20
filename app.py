@@ -44,31 +44,38 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["Home", "Manodopera", "Cassa", "Rese", "
 # --- TAB 1: HOME E REGISTRO GENERALE MODIFICABILE ---
 with tab1:
     st.header("🏠 Registro Generale (Editor)")
-    
-    # Nota esplicativa per sbloccare l'ordinamento su singola colonna
-    st.markdown("""
-    💡 **Come ordinare e modificare:** 
-    * **Ordina:** Clicca sul nome di una colonna in alto (es. `categoria` o `importo`) per metterla in ordine alfabetico, crescente o decrescente.
-    * **Modifica:** Fai doppio clic su una cella per correggere un dato, poi premi *Invio*.
-    """)
+    st.markdown("💡 Clicca sull'intestazione della colonna **Data** per ordinare i movimenti. Fai doppio clic sulle celle per modificarle.")
     
     df, sha = get_github_file()
     
     if not df.empty:
-        # 1. Creiamo una colonna temporanea interpretata come vera "Data" dal sistema
-        df['data_temp'] = pd.to_datetime(df['data'], format='%d-%m-%y', errors='coerce')
+        # 1. Trasformiamo il testo del database in una VERA data di calendario
+        df['data'] = pd.to_datetime(df['data'], errors='coerce')
         
-        # 2. Ordiniamo tutto il database mettendo in cima i movimenti più recenti (ascending=False)
-        # e rigeneriamo l'indice (reset_index) per evitare conflitti al salvataggio
-        df = df.sort_values(by='data_temp', ascending=False).drop(columns=['data_temp']).reset_index(drop=True)
+        # 2. Ordine cronologico iniziale (mostra i più recenti in cima)
+        df = df.sort_values(by='data', ascending=False).reset_index(drop=True)
 
-        # 3. Mostriamo l'editor con i dati ordinati
-        df_modificato = st.data_editor(df, num_rows="dynamic", use_container_width=True, key="editor_database")
+        # 3. Applichiamo la maschera visiva GG/MM/AAAA tramite column_config
+        df_modificato = st.data_editor(
+            df, 
+            column_config={
+                "data": st.column_config.DateColumn(
+                    "Data",
+                    format="DD/MM/YYYY",
+                )
+            },
+            num_rows="dynamic", 
+            use_container_width=True, 
+            key="editor_database"
+        )
         
         st.divider()
         if st.button("💾 SALVA MODIFICHE NEL DATABASE", type="primary"):
-            # Salviamo il file aggiornato e ordinato
-            if save_to_github(df_modificato, sha, "Modifica e Ordinamento da Tab 1"):
+            # MISURA DI SICUREZZA: Riconvertiamo nel formato standard prima di salvare
+            # per non corrompere la lettura delle altre Tab
+            df_modificato['data'] = df_modificato['data'].dt.strftime('%Y-%m-%d')
+            
+            if save_to_github(df_modificato, sha, "Ordinamento e Formato Data Europeo (Tab 1)"):
                 st.success("✅ Modifiche salvate con successo!")
                 st.rerun()
     else:
