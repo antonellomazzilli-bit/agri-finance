@@ -301,11 +301,11 @@ with tab3:
                     st.warning("L'importo deve essere maggiore di zero.")
 
 # ==========================================
-# --- TAB 4: TARGET PRODUZIONE E COPERTURA COSTI ---
+# --- TAB 4: TARGET PRODUZIONE E OBIETTIVO DI UTILE ---
 # ==========================================
 with tab4:
-    st.header("🎯 Target di Produzione (Break-Even Fisico)")
-    st.markdown("Calcola i volumi necessari per coprire le uscite, scegliendo se vendere Olio o Olive grezze.")
+    st.header("🎯 Target di Produzione e Utile Aziendale")
+    st.markdown("Calcola i volumi necessari per coprire le spese vive **e garantirti uno stipendio annuale adeguato**.")
 
     df_pareggio, _ = get_github_file()
     
@@ -314,59 +314,69 @@ with tab4:
         anni_disponibili = df_pareggio['data_dt'].dt.year.dropna().unique()
         
         if len(anni_disponibili) > 0:
-            anno_sel = st.selectbox("Seleziona Anno di Riferimento:", sorted(anni_disponibili, reverse=True), key="anno_target")
+            anno_sel = st.selectbox("Seleziona Anno di Riferimento Costi:", sorted(anni_disponibili, reverse=True), key="anno_target")
             
-            # Calcolo uscite totali dell'anno
+            # Calcolo uscite vive dell'anno
             uscite_totali = df_pareggio[(df_pareggio['data_dt'].dt.year == anno_sel) & (df_pareggio['tipo'] == 'Uscita')]['importo'].sum()
             
-            st.info(f"💸 **Totale Spese da Coprire nel {anno_sel}:** {format_euro(uscite_totali)}")
+            # --- NUOVA SEZIONE: OBIETTIVO DI GUADAGNO ---
+            st.write("### 1. Fabbisogno Finanziario")
+            c_costi, c_utile = st.columns(2)
+            with c_costi:
+                st.info(f"💸 **Spese Vive Aziendali Sostenute:** {format_euro(uscite_totali)}")
+            with c_utile:
+                # Preimpostiamo uno stipendio base di 24.000€ (2k x 12 mesi)
+                utile_desiderato = st.number_input("Tuo Obiettivo di Guadagno Annuo (€)", min_value=0.0, step=1000.0, value=24000.0)
+            
+            # Fabbisogno Reale: Spese + Stipendio
+            fabbisogno_totale = uscite_totali + utile_desiderato
+            st.warning(f"🏦 **FABBISOGNO TOTALE DA RECUPERARE:** {format_euro(fabbisogno_totale)} (Spese + Tuo Utile)")
             st.divider()
             
-            # SELETTORE STRATEGICO
-            strategia = st.radio("Strategia di Vendita:", ["Scenario 1: Molitura e Vendita Olio", "Scenario 2: Vendita Diretta Olive"], horizontal=True)
+            # --- SEZIONE STRATEGICA ---
+            st.write("### 2. Strategia di Vendita e Mercato")
+            strategia = st.radio("Cosa decidi di vendere?", ["Scenario 1: Molitura e Vendita Olio", "Scenario 2: Vendita Diretta Olive"], horizontal=True)
             
             with st.form("form_target"):
-                
                 if "Olio" in strategia:
-                    st.write("### Parametri di Mercato (Olio)")
                     c1, c2 = st.columns(2)
                     with c1:
                         prezzo_attuale = st.number_input("Prezzo di Vendita Olio (€ / Litro)", min_value=0.0, step=0.5, value=8.50)
                     with c2:
                         resa_stimata = st.number_input("Resa Stimata Frantoio (Litri per Quintale)", min_value=0.0, step=0.5, value=15.0)
                 else:
-                    st.write("### Parametri di Mercato (Olive)")
                     prezzo_attuale = st.number_input("Prezzo di Vendita Olive al Commerciante (€ / QUINTALE)", min_value=0.0, step=5.0, value=80.0)
-                    resa_stimata = 1.0 # Ininfluente in questo scenario, ma previene errori matematici
+                    resa_stimata = 1.0 # Ininfluente, evita errori
                 
-                calcola = st.form_submit_button("Calcola Volumi Necessari", type="primary")
+                calcola = st.form_submit_button("Calcola Volumi Necessari per l'Obiettivo", type="primary")
                 
+            # --- RISULTATI ---
             if calcola:
                 if prezzo_attuale > 0:
-                    
-                    st.subheader("📊 Traguardo Produttivo per andare in Pari")
+                    st.subheader("📊 Traguardo Produttivo")
                     
                     if "Olio" in strategia:
                         if resa_stimata > 0:
-                            litri_necessari = uscite_totali / prezzo_attuale
+                            # Adesso calcoliamo sul FABBISOGNO TOTALE, non solo sulle uscite
+                            litri_necessari = fabbisogno_totale / prezzo_attuale
                             quintali_necessari = litri_necessari / resa_stimata
                             
                             col1, col2 = st.columns(2)
                             col1.metric("1️⃣ Olio Necessario", f"{litri_necessari:,.0f} Litri")
-                            col2.metric("2️⃣ Olive Necessarie (Raccolta)", f"{quintali_necessari:,.1f} Quintali")
+                            col2.metric("2️⃣ Olive Necessarie (Raccolta)", f"{quintali_necessari:,.0f} Quintali")
                             
-                            st.success(f"📌 **Sintesi:** Per recuperare i {format_euro(uscite_totali)} spesi, vendendo l'olio a {prezzo_attuale} €/L (resa {resa_stimata} L/q), devi raccogliere almeno **{quintali_necessari:,.1f} quintali**.")
+                            st.success(f"📌 **Sintesi:** Per coprire le spese aziendali ({format_euro(uscite_totali)}) **e garantirti uno stipendio di {format_euro(utile_desiderato)}**, vendendo l'olio a {prezzo_attuale} €/L, devi raccogliere e molire almeno **{quintali_necessari:,.0f} quintali** di olive (resa {resa_stimata} L/q).")
                         else:
                             st.error("⚠️ La Resa del frantoio deve essere maggiore di zero.")
                             
                     else: # Scenario Olive
-                        quintali_necessari = uscite_totali / prezzo_attuale
+                        quintali_necessari = fabbisogno_totale / prezzo_attuale
                         
                         col1, col2 = st.columns(2)
-                        col1.metric("Olive da Vendere", f"{quintali_necessari:,.1f} Quintali")
+                        col1.metric("Olive da Vendere", f"{quintali_necessari:,.0f} Quintali")
                         col2.metric("Equivalente", f"{quintali_necessari * 100:,.0f} Kg")
                         
-                        st.success(f"📌 **Sintesi:** Per recuperare i {format_euro(uscite_totali)} spesi, vendendo le olive grezze a {prezzo_attuale} €/Quintale, devi conferire al commerciante almeno **{quintali_necessari:,.1f} quintali**.")
+                        st.success(f"📌 **Sintesi:** Per coprire le spese aziendali ({format_euro(uscite_totali)}) **e garantirti uno stipendio di {format_euro(utile_desiderato)}**, devi vendere al commerciante almeno **{quintali_necessari:,.0f} quintali** di olive a {prezzo_attuale} €/q.")
                 else:
                     st.error("⚠️ Il Prezzo di Vendita deve essere maggiore di zero per poter effettuare il calcolo.")
     else:
