@@ -56,7 +56,7 @@ with tab1:
     
     if not df.empty:
         # 1. Creiamo una colonna temporanea interpretata come vera "Data" dal sistema
-        df['data_temp'] = pd.to_datetime(df['data'], format='%Y-%m-%d', errors='coerce')
+        df['data_temp'] = pd.to_datetime(df['data'], format='%d-%m-%Y', errors='coerce')
         
         # 2. Ordiniamo tutto il database mettendo in cima i movimenti più recenti (ascending=False)
         # e rigeneriamo l'indice (reset_index) per evitare conflitti al salvataggio
