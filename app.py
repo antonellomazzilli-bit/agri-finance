@@ -130,10 +130,104 @@ with tab3:
 with tab4:
     st.header("Registro Rese")
 
-# --- TAB 5: BILANCIO ---
+# --- TAB 5: BILANCIO E CONTROLLO DI GESTIONE (DETTAGLIATO) ---
 with tab5:
-    st.header("⚖️ Bilancio Semplificato")
-    df, _ = get_github_file()
-    tot_entrate = df[df['tipo'] == 'Entrata']['importo'].sum()
-    tot_uscite = df[df['tipo'] == 'Uscita']['importo'].sum()
-    st.metric("Risultato Netto", format_euro(tot_entrate - tot_uscite))
+    st.header("📊 Bilancio e Controllo di Gestione")
+    st.markdown("Visione d'insieme sulle performance finanziarie e sui costi operativi dell'azienda.")
+    
+    df_dash, _ = get_github_file()
+    if not df_dash.empty:
+        df_dash['data_dt'] = pd.to_datetime(df_dash['data'], errors='coerce')
+        anni_disponibili = df_dash['data_dt'].dt.year.dropna().unique()
+        
+        if len(anni_disponibili) > 0:
+            anno_selezionato = st.selectbox("Seleziona Anno di Esercizio:", sorted(anni_disponibili, reverse=True))
+            df_anno = df_dash[df_dash['data_dt'].dt.year == anno_selezionato].copy()
+            
+            # --- 1. SINTESI FINANZIARIA (FLUSSO DI CASSA) ---
+            st.subheader("1. Sintesi Finanziaria (Cassa)")
+            tot_entrate = df_anno[df_anno['tipo'] == 'Entrata']['importo'].sum()
+            tot_uscite = df_anno[df_anno['tipo'] == 'Uscita']['importo'].sum()
+            utile_netto = tot_entrate - tot_uscite
+            
+            c1, c2, c3 = st.columns(3)
+            c1.metric("🟢 Totale Entrate (Vendite/Altro)", format_euro(tot_entrate))
+            c2.metric("🔴 Totale Uscite (Costi Totali)", format_euro(tot_uscite))
+            c3.metric("⚖️ Flusso di Cassa", format_euro(utile_netto), delta=f"{utile_netto:.2f} €", delta_color="normal")
+            
+            st.divider()
+            
+            # --- 2. SCOMPOSIZIONE DELLE USCITE (Personale vs Azienda) ---
+            st.subheader("2. Analisi dei Costi (Dove vanno i soldi?)")
+            
+            # Identifichiamo le categorie puramente finanziarie (pagamenti)
+            cat_personale_cassa = ['Busta Paga', 'Saldo Extra', 'Straordinari', 'Rimborsi']
+            df_uscite = df_anno[df_anno['tipo'] == 'Uscita'].copy()
+            
+            costo_personale = df_uscite[df_uscite['categoria'].isin(cat_personale_cassa)]['importo'].sum()
+            costo_operativo = tot_uscite - costo_personale
+            
+            col_p, col_o = st.columns(2)
+            with col_p:
+                st.info(f"**Cassa Personale:** {format_euro(costo_personale)}")
+                st.write("*Dettaglio Erogazioni ai Lavoratori:*")
+                dettaglio_pers = df_uscite[df_uscite['categoria'].isin(cat_personale_cassa)].groupby('categoria')['importo'].sum().reset_index()
+                st.dataframe(dettaglio_pers, hide_index=True, use_container_width=True)
+            
+            with col_o:
+                st.warning(f"**Costi Operativi (Azienda/Olive):** {format_euro(costo_operativo)}")
+                st.write("*Dettaglio Spese (Carburante, Materiali, ecc.):*")
+                dettaglio_op = df_uscite[~df_uscite['categoria'].isin(cat_personale_cassa) & ~df_uscite['categoria'].str.contains('Manodopera')].groupby('categoria')['importo'].sum().reset_index()
+                st.dataframe(dettaglio_op.sort_values(by='importo', ascending=False), hide_index=True, use_container_width=True)
+
+            st.divider()
+            
+            # --- 3. FOCUS MANODOPERA E FORZA LAVORO ---
+            st.subheader("3. Statistiche Forza Lavoro (Impegno Fisico)")
+            st.markdown("Analisi basata sui giorni di lavoro registrati (*1 Giornata = 6 Ore*).")
+            
+            # Sommiamo tutte le giornate fisiche estraendole dal testo
+            cat_lavoro = ['Manodopera', 'Manodopera Extra']
+            df_lavoro = df_anno[df_anno['categoria'].isin(cat_lavoro)]
+            
+            gg_ufficiali = 0.0
+            gg_extra = 0.0
+            
+            import re
+            for _, row in df_lavoro.iterrows():
+                # Cerca un numero (anche con decimali) seguito da "gg" nella descrizione
+                match = re.search(r'([\d\.]+)\s*gg', row['descrizione'])
+                if match:
+                    valore = float(match.group(1))
+                    if row['categoria'] == 'Manodopera':
+                        gg_ufficiali += valore
+                    else:
+                        gg_extra += valore
+                        
+            gg_totali = gg_ufficiali + gg_extra
+            valore_economico_generato = gg_totali * COSTO_GIORNATA_EXTRA
+            
+            c_lav1, c_lav2, c_lav3 = st.columns(3)
+            c_lav1.metric("🚜 Giornate Ufficiali", f"{gg_ufficiali:.3f} gg")
+            c_lav2.metric("⏱️ Giornate Fuori Busta", f"{gg_extra:.3f} gg")
+            c_lav3.metric("💸 Valore Lavoro Generato", format_euro(valore_economico_generato))
+            
+            st.divider()
+            
+            # --- 4. ANDAMENTO MENSILE DELLE SPESE ---
+            st.subheader("4. Andamento Uscite Mensili")
+            df_uscite['mese'] = df_uscite['data_dt'].dt.month
+            
+            # Creiamo una tabella pivot per il grafico escludendo le righe di pura registrazione giorni
+            df_uscite_grafico = df_uscite[~df_uscite['categoria'].str.contains('Manodopera')]
+            
+            if not df_uscite_grafico.empty:
+                andamento = df_uscite_grafico.groupby(['mese', 'categoria'])['importo'].sum().unstack().fillna(0)
+                st.bar_chart(andamento)
+            else:
+                st.write("Nessun movimento finanziario registrato per alimentare il grafico.")
+                
+        else:
+            st.info("Nessuna data valida trovata per generare il bilancio.")
+    else:
+        st.info("Nessun dato registrato al momento nel database.")
