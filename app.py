@@ -373,81 +373,71 @@ with tab5:
                     st.bar_chart(df_uscite_grafico.groupby(['mese', 'categoria'])['importo'].sum().unstack().fillna(0))
                     
             # --- SECONDA SOTTO-SCHEDA: DOCUMENTO STAMPABILE ---
+           # --- SECONDA SOTTO-SCHEDA: BILANCIO REALE STAMPABILE ---
             with sub_tab2:
-                st.subheader("Fascicolo Civile: Debiti e Spese Impegnate")
-                st.markdown("Isolamento e impaginazione automatica delle fatture e degli stipendi con stato **'Impegnato'** o **'Da Saldare'**.")
+                st.subheader("🖨️ Bilancio Aziendale Formale (Stampa)")
+                st.markdown("Documento di sintesi delle Entrate, Uscite e Risultato d'Esercizio.")
                 
-                # Filtro rigoroso: solo spese in uscita non saldate
-               # Filtro inclusivo: accetta "Impegnato", "Da Saldare" o qualsiasi variazione del vecchio codice
-df_impegnate = df_anno[
-    (df_anno['tipo'] == 'Uscita') & 
-    (df_anno['stato'].isin(['Impegnato', 'Da Saldare', 'Da Saldare (A credito/debito)']))
-].sort_values(by='data_dt')
+                # 1. Filtriamo tutti i dati dell'anno per il bilancio reale
+                df_entrate = df_anno[df_anno['tipo'] == 'Entrata'].sort_values(by='data_dt')
+                df_uscite = df_anno[df_anno['tipo'] == 'Uscita'].sort_values(by='data_dt')
                 
-                if not df_impegnate.empty:
-                    totale_debito = df_impegnate['importo'].sum()
-                    
-                    # Costruzione delle righe del documento HTML
-                    righe_html = ""
-                    for _, row in df_impegnate.iterrows():
-                        data_f = row['data_dt'].strftime('%d/%m/%Y')
-                        imp_f = format_euro(row['importo'])
-                        righe_html += f"<tr><td>{data_f}</td><td>{row['descrizione']}</td><td>{row['categoria']}</td><td class='right'>{imp_f}</td></tr>"
-                    
-                    # Template A4 Isolato
-                    html_template = f"""
-                    <html>
-                    <head>
-                    <style>
-                        body {{ font-family: 'Arial', sans-serif; background-color: #f4f4f9; padding: 20px; }}
-                        .foglio-a4 {{ background-color: white; color: black; padding: 40px; max-width: 800px; margin: auto; box-shadow: 0 0 15px rgba(0,0,0,0.2); }}
-                        h2, h3, h4 {{ text-align: center; margin: 5px 0; }}
-                        .header-doc {{ border-bottom: 2px solid black; padding-bottom: 15px; margin-bottom: 25px; }}
-                        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }}
-                        th, td {{ border: 1px solid #000; padding: 10px; text-align: left; }}
-                        th {{ background-color: #e9e9e9; font-weight: bold; }}
-                        .right {{ text-align: right; }}
-                        .bold {{ font-weight: bold; }}
-                        @media print {{
-                            body {{ background-color: white; padding: 0; }}
-                            .foglio-a4 {{ box-shadow: none; max-width: 100%; padding: 0; margin: 0; }}
-                            button {{ display: none; }}
-                        }}
-                    </style>
-                    </head>
-                    <body>
-                        <div style="text-align: center; margin-bottom: 20px;">
-                            <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background-color: #008CBA; color: white; border: none; border-radius: 5px; font-weight: bold;">🖨️ Stampa PDF Formale</button>
+                tot_entrate = df_entrate['importo'].sum()
+                tot_uscite = df_uscite['importo'].sum()
+                saldo_reale = tot_entrate - tot_uscite
+                
+                # 2. Creiamo le righe HTML per le tabelle
+                rows_entrate = "".join([f"<tr><td>{r['data_dt'].strftime('%d/%m/%Y')}</td><td>{r['descrizione']}</td><td class='right'>{format_euro(r['importo'])}</td></tr>" for _, r in df_entrate.iterrows()])
+                rows_uscite = "".join([f"<tr><td>{r['data_dt'].strftime('%d/%m/%Y')}</td><td>{r['descrizione']}</td><td class='right'>{format_euro(r['importo'])}</td></tr>" for _, r in df_uscite.iterrows()])
+                
+                # 3. HTML Formale per la stampa
+                html_template = f"""
+                <html>
+                <head>
+                <style>
+                    body {{ font-family: 'Arial', sans-serif; background-color: #f4f4f9; padding: 20px; }}
+                    .foglio-a4 {{ background-color: white; color: black; padding: 40px; max-width: 800px; margin: auto; box-shadow: 0 0 15px rgba(0,0,0,0.2); }}
+                    h2, h3, h4 {{ text-align: center; margin: 5px 0; }}
+                    .header-doc {{ border-bottom: 2px solid black; padding-bottom: 15px; margin-bottom: 25px; }}
+                    table {{ width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }}
+                    th, td {{ border: 1px solid #000; padding: 10px; text-align: left; }}
+                    th {{ background-color: #e9e9e9; font-weight: bold; }}
+                    .right {{ text-align: right; }}
+                    .bold {{ font-weight: bold; font-size: 16px; }}
+                    @media print {{
+                        body {{ background-color: white; padding: 0; }}
+                        .foglio-a4 {{ box-shadow: none; max-width: 100%; }}
+                        button {{ display: none; }}
+                    }}
+                </style>
+                </head>
+                <body>
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background-color: #2e7d32; color: white; border: none; border-radius: 5px; font-weight: bold;">🖨️ Stampa Bilancio PDF</button>
+                    </div>
+                    <div class="foglio-a4">
+                        <div class="header-doc">
+                            <h2>AZIENDA AGRICOLA ANTONELLO MAZZILLI</h2>
+                            <h3>BILANCIO REALE D'ESERCIZIO {anno_selezionato}</h3>
                         </div>
-                        <div class="foglio-a4">
-                            <div class="header-doc">
-                                <h2>AZIENDA AGRICOLA ANTONELLO MAZZILLI</h2>
-                                <h4>Produzione Olio ed Esercizio Agricolo</h4>
-                                <h3>ALLEGATO BILANCIO: PROSPETTO DEBITI E SPESE IMPEGNATE</h3>
-                                <p style="text-align:center; font-size: 12px;">Esercizio Fiscale: {anno_selezionato} | Redatto ai sensi dell'Art. 2424 c.c. (Passivo, Sez. D)</p>
-                            </div>
-                            <table>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Creditore / Descrizione</th>
-                                    <th>Natura Spesa</th>
-                                    <th class="right">Importo</th>
-                                </tr>
-                                {righe_html}
-                                <tr>
-                                    <td colspan="3" class="bold right" style="background-color: #e9e9e9;">TOTALE DEBITI VERSO FORNITORI E PERSONALE</td>
-                                    <td class="bold right" style="background-color: #e9e9e9;">{format_euro(totale_debito)}</td>
-                                </tr>
-                            </table>
+                        
+                        <h4>ENTRATE (Ricavi)</h4>
+                        <table><tr><th>Data</th><th>Descrizione</th><th class='right'>Importo</th></tr>{rows_entrate}</table>
+                        <p class='right bold'>Totale Entrate: {format_euro(tot_entrate)}</p>
+                        
+                        <h4>USCITE (Costi)</h4>
+                        <table><tr><th>Data</th><th>Descrizione</th><th class='right'>Importo</th></tr>{rows_uscite}</table>
+                        <p class='right bold'>Totale Uscite: {format_euro(tot_uscite)}</p>
+                        
+                        <div style="margin-top: 30px; border-top: 2px solid black; padding-top: 10px;">
+                            <p class='bold' style="text-align: right;">RISULTATO NETTO (Utile/Perdita): {format_euro(saldo_reale)}</p>
                         </div>
-                    </body>
-                    </html>
-                    """
-                    import streamlit.components.v1 as components
-                    # Incapsuliamo il documento in un riquadro visuale
-                    components.html(html_template, height=800, scrolling=True)
-                else:
-                    st.success("✅ Nessuna spesa impegnata o debito in sospeso per questo esercizio. Situazione contabile pulita!")
+                    </div>
+                </body>
+                </html>
+                """
+                import streamlit.components.v1 as components
+                components.html(html_template, height=800, scrolling=True)
 # ==========================================
 # --- TAB 6: FATTURE E COMMERCIALIZZAZIONE ---
 # ==========================================
