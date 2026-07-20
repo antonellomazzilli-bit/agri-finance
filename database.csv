@@ -1,28 +1,29 @@
 data,tipo,categoria,descrizione,importo,coltura_id,stato
-2026-05-18,Uscita,Altro,ONERI MESE DI APRILE,133.34,Olive,Saldato
-2026-04-16,Uscita,Altro,ONERI MESE DI MARZO,234.47,Olive,Saldato
-2026-06-05,Uscita,Altro,"Pagamento provvigioni apertura azienda agricola e partita IVA, infoagri",90.0,Olive ,Saldato
-2026-06-07,Uscita,Altro,Ricarica scheda acqua Associazione irrigua,300.0,Olive ,Saldato
-2026-06-10,Uscita,Altro,Pagamento f24 contributi operai IV Trimestre 2025,685.11,Olive,Saldato
-2026-06-20,Uscita,Altro,Bonifico per irrigazione,400.0,Olive,Saldato
-2026-06-23,Uscita,Altro,Olive felice 2025,9000.0,Olive,Impegnato
-2026-06-25,Uscita,Altro,gestione Contabile  | Note: Bonifico da cc ingdirect,500.02,Olive,Saldato
-2026-06-29,Uscita,Altro,Ricarica scheda per irrigazione,500.0,Olive,Saldato
+2026-07-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Pagamento Busta Paga Giugno 2026 - ,734.0,Olive,Saldato
 2026-07-03,Uscita,Altro,"F.24 dipendente mese di Giugno 2026, pagato da Zurich",160.42,Olive,Saldato
-2026-02-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Gennaio - ,914.29,Olive,Saldato
-2026-03-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Febbraio - ,989.2,Olive,Saldato
-2026-04-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Marzo - ,1058.67,Olive,Saldato
+2026-06-30,Uscita,Manodopera Extra,Iannone Felice | 1.090 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato
+2026-06-30,Uscita,Manodopera,Iannone Felice | 10.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato
+2026-06-29,Uscita,Altro,Ricarica scheda per irrigazione,500.0,Olive,Saldato
+2026-06-25,Uscita,Altro,gestione Contabile  | Note: Bonifico da cc ingdirect,500.02,Olive,Saldato
+2026-06-23,Uscita,Altro,Olive felice 2025,9000.0,Olive,Impegnato
+2026-06-20,Uscita,Altro,Bonifico per irrigazione,400.0,Olive,Saldato
+2026-06-10,Uscita,Altro,Pagamento f24 contributi operai IV Trimestre 2025,685.11,Olive,Saldato
+2026-06-07,Uscita,Altro,Ricarica scheda acqua Associazione irrigua,300.0,Olive ,Saldato
+2026-06-05,Uscita,Altro,"Pagamento provvigioni apertura azienda agricola e partita IVA, infoagri",90.0,Olive ,Saldato
+2026-05-31,Uscita,Manodopera Extra,Iannone Felice | 10.818 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato
+2026-05-18,Uscita,Altro,ONERI MESE DI APRILE,133.34,Olive,Saldato
 2026-05-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Aprile - ,641.63,Olive,Saldato
-2026-01-31,Uscita,Manodopera,Iannone Felice | 13.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Totale Gennaio 2026,0.0,Olive,Saldato
-2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.364 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Totale Gennaio 2026,0.0,Olive,Saldato
-2026-02-28,Uscita,Manodopera,Iannone Felice | 14.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riepilogo Febbraio 2026,0.0,Olive,Saldato
-2026-02-28,Uscita,Manodopera Extra,Iannone Felice | 9.454 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riepilogo Febbraio 2026,0.0,Olive,Saldato
-2026-03-31,Uscita,Manodopera,Iannone Felice | 15.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato
-2026-03-31,Uscita,Manodopera Extra,Iannone Felice | 21.363 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato
 2026-04-30,Uscita,Manodopera,Iannone Felice | 9.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato
 2026-04-30,Uscita,Manodopera Extra,Iannone Felice | 18.181 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato
-2026-05-31,Uscita,Manodopera Extra,Iannone Felice | 10.818 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato
-2026-06-30,Uscita,Manodopera,Iannone Felice | 10.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato
-2026-06-30,Uscita,Manodopera Extra,Iannone Felice | 1.090 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato
-2026-07-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Pagamento Busta Paga Giugno 2026 - ,734.0,Olive,Saldato
-2026-01-01,Entrata,Vendita Olive,Mazzilli Nunzio | Vendite Olive 2025,9000.0,Azienda Generale,Saldato
+2026-04-16,Uscita,Altro,ONERI MESE DI MARZO,234.47,Olive,Saldato
+2026-04-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Marzo - ,1058.67,Olive,Saldato
+2026-03-31,Uscita,Manodopera,Iannone Felice | 15.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato
+2026-03-31,Uscita,Manodopera Extra,Iannone Felice | 21.363 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato
+2026-03-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Febbraio - ,989.2,Olive,Saldato
+2026-02-28,Uscita,Manodopera,Iannone Felice | 14.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riepilogo Febbraio 2026,0.0,Olive,Saldato
+2026-02-28,Uscita,Manodopera Extra,Iannone Felice | 9.454 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riepilogo Febbraio 2026,0.0,Olive,Saldato
+2026-02-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Gennaio - ,914.29,Olive,Saldato
+2026-01-31,Uscita,Manodopera,Iannone Felice | 13.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Totale Gennaio 2026,0.0,Olive,Saldato
+2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.364 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Totale Gennaio 2026,0.0,Olive,Saldato
+2026-01-01,Entrata,Vendita Olive,Mazzilli Nunzio | Vendite Olive 2025,9000.0,Olive,Saldato
+,,,,,,
