@@ -324,3 +324,46 @@ if id_riga_selezionata is not None:
                         st.rerun()
 else:
     st.caption("ℹ️ Nessuna riga selezionata. Fai clic su un elemento della tabella sopra per aprire il pannello di controllo rapido.")
+
+# --- TAB 5: BILANCIO SEMPLIFICATO (CONTO ECONOMICO) ---
+with tab5:
+    st.header("⚖️ Bilancio Semplificato")
+    st.markdown("Analisi annuale di entrate, uscite e risultato netto.")
+    
+    df_dash, _ = get_github_file()
+    if not df_dash.empty:
+        df_dash['data_dt'] = pd.to_datetime(df_dash['data'], errors='coerce')
+        anno_selezionato = st.selectbox("Seleziona Anno per il Bilancio:", sorted(df_dash['data_dt'].dt.year.unique(), reverse=True))
+        df_anno = df_dash[df_dash['data_dt'].dt.year == anno_selezionato]
+        
+        # 1. CALCOLO ENTRATE E USCITE
+        tot_entrate = df_anno[df_anno['tipo'] == 'Entrata']['importo'].sum()
+        tot_uscite = df_anno[df_anno['tipo'] == 'Uscita']['importo'].sum()
+        risultato_netto = tot_entrate - tot_uscite
+        
+        # 2. VISUALIZZAZIONE METRICHE
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Totale Entrate", f"{format_euro(tot_entrate)}")
+        c2.metric("Totale Uscite", f"{format_euro(tot_uscite)}")
+        colore_risultato = "#388E3C" if risultato_netto >= 0 else "#D32F2F"
+        c3.metric("Risultato Netto", f"{format_euro(risultato_netto)}", delta_color="normal")
+        
+        st.divider()
+        
+        # 3. ANALISI DELLE USCITE (Dove finiscono i soldi?)
+        st.subheader("Analisi Dettagliata delle Uscite")
+        # Raggruppiamo le uscite per categoria
+        uscite_df = df_anno[df_anno['tipo'] == 'Uscita']
+        if not uscite_df.empty:
+            dettaglio_uscite = uscite_df.groupby('categoria')['importo'].sum().sort_values(ascending=False)
+            st.bar_chart(dettaglio_uscite)
+            st.table(dettaglio_uscite.apply(lambda x: format_euro(x)))
+        else:
+            st.info("Nessuna uscita registrata per l'anno selezionato.")
+            
+        # 4. AVVISO SE CI SONO MOVIMENTI NON CLASSIFICATI
+        if 'Entrata' not in df_anno['tipo'].unique() and 'Uscita' not in df_anno['tipo'].unique():
+            st.warning("⚠️ Attenzione: Verifica che i movimenti siano classificati come 'Entrata' o 'Uscita' nel registro principale.")
+
+    else:
+        st.write("Nessun dato presente nel database.")
