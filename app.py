@@ -301,64 +301,61 @@ with tab3:
                     st.warning("L'importo deve essere maggiore di zero.")
 
 # ==========================================
-# --- TAB 4: RESE (Modulo Calcolo Resa) ---
+# --- TAB 4: PUNTO DI PAREGGIO E COPERTURA COSTI ---
 # ==========================================
 with tab4:
-    st.header("🚜 Registro Rese e Produzione")
-    st.markdown("Inserisci i dati della molitura per calcolare la resa in percentuale.")
+    st.header("⚖️ Analisi di Copertura Costi (Punto di Pareggio)")
+    st.markdown("Valuta se la quantità di olio prodotta è sufficiente a coprire tutte le spese dell'anno.")
+
+    df_pareggio, _ = get_github_file()
     
-    with st.form("form_rese", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            resa_data = st.date_input("Data Molitura", format="DD/MM/YYYY")
-            q_olive = st.number_input("Quintali Olive (q)", min_value=0.0, step=0.1, format="%.2f")
-            q_olio = st.number_input("Litri Olio prodotti (L)", min_value=0.0, step=0.1, format="%.2f")
+    if not df_pareggio.empty:
+        df_pareggio['data_dt'] = pd.to_datetime(df_pareggio['data'], errors='coerce')
+        anni_disponibili = df_pareggio['data_dt'].dt.year.dropna().unique()
         
-        with c2:
-            st.write("### Risultato Resa")
-            if q_olive > 0:
-                resa_perc = (q_olio / (q_olive * 100)) * 100 # Calcolo semplificato resa L/q
-                st.metric("Resa Percentuale", f"{resa_perc:.2f} %")
-            else:
-                st.info("Inserisci i valori per vedere la resa.")
+        if len(anni_disponibili) > 0:
+            anno_sel = st.selectbox("Seleziona Anno di Riferimento:", sorted(anni_disponibili, reverse=True), key="anno_pareggio")
             
-            note_resa = st.text_input("Note (es. Frantoio di provenienza)")
-
-        if st.form_submit_button("Salva Resa nel Database"):
-            if q_olive > 0 and q_olio > 0:
-                df, sha = get_github_file()
+            # Calcolo automatico delle uscite totali dell'anno selezionato
+            uscite_totali = df_pareggio[(df_pareggio['data_dt'].dt.year == anno_sel) & (df_pareggio['tipo'] == 'Uscita')]['importo'].sum()
+            
+            st.info(f"💸 **Totale Uscite Sostenute nel {anno_sel}:** {format_euro(uscite_totali)}")
+            st.divider()
+            
+            with st.form("form_copertura"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    produzione_litri = st.number_input("Litri di Olio Prodotti (Stimati o Reali)", min_value=0.0, step=50.0)
+                with c2:
+                    prezzo_vendita = st.number_input("Prezzo di Vendita Stimato (€ / Litro)", min_value=0.0, step=0.5, value=8.0)
                 
-                descrizione = f"Resa: {q_olive} q Olive -> {q_olio} L Olio | {note_resa}"
-                # Salviamo la resa percentuale come 'importo' per poterla graficare in futuro
-                resa_perc = (q_olio / (q_olive * 100)) * 100
+                calcola = st.form_submit_button("Calcola Copertura Finanziaria", type="primary")
                 
-                nuova_riga = [
-                    resa_data.strftime('%Y-%m-%d'), 
-                    "Entrata", 
-                    "Resa Olive", 
-                    descrizione, 
-                    float(resa_perc), # Salvo la % nel campo importo
-                    "Olio", 
-                    "Saldato"
-                ]
-                
-                df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
-                
-                if save_to_github(df, sha, f"Registrata Resa: {q_olive}q"): 
-                    st.success("✅ Resa salvata correttamente!")
-                    time.sleep(1)
-                    st.rerun()
-            else:
-                st.error("Inserisci valori validi per Olive e Olio.")
-
-    # Visualizzazione storico rese
-    st.divider()
-    st.subheader("📊 Storico Rese")
-    df_storico, _ = get_github_file()
-    df_rese = df_storico[df_storico['categoria'] == 'Resa Olive'].sort_values(by='data', ascending=False)
-    
-    if not df_rese.empty:
-        st.dataframe(df_rese[['data', 'descrizione', 'importo']], use_container_width=True, hide_index=True)
+            if calcola:
+                if produzione_litri > 0:
+                    ricavo_stimato = produzione_litri * prezzo_vendita
+                    margine = ricavo_stimato - uscite_totali
+                    prezzo_minimo = uscite_totali / produzione_litri
+                    
+                    st.subheader("📊 Risultato Analisi")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Valore Stimato Produzione", format_euro(ricavo_stimato))
+                    
+                    if margine >= 0:
+                        col2.metric("Utile Netto Previsto", format_euro(margine), delta="Copertura Raggiunta", delta_color="normal")
+                        st.success(f"✅ La produzione copre tutte le spese! Vendendo a **{prezzo_vendita} €/L** sei in attivo.")
+                    else:
+                        col2.metric("Perdita Prevista", format_euro(margine), delta="Sotto Copertura", delta_color="inverse")
+                        st.error(f"❌ La produzione NON è sufficiente a coprire le spese. Il valore generato è inferiore ai costi sostenuti.")
+                    
+                    col3.metric("Prezzo Minimo (Break-Even)", f"€ {prezzo_minimo:.2f} / L")
+                    
+                    st.caption("💡 **Il Prezzo Minimo (Break-Even)** indica la cifra esatta a cui devi vendere ogni singolo litro di olio per coprire esattamente i costi aziendali, andando a pari a zero spaccato.")
+                else:
+                    st.warning("⚠️ Inserisci una produzione maggiore di 0 litri per effettuare il calcolo.")
+    else:
+        st.info("Nessun dato finanziario registrato nel database per poter calcolare la copertura.")
 
 # ==========================================
 # --- TAB 5: BILANCIO E CONTROLLO ---
