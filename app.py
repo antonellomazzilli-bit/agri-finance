@@ -44,21 +44,32 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["Home", "Manodopera", "Cassa", "Rese", "
 # --- TAB 1: HOME E REGISTRO GENERALE MODIFICABILE ---
 with tab1:
     st.header("🏠 Registro Generale (Editor)")
-    st.markdown("Fai **doppio clic** su una cella per modificarla (es. per aggiornare una categoria). Premi Invio per confermare la cella e poi usa il tasto verde qui sotto per salvare le modifiche nel database.")
     
-    # Recuperiamo il file e il suo codice di sicurezza (sha)
+    # Nota esplicativa per sbloccare l'ordinamento su singola colonna
+    st.markdown("""
+    💡 **Come ordinare e modificare:** 
+    * **Ordina:** Clicca sul nome di una colonna in alto (es. `categoria` o `importo`) per metterla in ordine alfabetico, crescente o decrescente.
+    * **Modifica:** Fai doppio clic su una cella per correggere un dato, poi premi *Invio*.
+    """)
+    
     df, sha = get_github_file()
     
     if not df.empty:
-        # Mostra il dataframe in modalità editor (stile Excel)
+        # 1. Creiamo una colonna temporanea interpretata come vera "Data" dal sistema
+        df['data_temp'] = pd.to_datetime(df['data'], format='%Y-%m-%d', errors='coerce')
+        
+        # 2. Ordiniamo tutto il database mettendo in cima i movimenti più recenti (ascending=False)
+        # e rigeneriamo l'indice (reset_index) per evitare conflitti al salvataggio
+        df = df.sort_values(by='data_temp', ascending=False).drop(columns=['data_temp']).reset_index(drop=True)
+
+        # 3. Mostriamo l'editor con i dati ordinati
         df_modificato = st.data_editor(df, num_rows="dynamic", use_container_width=True, key="editor_database")
         
-        # Tasto di salvataggio
         st.divider()
         if st.button("💾 SALVA MODIFICHE NEL DATABASE", type="primary"):
-            # Salviamo il nuovo dataframe sovrascrivendo quello vecchio
-            if save_to_github(df_modificato, sha, "Correzione manuale dati storici dalla Tab 1"):
-                st.success("✅ Modifiche storiche salvate con successo!")
+            # Salviamo il file aggiornato e ordinato
+            if save_to_github(df_modificato, sha, "Modifica e Ordinamento da Tab 1"):
+                st.success("✅ Modifiche salvate con successo!")
                 st.rerun()
     else:
         st.info("Nessun dato registrato al momento.")
