@@ -301,11 +301,11 @@ with tab3:
                     st.warning("L'importo deve essere maggiore di zero.")
 
 # ==========================================
-# --- TAB 4: PUNTO DI PAREGGIO E COPERTURA COSTI ---
+# --- TAB 4: TARGET PRODUZIONE E COPERTURA COSTI ---
 # ==========================================
 with tab4:
-    st.header("⚖️ Analisi di Copertura Costi (Punto di Pareggio)")
-    st.markdown("Valuta se la quantità di olio prodotta è sufficiente a coprire tutte le spese dell'anno.")
+    st.header("🎯 Target di Produzione (Break-Even Fisico)")
+    st.markdown("Calcola l'esatto quantitativo di olio e olive da produrre per coprire tutte le uscite, in base al prezzo di mercato attuale.")
 
     df_pareggio, _ = get_github_file()
     
@@ -314,48 +314,40 @@ with tab4:
         anni_disponibili = df_pareggio['data_dt'].dt.year.dropna().unique()
         
         if len(anni_disponibili) > 0:
-            anno_sel = st.selectbox("Seleziona Anno di Riferimento:", sorted(anni_disponibili, reverse=True), key="anno_pareggio")
+            anno_sel = st.selectbox("Seleziona Anno di Riferimento:", sorted(anni_disponibili, reverse=True), key="anno_target")
             
-            # Calcolo automatico delle uscite totali dell'anno selezionato
+            # Calcolo uscite totali dell'anno
             uscite_totali = df_pareggio[(df_pareggio['data_dt'].dt.year == anno_sel) & (df_pareggio['tipo'] == 'Uscita')]['importo'].sum()
             
-            st.info(f"💸 **Totale Uscite Sostenute nel {anno_sel}:** {format_euro(uscite_totali)}")
+            st.info(f"💸 **Totale Spese da Coprire nel {anno_sel}:** {format_euro(uscite_totali)}")
             st.divider()
             
-            with st.form("form_copertura"):
+            with st.form("form_target"):
                 c1, c2 = st.columns(2)
                 with c1:
-                    produzione_litri = st.number_input("Litri di Olio Prodotti (Stimati o Reali)", min_value=0.0, step=50.0)
+                    prezzo_attuale = st.number_input("Prezzo di Vendita Attuale (€ / Litro)", min_value=0.0, step=0.5, value=8.50)
                 with c2:
-                    prezzo_vendita = st.number_input("Prezzo di Vendita Stimato (€ / Litro)", min_value=0.0, step=0.5, value=8.0)
+                    resa_stimata = st.number_input("Resa Stimata Frantoio (Litri per ogni Quintale di olive)", min_value=0.0, step=0.5, value=15.0)
                 
-                calcola = st.form_submit_button("Calcola Copertura Finanziaria", type="primary")
+                calcola = st.form_submit_button("Calcola Volumi Necessari", type="primary")
                 
             if calcola:
-                if produzione_litri > 0:
-                    ricavo_stimato = produzione_litri * prezzo_vendita
-                    margine = ricavo_stimato - uscite_totali
-                    prezzo_minimo = uscite_totali / produzione_litri
+                if prezzo_attuale > 0 and resa_stimata > 0:
+                    # Formule di conversione
+                    litri_necessari = uscite_totali / prezzo_attuale
+                    quintali_necessari = litri_necessari / resa_stimata
                     
-                    st.subheader("📊 Risultato Analisi")
+                    st.subheader("📊 Traguardo Produttivo per andare in Pari")
                     
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("Valore Stimato Produzione", format_euro(ricavo_stimato))
+                    col1, col2 = st.columns(2)
+                    col1.metric("1️⃣ Olio Necessario", f"{litri_necessari:,.0f} Litri")
+                    col2.metric("2️⃣ Olive Necessarie", f"{quintali_necessari:,.1f} Quintali")
                     
-                    if margine >= 0:
-                        col2.metric("Utile Netto Previsto", format_euro(margine), delta="Copertura Raggiunta", delta_color="normal")
-                        st.success(f"✅ La produzione copre tutte le spese! Vendendo a **{prezzo_vendita} €/L** sei in attivo.")
-                    else:
-                        col2.metric("Perdita Prevista", format_euro(margine), delta="Sotto Copertura", delta_color="inverse")
-                        st.error(f"❌ La produzione NON è sufficiente a coprire le spese. Il valore generato è inferiore ai costi sostenuti.")
-                    
-                    col3.metric("Prezzo Minimo (Break-Even)", f"€ {prezzo_minimo:.2f} / L")
-                    
-                    st.caption("💡 **Il Prezzo Minimo (Break-Even)** indica la cifra esatta a cui devi vendere ogni singolo litro di olio per coprire esattamente i costi aziendali, andando a pari a zero spaccato.")
+                    st.success(f"📌 **Sintesi Strategica:** Per recuperare i {format_euro(uscite_totali)} spesi quest'anno vendendo l'olio a {prezzo_attuale} €/L, devi portare al frantoio almeno **{quintali_necessari:,.1f} quintali** di olive (ipotizzando una resa di {resa_stimata} litri al quintale). Ogni quintale prodotto in più sarà puro guadagno netto.")
                 else:
-                    st.warning("⚠️ Inserisci una produzione maggiore di 0 litri per effettuare il calcolo.")
+                    st.error("⚠️ Il Prezzo di Vendita e la Resa devono essere maggiori di zero per poter effettuare il calcolo.")
     else:
-        st.info("Nessun dato finanziario registrato nel database per poter calcolare la copertura.")
+        st.info("Nessun dato finanziario registrato nel database.")
 
 # ==========================================
 # --- TAB 5: BILANCIO E CONTROLLO ---
