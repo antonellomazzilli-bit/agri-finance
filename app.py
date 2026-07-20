@@ -236,40 +236,52 @@ with tab5:
 with tab6:
     st.header("🧾 Registrazione Fatture e Operazioni Commerciali")
     
+    # 1. SCELTA REATTIVA FUORI DAL FORM
+    # Scegliendo qui, la pagina si aggiorna all'istante
+    fat_tipo = st.radio("Seleziona la Natura dell'Operazione:", 
+                        ["Uscita (Acquisto / Spesa)", "Entrata (Vendita / Ricavo)"], 
+                        horizontal=True)
+    
+    # 2. FILTRAGGIO DINAMICO DELLE CATEGORIE
+    if "Uscita" in fat_tipo:
+        categorie_disponibili = ["Carburante e Mezzi", "Attrezzature", "Materiale Agricolo (Concimi/Piante)", "Manutenzione", "Consulenze/Tasse", "Altro"]
+        tipo_db = "Uscita"
+    else:
+        categorie_disponibili = ["Vendita Olio", "Vendita Olive", "Contributi/Aiuti", "Altro"]
+        tipo_db = "Entrata"
+        
+    st.divider()
+    
+    # 3. MODULO DI INSERIMENTO PROTETTO
     with st.form("form_fatture", clear_on_submit=True):
         c1, c2 = st.columns(2)
         
         with c1:
             fat_data = st.date_input("Data Fattura / Operazione", format="DD/MM/YYYY")
-            fat_tipo = st.selectbox("Tipo di Operazione", ["Uscita (Acquisto / Spesa)", "Entrata (Vendita / Ricavo)"])
-            fat_soggetto = st.text_input("Fornitore / Cliente (es. Consorzio Agrario)", placeholder="Nome azienda o persona")
+            fat_soggetto = st.text_input("Fornitore / Cliente", placeholder="es. Consorzio Agrario")
             fat_descrizione = st.text_input("Descrizione e Numero Fattura", placeholder="es. Fatt. 15/2026 - Acquisto Concime")
             
         with c2:
-            # Scegliamo dinamicamente le categorie in base al tipo di operazione
-            categorie_uscite = ["Carburante e Mezzi", "Attrezzature", "Materiale Agricolo (Concimi/Piante)", "Manutenzione", "Consulenze/Tasse", "Altro"]
-            categorie_entrate = ["Vendita Olio", "Vendita Olive", "Contributi/Aiuti", "Altro"]
-            
-            fat_categoria = st.selectbox("Categoria Bilancio", categorie_uscite + categorie_entrate)
+            # Qui il menu a tendina riceve solo la lista filtrata
+            fat_categoria = st.selectbox("Categoria Bilancio (Filtrata automaticamente)", categorie_disponibili)
             fat_importo = st.number_input("Importo Totale (€)", min_value=0.0, step=1.0, format="%.2f")
             fat_stato = st.selectbox("Stato Pagamento", ["Saldato", "Da Saldare (A credito/debito)"])
             
         if st.form_submit_button("Registra Operazione nel Database"):
             df, sha = get_github_file()
             
-            # Pulizia e formattazione dei dati per il salvataggio
-            tipo_db = "Uscita" if "Uscita" in fat_tipo else "Entrata"
+            # Formattazione per il database
             descrizione_completa = f"{fat_soggetto.strip()} | {fat_descrizione.strip()}"
             stato_db = "Saldato" if "Saldato" in fat_stato else "Impegnato"
             
-            # Creazione della nuova riga
+            # Creazione della riga
             nuova_riga = [
                 fat_data.strftime('%Y-%m-%d'), 
                 tipo_db, 
                 fat_categoria, 
                 descrizione_completa, 
                 float(fat_importo), 
-                "Azienda Generale", # Prodotto di default
+                "Azienda Generale", 
                 stato_db
             ]
             
