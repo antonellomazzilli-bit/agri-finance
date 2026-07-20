@@ -41,12 +41,28 @@ def estrai_giornate(descrizione, dipendente):
 st.title("AgriFinance Cloud")
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Home", "Manodopera", "Cassa", "Rese", "Bilancio"])
 
-# --- TAB 1: HOME ---
+# --- TAB 1: HOME E REGISTRO GENERALE MODIFICABILE ---
 with tab1:
-    st.header("Registro Generale")
-    df, _ = get_github_file()
-    st.dataframe(df, use_container_width=True)
-
+    st.header("🏠 Registro Generale (Editor)")
+    st.markdown("Fai **doppio clic** su una cella per modificarla (es. per aggiornare una categoria). Premi Invio per confermare la cella e poi usa il tasto verde qui sotto per salvare le modifiche nel database.")
+    
+    # Recuperiamo il file e il suo codice di sicurezza (sha)
+    df, sha = get_github_file()
+    
+    if not df.empty:
+        # Mostra il dataframe in modalità editor (stile Excel)
+        df_modificato = st.data_editor(df, num_rows="dynamic", use_container_width=True, key="editor_database")
+        
+        # Tasto di salvataggio
+        st.divider()
+        if st.button("💾 SALVA MODIFICHE NEL DATABASE", type="primary"):
+            # Salviamo il nuovo dataframe sovrascrivendo quello vecchio
+            if save_to_github(df_modificato, sha, "Correzione manuale dati storici dalla Tab 1"):
+                st.success("✅ Modifiche storiche salvate con successo!")
+                st.rerun()
+    else:
+        st.info("Nessun dato registrato al momento.")
+        
 # --- TAB 2: MANODOPERA (6h Day) ---
 with tab2:
     st.subheader("👥 Registro Manodopera (Giornata standard: 6 ore)")
