@@ -15,13 +15,13 @@ def get_github_file():
     # Se hai dei token o configurazioni specifiche, devono stare qui
     # Esempio semplificato:
     try:
-        return pd.read_csv("data.csv"), "sha_mock" 
+        return pd.read_csv("database.csv"), "sha_mock" 
     except:
         return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'prodotto', 'stato']), "new"
 
 def save_to_github(df, sha, message):
     # Inserisci qui il tuo codice esistente per salvare su GitHub
-    df.to_csv("data.csv", index=False)
+    df.to_csv("database.csv", index=False)
     return True
 
 def format_euro(valore):
