@@ -372,25 +372,30 @@ with tab5:
                 if not df_uscite_grafico.empty:
                     st.bar_chart(df_uscite_grafico.groupby(['mese', 'categoria'])['importo'].sum().unstack().fillna(0))
                     
-            # --- SECONDA SOTTO-SCHEDA: DOCUMENTO STAMPABILE ---
-           # --- SECONDA SOTTO-SCHEDA: BILANCIO REALE STAMPABILE ---
+           # --- SECONDA SOTTO-SCHEDA: BILANCIO REALE + APPENDICE DEBITI ---
             with sub_tab2:
                 st.subheader("🖨️ Bilancio Aziendale Formale (Stampa)")
-                st.markdown("Documento di sintesi delle Entrate, Uscite e Risultato d'Esercizio.")
                 
-                # 1. Filtriamo tutti i dati dell'anno per il bilancio reale
+                # 1. Calcoli Bilancio Reale
                 df_entrate = df_anno[df_anno['tipo'] == 'Entrata'].sort_values(by='data_dt')
                 df_uscite = df_anno[df_anno['tipo'] == 'Uscita'].sort_values(by='data_dt')
-                
                 tot_entrate = df_entrate['importo'].sum()
                 tot_uscite = df_uscite['importo'].sum()
                 saldo_reale = tot_entrate - tot_uscite
                 
-                # 2. Creiamo le righe HTML per le tabelle
+                # 2. Calcoli Spese Impegnate (Debiti)
+                df_impegnate = df_anno[
+                    (df_anno['tipo'] == 'Uscita') & 
+                    (df_anno['stato'].isin(['Impegnato', 'Da Saldare', 'Da Saldare (A credito/debito)']))
+                ].sort_values(by='data_dt')
+                tot_impegni = df_impegnate['importo'].sum()
+                
+                # 3. Preparazione Righe HTML
                 rows_entrate = "".join([f"<tr><td>{r['data_dt'].strftime('%d/%m/%Y')}</td><td>{r['descrizione']}</td><td class='right'>{format_euro(r['importo'])}</td></tr>" for _, r in df_entrate.iterrows()])
                 rows_uscite = "".join([f"<tr><td>{r['data_dt'].strftime('%d/%m/%Y')}</td><td>{r['descrizione']}</td><td class='right'>{format_euro(r['importo'])}</td></tr>" for _, r in df_uscite.iterrows()])
+                rows_impegni = "".join([f"<tr style='color: #b71c1c;'><td>{r['data_dt'].strftime('%d/%m/%Y')}</td><td>{r['descrizione']} (Stato: {r['stato']})</td><td class='right'>{format_euro(r['importo'])}</td></tr>" for _, r in df_impegnate.iterrows()])
                 
-                # 3. HTML Formale per la stampa
+                # 4. Template HTML con Appendice Debiti
                 html_template = f"""
                 <html>
                 <head>
@@ -404,16 +409,12 @@ with tab5:
                     th {{ background-color: #e9e9e9; font-weight: bold; }}
                     .right {{ text-align: right; }}
                     .bold {{ font-weight: bold; font-size: 16px; }}
-                    @media print {{
-                        body {{ background-color: white; padding: 0; }}
-                        .foglio-a4 {{ box-shadow: none; max-width: 100%; }}
-                        button {{ display: none; }}
-                    }}
+                    .evidenza {{ color: #b71c1c; font-weight: bold; background-color: #ffebee; }}
                 </style>
                 </head>
                 <body>
                     <div style="text-align: center; margin-bottom: 20px;">
-                        <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background-color: #2e7d32; color: white; border: none; border-radius: 5px; font-weight: bold;">🖨️ Stampa Bilancio PDF</button>
+                        <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background-color: #2e7d32; color: white; border: none; border-radius: 5px;">🖨️ Stampa Bilancio PDF</button>
                     </div>
                     <div class="foglio-a4">
                         <div class="header-doc">
@@ -429,9 +430,17 @@ with tab5:
                         <table><tr><th>Data</th><th>Descrizione</th><th class='right'>Importo</th></tr>{rows_uscite}</table>
                         <p class='right bold'>Totale Uscite: {format_euro(tot_uscite)}</p>
                         
-                        <div style="margin-top: 30px; border-top: 2px solid black; padding-top: 10px;">
-                            <p class='bold' style="text-align: right;">RISULTATO NETTO (Utile/Perdita): {format_euro(saldo_reale)}</p>
+                        <div style="margin-top: 20px;">
+                            <p class='bold' style="text-align: right;">RISULTATO NETTO: {format_euro(saldo_reale)}</p>
                         </div>
+                        
+                        <hr>
+                        <h4 class='evidenza'>APPENDICE: SPESE IMPEGNATE (DEBITI DA SALDARE)</h4>
+                        <table>
+                            <tr class='evidenza'><th>Data</th><th>Descrizione</th><th class='right'>Importo Impegnato</th></tr>
+                            {rows_impegni}
+                            <tr><td colspan='2' class='right bold'>TOTALE DEBITI IN SOSPESO:</td><td class='right bold evidenza'>{format_euro(tot_impegni)}</td></tr>
+                        </table>
                     </div>
                 </body>
                 </html>
