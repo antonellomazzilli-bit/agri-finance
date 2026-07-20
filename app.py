@@ -1,130 +1,139 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-import os
-# Assicurati di avere installato le librerie necessarie (github, ecc. se le usavi prima)
-
-# --- CONFIGURAZIONE ---
-st.set_page_config(page_title="AgriFinance Cloud", layout="wide")
-COSTO_GIORNATA_EXTRA = 55.0
-
 import requests
 import base64
 import json
+import re
+from io import StringIO
+import time
+
+# --- CONFIGURAZIONE INIZIALE ---
+st.set_page_config(page_title="AgriFinance Cloud", layout="wide")
+COSTO_GIORNATA_EXTRA = 55.0
+
+# --- FUNZIONI DI CONNESSIONE GITHUB ---
+@st.cache_data(ttl=0) # Forza Streamlit a scaricare dati sempre freschissimi aggirando la cache
+def get_github_file():
+    """Scarica il database aggiornato da GitHub."""
+    try:
+        token = st.secrets["GITHUB_TOKEN"]
+        repo = "antonellomazzilli-bit/agri-finance"
+        path = "database.csv"
+        url = f"https://api.github.com/repos/{repo}/contents/{path}"
+        headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+        
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            content = base64.b64decode(data['content']).decode('utf-8')
+            df = pd.read_csv(StringIO(content))
+            return df, data['sha']
+        else:
+            # Se il file non esiste ancora, crea le colonne base
+            return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'prodotto', 'stato']), ""
+    except Exception as e:
+        st.error(f"Errore di comunicazione in Lettura: {e}")
+        return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'prodotto', 'stato']), ""
 
 def save_to_github(df, sha, message):
-    """
-    Salva il dataframe su GitHub e restituisce True SOLO se l'operazione ha reale successo.
-    """
-    # 1. Recupero credenziali (Assicurati che i nomi corrispondano ai tuoi secrets)
-    # Sostituisci "TUO_NOME_UTENTE" e "agri-finance" con i tuoi dati reali se non usi i secrets per questi campi
-    token = st.secrets["GITHUB_TOKEN"] 
-    repo = "TUO_NOME_UTENTE/agri-finance" 
-    path = "database.csv"
-    
-    url = f"https://api.github.com/repos/{repo}/contents/{path}"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-
+    """Salva i dati e restituisce True SOLO in caso di successo effettivo confermato dal server."""
     try:
-        # 2. Conversione sicura in CSV senza indici
+        token = st.secrets["GITHUB_TOKEN"]
+        repo = "antonellomazzilli-bit/agri-finance"
+        path = "database.csv"
+        url = f"https://api.github.com/repos/{repo}/contents/{path}"
+        headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+
         csv_data = df.to_csv(index=False)
-        
-        # 3. Codifica obbligatoria in Base64 per l'API di GitHub
         encoded_data = base64.b64encode(csv_data.encode('utf-8')).decode('utf-8')
 
-        # 4. Preparazione del pacchetto di invio
-        data = {
+        payload = {
             "message": message,
             "content": encoded_data,
             "sha": sha
         }
 
-        # 5. Esecuzione dell'invio (Richiesta PUT)
-        response = requests.put(url, headers=headers, data=json.dumps(data))
+        response = requests.put(url, headers=headers, data=json.dumps(payload))
 
-        # 6. VERITÀ ASSOLUTA: Controlliamo la risposta di GitHub
         if response.status_code in [200, 201]:
-            # Successo reale
+            st.cache_data.clear() # Svuota la cache dopo il salvataggio
             return True
         else:
-            # Fallimento reale. Stampiamo il motivo esatto del blocco.
-            st.error(f"❌ Errore Server GitHub (Codice {response.status_code}): {response.text}")
+            st.error(f"❌ Errore Server GitHub: Impossibile salvare. Dettaglio: {response.text}")
             return False
-
     except Exception as e:
         st.error(f"❌ Errore di Sistema durante il salvataggio: {e}")
         return False
 
-# --- INTERFACCIA PRINCIPALE ---
+# --- FUNZIONI DI UTILITA' ---
+def format_euro(valore):
+    return f"€ {valore:,.2f}"
+
+def estrai_giornate(descrizione, dipendente):
+    try:
+        if dipendente in descrizione:
+            parti = descrizione.split('|')
+            for p in parti:
+                if 'gg' in p:
+                    return float(p.replace('gg', '').strip())
+        return 0.0
+    except: return 0.0
+
+
+# --- INTERFACCIA PRINCIPALE (LE 6 TAB) ---
 st.title("AgriFinance Cloud")
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Home", "Manodopera", "Cassa", "Rese", "Bilancio", "Fatture"])
 
-# --- TAB 1: HOME E REGISTRO GENERALE MODIFICABILE ---
+# ==========================================
+# --- TAB 1: HOME (Editor Diviso) ---
+# ==========================================
 with tab1:
     st.header("🏠 Registro Generale (Editor Diviso)")
-    st.markdown("💡 Le operazioni sono separate. Fai doppio clic sulle celle per modificare e premi Canc per eliminare una riga.")
+    st.markdown("💡 Fai doppio clic sulle celle per modificare e premi Canc per eliminare. Salva per confermare.")
     
     df, sha = get_github_file()
     
     if not df.empty:
-        # 1. Preparazione della Data come Oggetto Calendario
         df['data'] = pd.to_datetime(df['data'], errors='coerce')
         df = df.sort_values(by='data', ascending=False)
 
-        # 2. Separazione chirurgica dei dati
-        # Creiamo due dataframe separati in base alla colonna "tipo"
         df_entrate = df[df['tipo'] == 'Entrata'].reset_index(drop=True)
         df_uscite = df[df['tipo'] == 'Uscita'].reset_index(drop=True)
-        
-        # Paracadute: salviamo in memoria eventuali righe anomale per non perderle
         df_altri = df[(df['tipo'] != 'Entrata') & (df['tipo'] != 'Uscita')].reset_index(drop=True)
 
-        # 3. Creazione delle Colonne Visive
         col1, col2 = st.columns(2)
-
         with col1:
             st.subheader("🟢 Entrate")
             df_entrate_mod = st.data_editor(
                 df_entrate, 
                 column_config={"data": st.column_config.DateColumn("Data", format="DD/MM/YYYY")},
-                num_rows="dynamic", 
-                use_container_width=True, 
-                key="editor_entrate"
+                num_rows="dynamic", use_container_width=True, key="editor_entrate"
             )
-
         with col2:
             st.subheader("🔴 Uscite")
             df_uscite_mod = st.data_editor(
                 df_uscite, 
                 column_config={"data": st.column_config.DateColumn("Data", format="DD/MM/YYYY")},
-                num_rows="dynamic", 
-                use_container_width=True, 
-                key="editor_uscite"
+                num_rows="dynamic", use_container_width=True, key="editor_uscite"
             )
             
         st.divider()
-        
-        # 4. Pulsante di Salvataggio e Fusione dei Dati
         if st.button("💾 SALVA MODIFICHE NEL DATABASE", type="primary", use_container_width=True):
-            
-            # Ricuciamo le tabelle modificate insieme al paracadute delle righe anomale
             df_modificato = pd.concat([df_entrate_mod, df_uscite_mod, df_altri], ignore_index=True)
-            
-            # Formattiamo e riordiniamo per il salvataggio sicuro
             df_modificato['data'] = pd.to_datetime(df_modificato['data'], errors='coerce')
             df_modificato = df_modificato.sort_values(by='data', ascending=False).reset_index(drop=True)
             df_modificato['data'] = df_modificato['data'].dt.strftime('%Y-%m-%d')
             
-            if save_to_github(df_modificato, sha, "Modifica da Editor Diviso (Tab 1)"):
-                st.success("✅ Modifiche salvate con successo!")
+            if save_to_github(df_modificato, sha, "Modifica da Editor Diviso"):
+                st.success("✅ Modifiche salvate!")
+                time.sleep(1)
                 st.rerun()
     else:
-        st.info("Nessun dato registrato al momento.")
-        
-# --- TAB 2: MANODOPERA (6h Day) ---
+        st.info("Nessun dato registrato al momento nel database.")
+
+# ==========================================
+# --- TAB 2: MANODOPERA (Standard 6 Ore) ---
+# ==========================================
 with tab2:
     st.subheader("👥 Registro Manodopera (Giornata standard: 6 ore)")
     with st.form("operaio_form", clear_on_submit=True):
@@ -140,44 +149,73 @@ with tab2:
         
         if st.form_submit_button("Registra Giornate"):
             df, sha = get_github_file()
+            
+            righe_nuove = []
             if op_ufficiali > 0:
                 desc_uff = f"{op_nome} | {op_ufficiali:.3f} gg | UFFICIALE: {op_note}"
-                df = pd.concat([df, pd.DataFrame([[op_data, "Uscita", "Manodopera", desc_uff, 0.0, "Olive", "Impegnato"]], columns=df.columns)])
+                righe_nuove.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera", desc_uff, 0.0, "Olive", "Impegnato"])
+            
             gg_extra = op_reali - op_ufficiali
             if abs(gg_extra) > 0.001:
                 desc_extra = f"{op_nome} | {gg_extra:.3f} gg | EXTRA: {op_note}"
-                df = pd.concat([df, pd.DataFrame([[op_data, "Uscita", "Manodopera Extra", desc_extra, 0.0, "Olive", "Impegnato"]], columns=df.columns)])
-            save_to_github(df, sha, "Aggiornamento Manodopera")
-            st.rerun()
+                righe_nuove.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera Extra", desc_extra, 0.0, "Olive", "Impegnato"])
+            
+            if righe_nuove:
+                df_nuove = pd.DataFrame(righe_nuove, columns=df.columns)
+                df = pd.concat([df, df_nuove], ignore_index=True)
+                if save_to_github(df, sha, "Aggiornamento Manodopera (6h)"):
+                    st.success("✅ Giornate lavorative registrate!")
+                    time.sleep(1)
+                    st.rerun()
 
+# ==========================================
 # --- TAB 3: CASSA ---
+# ==========================================
 with tab3:
     st.subheader("💸 Cassa e Estratto Conto (Euro)")
     df, _ = get_github_file()
-    cat_pagamenti = ['Busta Paga', 'Saldo Extra', 'Straordinari', 'Rimborsi']
-    tot_versato = df[df['categoria'].isin(cat_pagamenti)]['importo'].sum()
-    gg_totali = sum(estrai_giornate(row['descrizione'], "Iannone Felice") for _, row in df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].iterrows())
-    valore_lavoro = gg_totali * COSTO_GIORNATA_EXTRA
     
-    saldo = tot_versato - valore_lavoro
-    st.metric("Saldo Dare/Avere", format_euro(saldo))
-    
-    with st.form("cassa_form"):
-        tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra"])
-        imp = st.number_input("Importo (€)", min_value=0.0)
-        if st.form_submit_button("Registra"):
-            # Aggiungi riga logica di salvataggio
-            st.rerun()
+    if not df.empty:
+        cat_pagamenti = ['Busta Paga', 'Saldo Extra', 'Straordinari', 'Rimborsi']
+        tot_versato = df[df['categoria'].isin(cat_pagamenti)]['importo'].sum()
+        gg_totali = sum(estrai_giornate(row['descrizione'], "Iannone Felice") for _, row in df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].iterrows())
+        valore_lavoro = gg_totali * COSTO_GIORNATA_EXTRA
+        
+        saldo = tot_versato - valore_lavoro
+        st.metric("Saldo Dare/Avere Dipendente", format_euro(saldo), delta="Verde = in credito | Rosso = a debito", delta_color="normal" if saldo>=0 else "inverse")
+        
+        with st.form("cassa_form", clear_on_submit=True):
+            st.write("Registra un pagamento al dipendente:")
+            c1, c2 = st.columns(2)
+            with c1:
+                data_pag = st.date_input("Data Pagamento", format="DD/MM/YYYY")
+                tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
+            with c2:
+                imp = st.number_input("Importo Erogato (€)", min_value=0.0, step=10.0, format="%.2f")
+            
+            if st.form_submit_button("Registra Pagamento"):
+                if imp > 0:
+                    nuova_riga = [data_pag.strftime('%Y-%m-%d'), "Uscita", tipo_op, f"Pagamento Iannone Felice | {tipo_op}", float(imp), "Azienda", "Saldato"]
+                    df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
+                    if save_to_github(df, sha, f"Pagamento Cassa: {imp}€"):
+                        st.success("✅ Pagamento registrato!")
+                        time.sleep(1)
+                        st.rerun()
+                else:
+                    st.warning("L'importo deve essere maggiore di zero.")
 
+# ==========================================
 # --- TAB 4: RESE ---
+# ==========================================
 with tab4:
-    st.header("Registro Rese")
+    st.header("🚜 Registro Rese e Produzione")
+    st.info("Modulo di calcolo rese olive/olio in fase di sviluppo.")
 
-# --- TAB 5: BILANCIO E CONTROLLO DI GESTIONE (DETTAGLIATO) ---
+# ==========================================
+# --- TAB 5: BILANCIO E CONTROLLO ---
+# ==========================================
 with tab5:
     st.header("📊 Bilancio e Controllo di Gestione")
-    st.markdown("Visione d'insieme sulle performance finanziarie e sui costi operativi dell'azienda.")
-    
     df_dash, _ = get_github_file()
     if not df_dash.empty:
         df_dash['data_dt'] = pd.to_datetime(df_dash['data'], errors='coerce')
@@ -187,59 +225,38 @@ with tab5:
             anno_selezionato = st.selectbox("Seleziona Anno di Esercizio:", sorted(anni_disponibili, reverse=True))
             df_anno = df_dash[df_dash['data_dt'].dt.year == anno_selezionato].copy()
             
-            # --- 1. SINTESI FINANZIARIA (FLUSSO DI CASSA) ---
             st.subheader("1. Sintesi Finanziaria (Cassa)")
             tot_entrate = df_anno[df_anno['tipo'] == 'Entrata']['importo'].sum()
             tot_uscite = df_anno[df_anno['tipo'] == 'Uscita']['importo'].sum()
             utile_netto = tot_entrate - tot_uscite
             
             c1, c2, c3 = st.columns(3)
-            c1.metric("🟢 Totale Entrate (Vendite/Altro)", format_euro(tot_entrate))
-            c2.metric("🔴 Totale Uscite (Costi Totali)", format_euro(tot_uscite))
+            c1.metric("🟢 Totale Entrate", format_euro(tot_entrate))
+            c2.metric("🔴 Totale Uscite", format_euro(tot_uscite))
             c3.metric("⚖️ Flusso di Cassa", format_euro(utile_netto), delta=f"{utile_netto:.2f} €", delta_color="normal")
             
             st.divider()
-            
-            # --- 2. SCOMPOSIZIONE DELLE USCITE (Personale vs Azienda) ---
-            st.subheader("2. Analisi dei Costi (Dove vanno i soldi?)")
-            
-            # Identifichiamo le categorie puramente finanziarie (pagamenti)
+            st.subheader("2. Analisi dei Costi")
             cat_personale_cassa = ['Busta Paga', 'Saldo Extra', 'Straordinari', 'Rimborsi']
             df_uscite = df_anno[df_anno['tipo'] == 'Uscita'].copy()
-            
             costo_personale = df_uscite[df_uscite['categoria'].isin(cat_personale_cassa)]['importo'].sum()
             costo_operativo = tot_uscite - costo_personale
             
             col_p, col_o = st.columns(2)
             with col_p:
                 st.info(f"**Cassa Personale:** {format_euro(costo_personale)}")
-                st.write("*Dettaglio Erogazioni ai Lavoratori:*")
-                dettaglio_pers = df_uscite[df_uscite['categoria'].isin(cat_personale_cassa)].groupby('categoria')['importo'].sum().reset_index()
-                st.dataframe(dettaglio_pers, hide_index=True, use_container_width=True)
-            
+                st.dataframe(df_uscite[df_uscite['categoria'].isin(cat_personale_cassa)].groupby('categoria')['importo'].sum().reset_index(), hide_index=True, use_container_width=True)
             with col_o:
-                st.warning(f"**Costi Operativi (Azienda/Olive):** {format_euro(costo_operativo)}")
-                st.write("*Dettaglio Spese (Carburante, Materiali, ecc.):*")
-                dettaglio_op = df_uscite[~df_uscite['categoria'].isin(cat_personale_cassa) & ~df_uscite['categoria'].str.contains('Manodopera')].groupby('categoria')['importo'].sum().reset_index()
-                st.dataframe(dettaglio_op.sort_values(by='importo', ascending=False), hide_index=True, use_container_width=True)
+                st.warning(f"**Costi Operativi:** {format_euro(costo_operativo)}")
+                st.dataframe(df_uscite[~df_uscite['categoria'].isin(cat_personale_cassa) & ~df_uscite['categoria'].str.contains('Manodopera')].groupby('categoria')['importo'].sum().reset_index().sort_values(by='importo', ascending=False), hide_index=True, use_container_width=True)
 
             st.divider()
+            st.subheader("3. Statistiche Forza Lavoro")
+            df_lavoro = df_anno[df_anno['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
+            gg_ufficiali, gg_extra = 0.0, 0.0
             
-            # --- 3. FOCUS MANODOPERA E FORZA LAVORO ---
-            st.subheader("3. Statistiche Forza Lavoro (Impegno Fisico)")
-            st.markdown("Analisi basata sui giorni di lavoro registrati (*1 Giornata = 6 Ore*).")
-            
-            # Sommiamo tutte le giornate fisiche estraendole dal testo
-            cat_lavoro = ['Manodopera', 'Manodopera Extra']
-            df_lavoro = df_anno[df_anno['categoria'].isin(cat_lavoro)]
-            
-            gg_ufficiali = 0.0
-            gg_extra = 0.0
-            
-            import re
             for _, row in df_lavoro.iterrows():
-                # Cerca un numero (anche con decimali) seguito da "gg" nella descrizione
-                match = re.search(r'([\d\.]+)\s*gg', row['descrizione'])
+                match = re.search(r'([\d\.]+)\s*gg', str(row['descrizione']))
                 if match:
                     valore = float(match.group(1))
                     if row['categoria'] == 'Manodopera':
@@ -247,45 +264,27 @@ with tab5:
                     else:
                         gg_extra += valore
                         
-            gg_totali = gg_ufficiali + gg_extra
-            valore_economico_generato = gg_totali * COSTO_GIORNATA_EXTRA
-            
+            valore_generato = (gg_ufficiali + gg_extra) * COSTO_GIORNATA_EXTRA
             c_lav1, c_lav2, c_lav3 = st.columns(3)
             c_lav1.metric("🚜 Giornate Ufficiali", f"{gg_ufficiali:.3f} gg")
             c_lav2.metric("⏱️ Giornate Fuori Busta", f"{gg_extra:.3f} gg")
-            c_lav3.metric("💸 Valore Lavoro Generato", format_euro(valore_economico_generato))
+            c_lav3.metric("💸 Valore Lavoro Generato", format_euro(valore_generato))
             
             st.divider()
-            
-            # --- 4. ANDAMENTO MENSILE DELLE SPESE ---
             st.subheader("4. Andamento Uscite Mensili")
             df_uscite['mese'] = df_uscite['data_dt'].dt.month
-            
-            # Creiamo una tabella pivot per il grafico escludendo le righe di pura registrazione giorni
             df_uscite_grafico = df_uscite[~df_uscite['categoria'].str.contains('Manodopera')]
-            
             if not df_uscite_grafico.empty:
-                andamento = df_uscite_grafico.groupby(['mese', 'categoria'])['importo'].sum().unstack().fillna(0)
-                st.bar_chart(andamento)
-            else:
-                st.write("Nessun movimento finanziario registrato per alimentare il grafico.")
-                
-        else:
-            st.info("Nessuna data valida trovata per generare il bilancio.")
-    else:
-        st.info("Nessun dato registrato al momento nel database.")
+                st.bar_chart(df_uscite_grafico.groupby(['mese', 'categoria'])['importo'].sum().unstack().fillna(0))
 
-# --- TAB 6: REGISTRAZIONE FATTURE E SPESE OPERATIVE ---
+# ==========================================
+# --- TAB 6: FATTURE E COMMERCIALIZZAZIONE ---
+# ==========================================
 with tab6:
     st.header("🧾 Registrazione Fatture e Operazioni Commerciali")
     
-    # 1. SCELTA REATTIVA FUORI DAL FORM
-    # Scegliendo qui, la pagina si aggiorna all'istante
-    fat_tipo = st.radio("Seleziona la Natura dell'Operazione:", 
-                        ["Uscita (Acquisto / Spesa)", "Entrata (Vendita / Ricavo)"], 
-                        horizontal=True)
+    fat_tipo = st.radio("Seleziona la Natura dell'Operazione:", ["Uscita (Acquisto / Spesa)", "Entrata (Vendita / Ricavo)"], horizontal=True)
     
-    # 2. FILTRAGGIO DINAMICO DELLE CATEGORIE
     if "Uscita" in fat_tipo:
         categorie_disponibili = ["Carburante e Mezzi", "Attrezzature", "Materiale Agricolo (Concimi/Piante)", "Manutenzione", "Consulenze/Tasse", "Altro"]
         tipo_db = "Uscita"
@@ -295,59 +294,32 @@ with tab6:
         
     st.divider()
     
-    # 3. MODULO DI INSERIMENTO PROTETTO
     with st.form("form_fatture", clear_on_submit=True):
         c1, c2 = st.columns(2)
-        
         with c1:
-            fat_data = st.date_input("Data Fattura / Operazione", format="DD/MM/YYYY")
+            fat_data = st.date_input("Data Operazione", format="DD/MM/YYYY")
             fat_soggetto = st.text_input("Fornitore / Cliente", placeholder="es. Consorzio Agrario")
-            fat_descrizione = st.text_input("Descrizione e Numero Fattura", placeholder="es. Fatt. 15/2026 - Acquisto Concime")
-            
+            fat_descrizione = st.text_input("Descrizione e Numero Documento", placeholder="es. Fatt. 15/2026")
         with c2:
-            # Qui il menu a tendina riceve solo la lista filtrata
-            fat_categoria = st.selectbox("Categoria Bilancio (Filtrata automaticamente)", categorie_disponibili)
+            fat_categoria = st.selectbox("Categoria Bilancio", categorie_disponibili)
             fat_importo = st.number_input("Importo Totale (€)", min_value=0.0, step=1.0, format="%.2f")
-            fat_stato = st.selectbox("Stato Pagamento", ["Saldato", "Da Saldare (A credito/debito)"])
+            fat_stato = st.selectbox("Stato Pagamento", ["Saldato", "Da Saldare"])
             
-        if st.form_submit_button("Registra Operazione nel Database"):
-            try:
+        if st.form_submit_button("Registra Operazione"):
+            if fat_importo > 0 and fat_soggetto:
                 df, sha = get_github_file()
-                
-                tipo_db = "Uscita" if "Uscita" in fat_tipo else "Entrata"
                 descrizione_completa = f"{fat_soggetto.strip()} | {fat_descrizione.strip()}"
                 stato_db = "Saldato" if "Saldato" in fat_stato else "Impegnato"
                 
-                # Creazione della nuova riga
-                nuova_riga = [
-                    fat_data.strftime('%Y-%m-%d'), 
-                    tipo_db, 
-                    fat_categoria, 
-                    descrizione_completa, 
-                    float(fat_importo), 
-                    "Azienda Generale", 
-                    stato_db
-                ]
+                nuova_riga = [fat_data.strftime('%Y-%m-%d'), tipo_db, fat_categoria, descrizione_completa, float(fat_importo), "Azienda Generale", stato_db]
                 
-                # CONTROLLO DI SICUREZZA COLONNE
                 if len(nuova_riga) != len(df.columns):
-                    st.error(f"❌ ERRORE STRUTTURALE: Stai cercando di inserire {len(nuova_riga)} dati, ma il tuo database ha {len(df.columns)} colonne. Colonne del database: {list(df.columns)}")
+                    st.error(f"Errore Colonne: Il database ha {len(df.columns)} colonne, stiamo cercando di inserirne {len(nuova_riga)}.")
                 else:
-                    df_nuova = pd.DataFrame([nuova_riga], columns=df.columns)
-                    df = pd.concat([df, df_nuova], ignore_index=True)
-                    
-                    # TENTATIVO DI SALVATAGGIO CON SEGNALAZIONE
-                    esito_salvataggio = save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}")
-                    
-                    if esito_salvataggio: 
-                        st.success(f"✅ Operazione da {fat_importo} € registrata con successo!")
-                        # Mettiamo in pausa 2 secondi prima di ricaricare per permettere a GitHub di allinearsi
-                        import time
+                    df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
+                    if save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}"): 
+                        st.success(f"✅ Operazione registrata con successo!")
                         time.sleep(2)
                         st.rerun()
-                    else:
-                        st.error("❌ ERRORE GITHUB: Il sistema non è riuscito a scrivere sul file. Verifica i permessi del Token GitHub.")
-
-            except Exception as e:
-                # Questo intercetta qualsiasi altro errore Python o Pandas
-                st.error(f"❌ ERRORE TECNICO BLOCCANTE: {e}")
+            else:
+                st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
