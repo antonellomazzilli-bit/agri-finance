@@ -389,152 +389,106 @@ with tab4:
 
 
 # ==========================================
-# --- TAB 5: BILANCIO E CONTROLLO ---
+# --- TAB 5: BILANCIO (SCHEMA IV DIRETTIVA CEE) ---
 # ==========================================
 with tab5:
-    st.header("📊 Bilancio e Controllo di Gestione")
-    df_dash, _ = get_github_file()
+    st.header("⚖️ Conto Economico CEE (Art. 2425 c.c.)")
+    st.markdown("Riclassificazione civilistica automatica in base alla natura della spesa.")
+
+    df_bilancio, _ = get_github_file()
     
-    if not df_dash.empty:
-        df_dash['data_dt'] = pd.to_datetime(df_dash['data'], errors='coerce')
-        anni_disponibili = df_dash['data_dt'].dt.year.dropna().unique()
+    if not df_bilancio.empty:
+        df_bilancio['data_dt'] = pd.to_datetime(df_bilancio['data'], errors='coerce')
+        anni_disponibili = df_bilancio['data_dt'].dt.year.dropna().unique()
         
         if len(anni_disponibili) > 0:
-            anno_selezionato = st.selectbox("Seleziona Anno di Esercizio:", sorted(anni_disponibili, reverse=True))
-            df_anno = df_dash[df_dash['data_dt'].dt.year == anno_selezionato].copy()
+            c_anno, c_vuota = st.columns([1, 2])
+            with c_anno:
+                anno_sel = st.selectbox("Seleziona Esercizio Fiscale:", sorted(anni_disponibili, reverse=True))
             
-            # --- CREAZIONE SOTTO-SCHEDE ---
-            sub_tab1, sub_tab2 = st.tabs(["📈 Cruscotto Interattivo", "🖨️ Fascicolo Debiti (Stampa Civile)"])
-            
-            # --- PRIMA SOTTO-SCHEDA: IL TUO VECCHIO CRUSCOTTO ---
-            with sub_tab1:
-                st.subheader("1. Sintesi Finanziaria (Cassa)")
-                tot_entrate = df_anno[df_anno['tipo'] == 'Entrata']['importo'].sum()
-                tot_uscite = df_anno[df_anno['tipo'] == 'Uscita']['importo'].sum()
-                utile_netto = tot_entrate - tot_uscite
-                
-                c1, c2, c3 = st.columns(3)
-                c1.metric("🟢 Totale Entrate", format_euro(tot_entrate))
-                c2.metric("🔴 Totale Uscite", format_euro(tot_uscite))
-                c3.metric("⚖️ Flusso di Cassa", format_euro(utile_netto), delta=f"{utile_netto:.2f} €", delta_color="normal")
-                
-                st.divider()
-                st.subheader("2. Analisi dei Costi")
-                cat_personale_cassa = ['Busta Paga', 'Saldo Extra', 'Straordinari', 'Rimborsi']
-                df_uscite = df_anno[df_anno['tipo'] == 'Uscita'].copy()
-                costo_personale = df_uscite[df_uscite['categoria'].isin(cat_personale_cassa)]['importo'].sum()
-                costo_operativo = tot_uscite - costo_personale
-                
-                col_p, col_o = st.columns(2)
-                with col_p:
-                    st.info(f"**Cassa Personale:** {format_euro(costo_personale)}")
-                    st.dataframe(df_uscite[df_uscite['categoria'].isin(cat_personale_cassa)].groupby('categoria')['importo'].sum().reset_index(), hide_index=True, use_container_width=True)
-                with col_o:
-                    st.warning(f"**Costi Operativi:** {format_euro(costo_operativo)}")
-                    st.dataframe(df_uscite[~df_uscite['categoria'].isin(cat_personale_cassa) & ~df_uscite['categoria'].str.contains('Manodopera')].groupby('categoria')['importo'].sum().reset_index().sort_values(by='importo', ascending=False), hide_index=True, use_container_width=True)
+            df_anno = df_bilancio[df_bilancio['data_dt'].dt.year == anno_sel].copy()
 
-                st.divider()
-                st.subheader("3. Statistiche Forza Lavoro")
-                df_lavoro = df_anno[df_anno['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
-                gg_ufficiali, gg_extra = 0.0, 0.0
+            # --- MOTORE DI TRADUZIONE CIVILISTICA (MAPPING CEE) ---
+            def classifica_cee(row):
+                cat = str(row['categoria']).upper()
+                tipo = row['tipo']
                 
-                for _, row in df_lavoro.iterrows():
-                    match = re.search(r'([\d\.]+)\s*gg', str(row['descrizione']))
-                    if match:
-                        valore = float(match.group(1))
-                        if row['categoria'] == 'Manodopera':
-                            gg_ufficiali += valore
-                        else:
-                            gg_extra += valore
-                            
-                valore_generato = (gg_ufficiali + gg_extra) * COSTO_GIORNATA_EXTRA
-                c_lav1, c_lav2, c_lav3 = st.columns(3)
-                c_lav1.metric("🚜 Giornate Ufficiali", f"{gg_ufficiali:.3f} gg")
-                c_lav2.metric("⏱️ Giornate Fuori Busta", f"{gg_extra:.3f} gg")
-                c_lav3.metric("💸 Valore Lavoro Generato", format_euro(valore_generato))
+                if tipo == 'Entrata':
+                    if 'CONTRIBUT' in cat or 'AGEA' in cat or 'PAC' in cat:
+                        return "A.5 - Altri ricavi e proventi (Contributi)"
+                    else:
+                        return "A.1 - Ricavi delle vendite e delle prestazioni"
+                elif tipo == 'Uscita':
+                    if 'MANODOPERA' in cat or 'BUSTA' in cat or 'SALDO' in cat:
+                        return "B.9 - Costi per il personale"
+                    elif 'ATTREZZATUR' in cat or 'AMMORTAMENT' in cat or 'MACCHINARI' in cat:
+                        return "B.10 - Ammortamenti e svalutazioni"
+                    elif 'SERVIZ' in cat or 'FRANTOIO' in cat or 'MOLITURA' in cat or 'TERZI' in cat or 'CONSULENZ' in cat:
+                        return "B.7 - Costi per servizi"
+                    elif 'CONCIM' in cat or 'MATERI' in cat or 'PIANTIN' in cat or 'CARBURANT' in cat or 'GASOLIO' in cat:
+                        return "B.6 - Per materie prime, sussidiarie e di consumo"
+                    elif 'AFFITT' in cat or 'LEASING' in cat:
+                        return "B.8 - Per godimento di beni di terzi"
+                    else:
+                        return "B.14 - Oneri diversi di gestione"
+                return "Non Classificato"
+
+            # Applichiamo la traduzione CEE al database
+            df_anno['voce_cee'] = df_anno.apply(classifica_cee, axis=1)
+
+            # --- CALCOLO AGGREGATI ---
+            entrate = df_anno[df_anno['tipo'] == 'Entrata'].groupby('voce_cee')['importo'].sum().reset_index()
+            uscite = df_anno[df_anno['tipo'] == 'Uscita'].groupby('voce_cee')['importo'].sum().reset_index()
+            
+            tot_a = entrate['importo'].sum() if not entrate.empty else 0.0
+            tot_b = uscite['importo'].sum() if not uscite.empty else 0.0
+            risultato_operativo = tot_a - tot_b
+
+            # --- INTERFACCIA GRAFICA CIVILISTICA ---
+            st.divider()
+            
+            col_a, col_b = st.columns(2)
+            
+            # SEZIONE A: VALORE DELLA PRODUZIONE
+            with col_a:
+                st.subheader("🟢 A) VALORE DELLA PRODUZIONE")
+                if not entrate.empty:
+                    for _, row in entrate.sort_values(by='voce_cee').iterrows():
+                        st.markdown(f"**{row['voce_cee']}**")
+                        st.markdown(f"<p style='text-align: right; color: #1b5e20; font-size: 18px;'>{format_euro(row['importo'])}</p>", unsafe_allow_html=True)
+                else:
+                    st.write("Nessun ricavo registrato.")
                 
-                st.divider()
-                st.subheader("4. Andamento Uscite Mensili")
-                df_uscite['mese'] = df_uscite['data_dt'].dt.month
-                df_uscite_grafico = df_uscite[~df_uscite['categoria'].str.contains('Manodopera')]
-                if not df_uscite_grafico.empty:
-                    st.bar_chart(df_uscite_grafico.groupby(['mese', 'categoria'])['importo'].sum().unstack().fillna(0))
-                    
-           # --- SECONDA SOTTO-SCHEDA: BILANCIO REALE + APPENDICE DEBITI ---
-            with sub_tab2:
-                st.subheader("🖨️ Bilancio Aziendale Formale (Stampa)")
+                st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='text-align: right;'>TOTALE A: {format_euro(tot_a)}</h4>", unsafe_allow_html=True)
+
+            # SEZIONE B: COSTI DELLA PRODUZIONE
+            with col_b:
+                st.subheader("🔴 B) COSTI DELLA PRODUZIONE")
+                if not uscite.empty:
+                    for _, row in uscite.sort_values(by='voce_cee').iterrows():
+                        st.markdown(f"**{row['voce_cee']}**")
+                        st.markdown(f"<p style='text-align: right; color: #b71c1c; font-size: 18px;'>{format_euro(row['importo'])}</p>", unsafe_allow_html=True)
+                else:
+                    st.write("Nessun costo registrato.")
                 
-                # 1. Calcoli Bilancio Reale
-                df_entrate = df_anno[df_anno['tipo'] == 'Entrata'].sort_values(by='data_dt')
-                df_uscite = df_anno[df_anno['tipo'] == 'Uscita'].sort_values(by='data_dt')
-                tot_entrate = df_entrate['importo'].sum()
-                tot_uscite = df_uscite['importo'].sum()
-                saldo_reale = tot_entrate - tot_uscite
+                st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='text-align: right;'>TOTALE B: {format_euro(tot_b)}</h4>", unsafe_allow_html=True)
+
+            # --- DIFFERENZA A - B (RISULTATO OPERATIVO) ---
+            st.divider()
+            col_risultato1, col_risultato2, col_risultato3 = st.columns([1, 2, 1])
+            with col_risultato2:
+                colore = "#1b5e20" if risultato_operativo >= 0 else "#b71c1c"
+                st.markdown(f"""
+                <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid {colore};">
+                    <h3 style="margin: 0; color: #333;">Differenza tra Valore e Costi della Produzione (A - B)</h3>
+                    <h1 style="margin: 0; color: {colore};">{format_euro(risultato_operativo)}</h1>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                # 2. Calcoli Spese Impegnate (Debiti)
-                df_impegnate = df_anno[
-                    (df_anno['tipo'] == 'Uscita') & 
-                    (df_anno['stato'].isin(['Impegnato', 'Da Saldare', 'Da Saldare (A credito/debito)']))
-                ].sort_values(by='data_dt')
-                tot_impegni = df_impegnate['importo'].sum()
-                
-                # 3. Preparazione Righe HTML
-                rows_entrate = "".join([f"<tr><td>{r['data_dt'].strftime('%d/%m/%Y')}</td><td>{r['descrizione']}</td><td class='right'>{format_euro(r['importo'])}</td></tr>" for _, r in df_entrate.iterrows()])
-                rows_uscite = "".join([f"<tr><td>{r['data_dt'].strftime('%d/%m/%Y')}</td><td>{r['descrizione']}</td><td class='right'>{format_euro(r['importo'])}</td></tr>" for _, r in df_uscite.iterrows()])
-                rows_impegni = "".join([f"<tr style='color: #b71c1c;'><td>{r['data_dt'].strftime('%d/%m/%Y')}</td><td>{r['descrizione']} (Stato: {r['stato']})</td><td class='right'>{format_euro(r['importo'])}</td></tr>" for _, r in df_impegnate.iterrows()])
-                
-                # 4. Template HTML con Appendice Debiti
-                html_template = f"""
-                <html>
-                <head>
-                <style>
-                    body {{ font-family: 'Arial', sans-serif; background-color: #f4f4f9; padding: 20px; }}
-                    .foglio-a4 {{ background-color: white; color: black; padding: 40px; max-width: 800px; margin: auto; box-shadow: 0 0 15px rgba(0,0,0,0.2); }}
-                    h2, h3, h4 {{ text-align: center; margin: 5px 0; }}
-                    .header-doc {{ border-bottom: 2px solid black; padding-bottom: 15px; margin-bottom: 25px; }}
-                    table {{ width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }}
-                    th, td {{ border: 1px solid #000; padding: 10px; text-align: left; }}
-                    th {{ background-color: #e9e9e9; font-weight: bold; }}
-                    .right {{ text-align: right; }}
-                    .bold {{ font-weight: bold; font-size: 16px; }}
-                    .evidenza {{ color: #b71c1c; font-weight: bold; background-color: #ffebee; }}
-                </style>
-                </head>
-                <body>
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background-color: #2e7d32; color: white; border: none; border-radius: 5px;">🖨️ Stampa Bilancio PDF</button>
-                    </div>
-                    <div class="foglio-a4">
-                        <div class="header-doc">
-                            <h2>AZIENDA AGRICOLA ANTONELLO MAZZILLI</h2>
-                            <h3>BILANCIO REALE D'ESERCIZIO {anno_selezionato}</h3>
-                        </div>
-                        
-                        <h4>ENTRATE (Ricavi)</h4>
-                        <table><tr><th>Data</th><th>Descrizione</th><th class='right'>Importo</th></tr>{rows_entrate}</table>
-                        <p class='right bold'>Totale Entrate: {format_euro(tot_entrate)}</p>
-                        
-                        <h4>USCITE (Costi)</h4>
-                        <table><tr><th>Data</th><th>Descrizione</th><th class='right'>Importo</th></tr>{rows_uscite}</table>
-                        <p class='right bold'>Totale Uscite: {format_euro(tot_uscite)}</p>
-                        
-                        <div style="margin-top: 20px;">
-                            <p class='bold' style="text-align: right;">RISULTATO NETTO: {format_euro(saldo_reale)}</p>
-                        </div>
-                        
-                        <hr>
-                        <h4 class='evidenza'>APPENDICE: SPESE IMPEGNATE (DEBITI DA SALDARE)</h4>
-                        <table>
-                            <tr class='evidenza'><th>Data</th><th>Descrizione</th><th class='right'>Importo Impegnato</th></tr>
-                            {rows_impegni}
-                            <tr><td colspan='2' class='right bold'>TOTALE DEBITI IN SOSPESO:</td><td class='right bold evidenza'>{format_euro(tot_impegni)}</td></tr>
-                        </table>
-                    </div>
-                </body>
-                </html>
-                """
-                import streamlit.components.v1 as components
-                components.html(html_template, height=800, scrolling=True)
+    else:
+        st.info("Nessun dato registrato nel database per generare il bilancio.")
 # ==========================================
 # --- TAB 6: FATTURE E COMMERCIALIZZAZIONE ---
 # ==========================================
