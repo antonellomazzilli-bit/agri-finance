@@ -393,8 +393,7 @@ with tab4:
 # ==========================================
 with tab5:
     st.header("⚖️ Conto Economico CEE (Art. 2425 c.c.)")
-    st.markdown("Riclassificazione civilistica automatica in base alla natura della spesa.")
-
+    
     df_bilancio, _ = get_github_file()
     
     if not df_bilancio.empty:
@@ -402,10 +401,7 @@ with tab5:
         anni_disponibili = df_bilancio['data_dt'].dt.year.dropna().unique()
         
         if len(anni_disponibili) > 0:
-            c_anno, c_vuota = st.columns([1, 2])
-            with c_anno:
-                anno_sel = st.selectbox("Seleziona Esercizio Fiscale:", sorted(anni_disponibili, reverse=True))
-            
+            anno_sel = st.selectbox("Seleziona Esercizio Fiscale:", sorted(anni_disponibili, reverse=True), key="bilancio_anno")
             df_anno = df_bilancio[df_bilancio['data_dt'].dt.year == anno_sel].copy()
 
             # --- MOTORE DI TRADUZIONE CIVILISTICA (MAPPING CEE) ---
@@ -433,7 +429,6 @@ with tab5:
                         return "B.14 - Oneri diversi di gestione"
                 return "Non Classificato"
 
-            # Applichiamo la traduzione CEE al database
             df_anno['voce_cee'] = df_anno.apply(classifica_cee, axis=1)
 
             # --- CALCOLO AGGREGATI ---
@@ -444,48 +439,113 @@ with tab5:
             tot_b = uscite['importo'].sum() if not uscite.empty else 0.0
             risultato_operativo = tot_a - tot_b
 
-            # --- INTERFACCIA GRAFICA CIVILISTICA ---
-            st.divider()
-            
-            col_a, col_b = st.columns(2)
-            
-            # SEZIONE A: VALORE DELLA PRODUZIONE
-            with col_a:
-                st.subheader("🟢 A) VALORE DELLA PRODUZIONE")
-                if not entrate.empty:
-                    for _, row in entrate.sort_values(by='voce_cee').iterrows():
-                        st.markdown(f"**{row['voce_cee']}**")
-                        st.markdown(f"<p style='text-align: right; color: #1b5e20; font-size: 18px;'>{format_euro(row['importo'])}</p>", unsafe_allow_html=True)
-                else:
-                    st.write("Nessun ricavo registrato.")
-                
-                st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-                st.markdown(f"<h4 style='text-align: right;'>TOTALE A: {format_euro(tot_a)}</h4>", unsafe_allow_html=True)
+            # --- CREAZIONE SOTTO-SCHEDE ---
+            sub_bil1, sub_bil2 = st.tabs(["💻 Visualizzazione Interattiva", "🖨️ Documento Stampabile (PDF)"])
 
-            # SEZIONE B: COSTI DELLA PRODUZIONE
-            with col_b:
-                st.subheader("🔴 B) COSTI DELLA PRODUZIONE")
-                if not uscite.empty:
-                    for _, row in uscite.sort_values(by='voce_cee').iterrows():
-                        st.markdown(f"**{row['voce_cee']}**")
-                        st.markdown(f"<p style='text-align: right; color: #b71c1c; font-size: 18px;'>{format_euro(row['importo'])}</p>", unsafe_allow_html=True)
-                else:
-                    st.write("Nessun costo registrato.")
+            # --- SOTTO-SCHEDA 1: CRUSCOTTO VIDEO ---
+            with sub_bil1:
+                col_a, col_b = st.columns(2)
                 
-                st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-                st.markdown(f"<h4 style='text-align: right;'>TOTALE B: {format_euro(tot_b)}</h4>", unsafe_allow_html=True)
+                with col_a:
+                    st.subheader("🟢 A) VALORE DELLA PRODUZIONE")
+                    if not entrate.empty:
+                        for _, row in entrate.sort_values(by='voce_cee').iterrows():
+                            st.markdown(f"**{row['voce_cee']}**")
+                            st.markdown(f"<p style='text-align: right; color: #1b5e20; font-size: 18px;'>{format_euro(row['importo'])}</p>", unsafe_allow_html=True)
+                    else:
+                        st.write("Nessun ricavo registrato.")
+                    st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+                    st.markdown(f"<h4 style='text-align: right;'>TOTALE A: {format_euro(tot_a)}</h4>", unsafe_allow_html=True)
 
-            # --- DIFFERENZA A - B (RISULTATO OPERATIVO) ---
-            st.divider()
-            col_risultato1, col_risultato2, col_risultato3 = st.columns([1, 2, 1])
-            with col_risultato2:
-                colore = "#1b5e20" if risultato_operativo >= 0 else "#b71c1c"
-                st.markdown(f"""
-                <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid {colore};">
-                    <h3 style="margin: 0; color: #333;">Differenza tra Valore e Costi della Produzione (A - B)</h3>
-                    <h1 style="margin: 0; color: {colore};">{format_euro(risultato_operativo)}</h1>
-                </div>
-                """, unsafe_allow_html=True)
+                with col_b:
+                    st.subheader("🔴 B) COSTI DELLA PRODUZIONE")
+                    if not uscite.empty:
+                        for _, row in uscite.sort_values(by='voce_cee').iterrows():
+                            st.markdown(f"**{row['voce_cee']}**")
+                            st.markdown(f"<p style='text-align: right; color: #b71c1c; font-size: 18px;'>{format_euro(row['importo'])}</p>", unsafe_allow_html=True)
+                    else:
+                        st.write("Nessun costo registrato.")
+                    st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+                    st.markdown(f"<h4 style='text-align: right;'>TOTALE B: {format_euro(tot_b)}</h4>", unsafe_allow_html=True)
+
+                st.divider()
+                col_risultato1, col_risultato2, col_risultato3 = st.columns([1, 2, 1])
+                with col_risultato2:
+                    colore = "#1b5e20" if risultato_operativo >= 0 else "#b71c1c"
+                    st.markdown(f"""
+                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid {colore};">
+                        <h3 style="margin: 0; color: #333;">Differenza tra Valore e Costi della Produzione (A - B)</h3>
+                        <h1 style="margin: 0; color: {colore};">{format_euro(risultato_operativo)}</h1>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            # --- SOTTO-SCHEDA 2: STAMPA HTML CIVILISTICA ---
+            with sub_bil2:
+                # Costruzione stringhe per le tabelle HTML
+                righe_entrate = "".join([f"<tr><td>{row['voce_cee']}</td><td class='right'>{format_euro(row['importo'])}</td></tr>" for _, row in entrate.sort_values(by='voce_cee').iterrows()])
+                righe_uscite = "".join([f"<tr><td>{row['voce_cee']}</td><td class='right'>{format_euro(row['importo'])}</td></tr>" for _, row in uscite.sort_values(by='voce_cee').iterrows()])
+                
+                colore_risultato_stampa = "#1b5e20" if risultato_operativo >= 0 else "#b71c1c"
+
+                html_bilancio = f"""
+                <html>
+                <head>
+                <style>
+                    body {{ font-family: 'Arial', sans-serif; background-color: #f4f4f9; padding: 20px; }}
+                    .foglio-a4 {{ background-color: white; color: black; padding: 40px; max-width: 800px; margin: auto; box-shadow: 0 0 15px rgba(0,0,0,0.2); }}
+                    h2, h3, h4 {{ text-align: center; margin: 5px 0; }}
+                    .header-doc {{ border-bottom: 2px solid black; padding-bottom: 15px; margin-bottom: 25px; }}
+                    table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; page-break-inside: avoid; }}
+                    th, td {{ border: 1px solid #000; padding: 8px; text-align: left; }}
+                    th {{ background-color: #e9e9e9; font-weight: bold; }}
+                    .right {{ text-align: right; }}
+                    .bold {{ font-weight: bold; }}
+                    .totale-box {{ margin-top: 30px; border: 2px solid black; padding: 15px; text-align: right; page-break-inside: avoid; }}
+                    @media print {{
+                        body {{ background-color: white; padding: 0; }}
+                        .foglio-a4 {{ box-shadow: none; max-width: 100%; padding: 0; margin: 0; }}
+                        button {{ display: none; }}
+                    }}
+                </style>
+                </head>
+                <body>
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background-color: #1565c0; color: white; border: none; border-radius: 5px; font-weight: bold;">🖨️ Stampa Conto Economico PDF</button>
+                    </div>
+                    <div class="foglio-a4">
+                        <div class="header-doc">
+                            <h2>AZIENDA AGRICOLA ANTONELLO MAZZILLI</h2>
+                            <h4>Produzione Olio ed Esercizio Agricolo</h4>
+                            <h3>CONTO ECONOMICO ESERCIZIO {anno_sel}</h3>
+                            <p style="text-align:center; font-size: 12px;">Redatto in conformità all'Art. 2425 c.c. (Schema IV Direttiva CEE)</p>
+                        </div>
+                        
+                        <h4 style="text-align: left;">A) VALORE DELLA PRODUZIONE</h4>
+                        <table>
+                            <tr><th>Voce Bilancio (Ricavi)</th><th class="right">Importo</th></tr>
+                            {righe_entrate if righe_entrate else "<tr><td colspan='2'>Nessun dato presente</td></tr>"}
+                            <tr><td class="bold right" style="background-color: #e9e9e9;">TOTALE A</td><td class="bold right" style="background-color: #e9e9e9;">{format_euro(tot_a)}</td></tr>
+                        </table>
+
+                        <br>
+                        
+                        <h4 style="text-align: left;">B) COSTI DELLA PRODUZIONE</h4>
+                        <table>
+                            <tr><th>Voce Bilancio (Costi Operativi)</th><th class="right">Importo</th></tr>
+                            {righe_uscite if righe_uscite else "<tr><td colspan='2'>Nessun dato presente</td></tr>"}
+                            <tr><td class="bold right" style="background-color: #e9e9e9;">TOTALE B</td><td class="bold right" style="background-color: #e9e9e9;">{format_euro(tot_b)}</td></tr>
+                        </table>
+
+                        <div class="totale-box">
+                            <h3>Differenza tra Valore e Costi della Produzione (A - B)</h3>
+                            <h2 style="color: {colore_risultato_stampa};">{format_euro(risultato_operativo)}</h2>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """
+                import streamlit.components.v1 as components
+                components.html(html_bilancio, height=850, scrolling=True)
                 
     else:
         st.info("Nessun dato registrato nel database per generare il bilancio.")
