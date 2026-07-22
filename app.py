@@ -389,105 +389,114 @@ with tab4:
 
 
 # ==========================================
-# --- TAB 5: BILANCIO (SCHEMA IV DIRETTIVA CEE) ---
+# --- TAB 5: BILANCIO (SCHEMA CEE COMPARATO N vs N-1) ---
 # ==========================================
 with tab5:
-    st.header("⚖️ Conto Economico CEE (Art. 2425 c.c.)")
-    
+    st.header("⚖️ Conto Economico CEE Comparato")
+    st.markdown("Riclassificazione civilistica (Art. 2425 c.c.) con affiancamento automatico dell'anno precedente.")
+
     df_bilancio, _ = get_github_file()
     
     if not df_bilancio.empty:
         df_bilancio['data_dt'] = pd.to_datetime(df_bilancio['data'], errors='coerce')
-        anni_disponibili = df_bilancio['data_dt'].dt.year.dropna().unique()
+        df_bilancio = df_bilancio.dropna(subset=['data_dt'])
+        anni_disponibili = sorted(df_bilancio['data_dt'].dt.year.unique(), reverse=True)
         
         if len(anni_disponibili) > 0:
-            anno_sel = st.selectbox("Seleziona Esercizio Fiscale:", sorted(anni_disponibili, reverse=True), key="bilancio_anno")
-            df_anno = df_bilancio[df_bilancio['data_dt'].dt.year == anno_sel].copy()
-
-            # --- MOTORE DI TRADUZIONE CIVILISTICA (MAPPING CEE) ---
+            anno_sel = st.selectbox("Seleziona Esercizio Fiscale (N):", anni_disponibili, key="bilancio_anno")
+            anno_prec = anno_sel - 1
+            
+            # --- MOTORE DI TRADUZIONE CIVILISTICA ---
             def classifica_cee(row):
                 cat = str(row['categoria']).upper()
                 tipo = row['tipo']
-                
                 if tipo == 'Entrata':
-                    if 'CONTRIBUT' in cat or 'AGEA' in cat or 'PAC' in cat:
-                        return "A.5 - Altri ricavi e proventi (Contributi)"
-                    else:
-                        return "A.1 - Ricavi delle vendite e delle prestazioni"
+                    if 'CONTRIBUT' in cat or 'AGEA' in cat or 'PAC' in cat: return "A.5 - Altri ricavi e proventi (Contributi)"
+                    else: return "A.1 - Ricavi delle vendite e prestazioni"
                 elif tipo == 'Uscita':
-                    if 'MANODOPERA' in cat or 'BUSTA' in cat or 'SALDO' in cat:
-                        return "B.9 - Costi per il personale"
-                    elif 'ATTREZZATUR' in cat or 'AMMORTAMENT' in cat or 'MACCHINARI' in cat:
-                        return "B.10 - Ammortamenti e svalutazioni"
-                    elif 'SERVIZ' in cat or 'FRANTOIO' in cat or 'MOLITURA' in cat or 'TERZI' in cat or 'CONSULENZ' in cat:
-                        return "B.7 - Costi per servizi"
-                    elif 'CONCIM' in cat or 'MATERI' in cat or 'PIANTIN' in cat or 'CARBURANT' in cat or 'GASOLIO' in cat:
-                        return "B.6 - Per materie prime, sussidiarie e di consumo"
-                    elif 'AFFITT' in cat or 'LEASING' in cat:
-                        return "B.8 - Per godimento di beni di terzi"
-                    else:
-                        return "B.14 - Oneri diversi di gestione"
+                    if 'MANODOPERA' in cat or 'BUSTA' in cat or 'SALDO' in cat: return "B.9 - Costi per il personale"
+                    elif 'ATTREZZATUR' in cat or 'AMMORTAMENT' in cat or 'MACCHINARI' in cat: return "B.10 - Ammortamenti e svalutazioni"
+                    elif 'SERVIZ' in cat or 'FRANTOIO' in cat or 'MOLITURA' in cat or 'TERZI' in cat or 'CONSULENZ' in cat: return "B.7 - Costi per servizi"
+                    elif 'CONCIM' in cat or 'MATERI' in cat or 'PIANTIN' in cat or 'CARBURANT' in cat or 'GASOLIO' in cat: return "B.6 - Per materie prime, sussidiarie, di consumo"
+                    elif 'AFFITT' in cat or 'LEASING' in cat: return "B.8 - Per godimento di beni di terzi"
+                    else: return "B.14 - Oneri diversi di gestione"
                 return "Non Classificato"
 
-            df_anno['voce_cee'] = df_anno.apply(classifica_cee, axis=1)
+            df_bilancio['voce_cee'] = df_bilancio.apply(classifica_cee, axis=1)
 
-            # --- CALCOLO AGGREGATI ---
-            entrate = df_anno[df_anno['tipo'] == 'Entrata'].groupby('voce_cee')['importo'].sum().reset_index()
-            uscite = df_anno[df_anno['tipo'] == 'Uscita'].groupby('voce_cee')['importo'].sum().reset_index()
+            # Estrazione dati Anno N
+            df_n = df_bilancio[df_bilancio['data_dt'].dt.year == anno_sel]
+            entrate_n = df_n[df_n['tipo'] == 'Entrata'].groupby('voce_cee')['importo'].sum()
+            uscite_n = df_n[df_n['tipo'] == 'Uscita'].groupby('voce_cee')['importo'].sum()
             
-            tot_a = entrate['importo'].sum() if not entrate.empty else 0.0
-            tot_b = uscite['importo'].sum() if not uscite.empty else 0.0
-            risultato_operativo = tot_a - tot_b
+            # Estrazione dati Anno N-1
+            df_n1 = df_bilancio[df_bilancio['data_dt'].dt.year == anno_prec]
+            entrate_n1 = df_n1[df_n1['tipo'] == 'Entrata'].groupby('voce_cee')['importo'].sum()
+            uscite_n1 = df_n1[df_n1['tipo'] == 'Uscita'].groupby('voce_cee')['importo'].sum()
 
-            # --- CREAZIONE SOTTO-SCHEDE ---
-            sub_bil1, sub_bil2 = st.tabs(["💻 Visualizzazione Interattiva", "🖨️ Documento Stampabile (PDF)"])
+            # Elenco univoco delle voci utilizzate in entrambi gli anni
+            voci_a = sorted(list(set(entrate_n.index).union(set(entrate_n1.index))))
+            voci_b = sorted(list(set(uscite_n.index).union(set(uscite_n1.index))))
 
-            # --- SOTTO-SCHEDA 1: CRUSCOTTO VIDEO ---
+            # Calcolo Totali Complessivi
+            tot_a_n, tot_a_n1 = entrate_n.sum(), entrate_n1.sum()
+            tot_b_n, tot_b_n1 = uscite_n.sum(), uscite_n1.sum()
+            ris_operativo_n = tot_a_n - tot_b_n
+            ris_operativo_n1 = tot_a_n1 - tot_b_n1
+
+            sub_bil1, sub_bil2 = st.tabs(["💻 Visualizzazione Interattiva (N vs N-1)", "🖨️ Documento Stampabile (PDF Comparato)"])
+
+            # --- SOTTO-SCHEDA 1: CRUSCOTTO VIDEO (COMPARATIVO) ---
             with sub_bil1:
                 col_a, col_b = st.columns(2)
                 
                 with col_a:
-                    st.subheader("🟢 A) VALORE DELLA PRODUZIONE")
-                    if not entrate.empty:
-                        for _, row in entrate.sort_values(by='voce_cee').iterrows():
-                            st.markdown(f"**{row['voce_cee']}**")
-                            st.markdown(f"<p style='text-align: right; color: #1b5e20; font-size: 18px;'>{format_euro(row['importo'])}</p>", unsafe_allow_html=True)
-                    else:
-                        st.write("Nessun ricavo registrato.")
-                    st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-                    st.markdown(f"<h4 style='text-align: right;'>TOTALE A: {format_euro(tot_a)}</h4>", unsafe_allow_html=True)
+                    st.subheader(f"🟢 A) VALORE PRODUZIONE")
+                    for v in voci_a:
+                        val_n = entrate_n.get(v, 0.0)
+                        val_n1 = entrate_n1.get(v, 0.0)
+                        st.write(f"**{v}**")
+                        c1, c2 = st.columns(2)
+                        c1.metric(f"Anno {anno_sel}", format_euro(val_n))
+                        c2.metric(f"Anno {anno_prec}", format_euro(val_n1), delta=f"{val_n - val_n1:.2f} €", delta_color="normal")
+                    st.divider()
+                    st.markdown(f"<h4 style='color: #1b5e20;'>TOTALE A ({anno_sel}): {format_euro(tot_a_n)}</h4>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='color: gray;'>TOTALE A ({anno_prec}): {format_euro(tot_a_n1)}</p>", unsafe_allow_html=True)
 
                 with col_b:
-                    st.subheader("🔴 B) COSTI DELLA PRODUZIONE")
-                    if not uscite.empty:
-                        for _, row in uscite.sort_values(by='voce_cee').iterrows():
-                            st.markdown(f"**{row['voce_cee']}**")
-                            st.markdown(f"<p style='text-align: right; color: #b71c1c; font-size: 18px;'>{format_euro(row['importo'])}</p>", unsafe_allow_html=True)
-                    else:
-                        st.write("Nessun costo registrato.")
-                    st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-                    st.markdown(f"<h4 style='text-align: right;'>TOTALE B: {format_euro(tot_b)}</h4>", unsafe_allow_html=True)
+                    st.subheader(f"🔴 B) COSTI PRODUZIONE")
+                    for v in voci_b:
+                        val_n = uscite_n.get(v, 0.0)
+                        val_n1 = uscite_n1.get(v, 0.0)
+                        st.write(f"**{v}**")
+                        c1, c2 = st.columns(2)
+                        c1.metric(f"Anno {anno_sel}", format_euro(val_n))
+                        # Inversione colori delta per i costi: se il costo sale (delta positivo) è un peggioramento (rosso)
+                        c2.metric(f"Anno {anno_prec}", format_euro(val_n1), delta=f"{val_n - val_n1:.2f} €", delta_color="inverse")
+                    st.divider()
+                    st.markdown(f"<h4 style='color: #b71c1c;'>TOTALE B ({anno_sel}): {format_euro(tot_b_n)}</h4>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='color: gray;'>TOTALE B ({anno_prec}): {format_euro(tot_b_n1)}</p>", unsafe_allow_html=True)
 
                 st.divider()
-                col_risultato1, col_risultato2, col_risultato3 = st.columns([1, 2, 1])
-                with col_risultato2:
-                    colore = "#1b5e20" if risultato_operativo >= 0 else "#b71c1c"
-                    st.markdown(f"""
-                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid {colore};">
-                        <h3 style="margin: 0; color: #333;">Differenza tra Valore e Costi della Produzione (A - B)</h3>
-                        <h1 style="margin: 0; color: {colore};">{format_euro(risultato_operativo)}</h1>
-                    </div>
-                    """, unsafe_allow_html=True)
+                st.subheader("⚖️ RISULTATO D'ESERCIZIO")
+                c_ris1, c_ris2, c_ris3 = st.columns(3)
+                c_ris1.metric(f"Utile/Perdita {anno_prec}", format_euro(ris_operativo_n1))
+                c_ris2.metric(f"Utile/Perdita {anno_sel}", format_euro(ris_operativo_n), delta=f"{ris_operativo_n - ris_operativo_n1:.2f} €")
 
-            # --- SOTTO-SCHEDA 2: STAMPA HTML CIVILISTICA ---
+            # --- SOTTO-SCHEDA 2: STAMPA HTML CIVILISTICA (A 3 COLONNE) ---
             with sub_bil2:
-                # Costruzione stringhe per le tabelle HTML
-                righe_entrate = "".join([f"<tr><td>{row['voce_cee']}</td><td class='right'>{format_euro(row['importo'])}</td></tr>" for _, row in entrate.sort_values(by='voce_cee').iterrows()])
-                righe_uscite = "".join([f"<tr><td>{row['voce_cee']}</td><td class='right'>{format_euro(row['importo'])}</td></tr>" for _, row in uscite.sort_values(by='voce_cee').iterrows()])
+                # Creazione righe HTML combinando N e N-1
+                html_righe_a = ""
+                for v in voci_a:
+                    html_righe_a += f"<tr><td>{v}</td><td class='right bold'>{format_euro(entrate_n.get(v, 0.0))}</td><td class='right' style='color: #555;'>{format_euro(entrate_n1.get(v, 0.0))}</td></tr>"
                 
-                colore_risultato_stampa = "#1b5e20" if risultato_operativo >= 0 else "#b71c1c"
+                html_righe_b = ""
+                for v in voci_b:
+                    html_righe_b += f"<tr><td>{v}</td><td class='right bold'>{format_euro(uscite_n.get(v, 0.0))}</td><td class='right' style='color: #555;'>{format_euro(uscite_n1.get(v, 0.0))}</td></tr>"
 
-                html_bilancio = f"""
+                colore_ris = "#1b5e20" if ris_operativo_n >= 0 else "#b71c1c"
+
+                html_bilancio_comparato = f"""
                 <html>
                 <head>
                 <style>
@@ -495,12 +504,14 @@ with tab5:
                     .foglio-a4 {{ background-color: white; color: black; padding: 40px; max-width: 800px; margin: auto; box-shadow: 0 0 15px rgba(0,0,0,0.2); }}
                     h2, h3, h4 {{ text-align: center; margin: 5px 0; }}
                     .header-doc {{ border-bottom: 2px solid black; padding-bottom: 15px; margin-bottom: 25px; }}
-                    table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; page-break-inside: avoid; }}
+                    table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; page-break-inside: avoid; }}
                     th, td {{ border: 1px solid #000; padding: 8px; text-align: left; }}
-                    th {{ background-color: #e9e9e9; font-weight: bold; }}
+                    th {{ background-color: #e9e9e9; font-weight: bold; text-align: center; }}
                     .right {{ text-align: right; }}
                     .bold {{ font-weight: bold; }}
-                    .totale-box {{ margin-top: 30px; border: 2px solid black; padding: 15px; text-align: right; page-break-inside: avoid; }}
+                    .totale-riga td {{ background-color: #e9e9e9; font-weight: bold; }}
+                    .totale-box {{ margin-top: 30px; border: 2px solid black; padding: 15px; page-break-inside: avoid; }}
+                    .box-row {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }}
                     @media print {{
                         body {{ background-color: white; padding: 0; }}
                         .foglio-a4 {{ box-shadow: none; max-width: 100%; padding: 0; margin: 0; }}
@@ -510,42 +521,48 @@ with tab5:
                 </head>
                 <body>
                     <div style="text-align: center; margin-bottom: 20px;">
-                        <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background-color: #1565c0; color: white; border: none; border-radius: 5px; font-weight: bold;">🖨️ Stampa Conto Economico PDF</button>
+                        <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background-color: #1565c0; color: white; border: none; border-radius: 5px; font-weight: bold;">🖨️ Stampa Bilancio Comparato PDF</button>
                     </div>
                     <div class="foglio-a4">
                         <div class="header-doc">
                             <h2>AZIENDA AGRICOLA ANTONELLO MAZZILLI</h2>
                             <h4>Produzione Olio ed Esercizio Agricolo</h4>
-                            <h3>CONTO ECONOMICO ESERCIZIO {anno_sel}</h3>
+                            <h3>CONTO ECONOMICO COMPARATO: ESERCIZIO {anno_sel} vs {anno_prec}</h3>
                             <p style="text-align:center; font-size: 12px;">Redatto in conformità all'Art. 2425 c.c. (Schema IV Direttiva CEE)</p>
                         </div>
                         
                         <h4 style="text-align: left;">A) VALORE DELLA PRODUZIONE</h4>
                         <table>
-                            <tr><th>Voce Bilancio (Ricavi)</th><th class="right">Importo</th></tr>
-                            {righe_entrate if righe_entrate else "<tr><td colspan='2'>Nessun dato presente</td></tr>"}
-                            <tr><td class="bold right" style="background-color: #e9e9e9;">TOTALE A</td><td class="bold right" style="background-color: #e9e9e9;">{format_euro(tot_a)}</td></tr>
+                            <tr><th>Voce Bilancio</th><th style="width: 20%;">Anno {anno_sel}</th><th style="width: 20%;">Anno {anno_prec}</th></tr>
+                            {html_righe_a if html_righe_a else "<tr><td colspan='3'>Nessun dato presente</td></tr>"}
+                            <tr class="totale-riga"><td>TOTALE A</td><td class="right">{format_euro(tot_a_n)}</td><td class="right">{format_euro(tot_a_n1)}</td></tr>
                         </table>
 
                         <br>
-                        
                         <h4 style="text-align: left;">B) COSTI DELLA PRODUZIONE</h4>
                         <table>
-                            <tr><th>Voce Bilancio (Costi Operativi)</th><th class="right">Importo</th></tr>
-                            {righe_uscite if righe_uscite else "<tr><td colspan='2'>Nessun dato presente</td></tr>"}
-                            <tr><td class="bold right" style="background-color: #e9e9e9;">TOTALE B</td><td class="bold right" style="background-color: #e9e9e9;">{format_euro(tot_b)}</td></tr>
+                            <tr><th>Voce Bilancio</th><th style="width: 20%;">Anno {anno_sel}</th><th style="width: 20%;">Anno {anno_prec}</th></tr>
+                            {html_righe_b if html_righe_b else "<tr><td colspan='3'>Nessun dato presente</td></tr>"}
+                            <tr class="totale-riga"><td>TOTALE B</td><td class="right">{format_euro(tot_b_n)}</td><td class="right">{format_euro(tot_b_n1)}</td></tr>
                         </table>
 
                         <div class="totale-box">
-                            <h3>Differenza tra Valore e Costi della Produzione (A - B)</h3>
-                            <h2 style="color: {colore_risultato_stampa};">{format_euro(risultato_operativo)}</h2>
+                            <h3 style="text-align: center; border-bottom: 1px solid #ccc; padding-bottom: 10px;">DIFFERENZA TRA VALORE E COSTI DELLA PRODUZIONE (A - B)</h3>
+                            <div class="box-row">
+                                <span style="font-size: 18px;">Risultato d'Esercizio {anno_prec}:</span>
+                                <span style="font-size: 18px; color: #555;">{format_euro(ris_operativo_n1)}</span>
+                            </div>
+                            <div class="box-row">
+                                <span style="font-size: 22px; font-weight: bold;">Risultato d'Esercizio {anno_sel}:</span>
+                                <span style="font-size: 24px; font-weight: bold; color: {colore_ris};">{format_euro(ris_operativo_n)}</span>
+                            </div>
                         </div>
                     </div>
                 </body>
                 </html>
                 """
                 import streamlit.components.v1 as components
-                components.html(html_bilancio, height=850, scrolling=True)
+                components.html(html_bilancio_comparato, height=900, scrolling=True)
                 
     else:
         st.info("Nessun dato registrato nel database per generare il bilancio.")
