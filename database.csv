@@ -5,7 +5,7 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato
 2026-06-30,Uscita,Manodopera,Iannone Felice | 10.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato
 2026-06-29,Uscita,Irrigazione,Ricarica scheda per irrigazione,500.0,Olive,Saldato
 2026-06-25,Uscita,Altro,gestione Contabile  | Note: Bonifico da cc ingdirect,500.02,Olive,Saldato
-2026-06-23,Uscita,Altro,Olive felice 2025,9000.0,Olive,Impegnato
+2026-06-23,Uscita,Altro,Olive felice 2025,9000.0,Olive,Da Saldare
 2026-06-20,Uscita,Irrigazione,Bonifico per irrigazione,400.0,Olive,Saldato
 2026-06-10,Uscita,Oneri,Pagamento f24 contributi operai IV Trimestre 2025,685.11,Olive,Saldato
 2026-06-07,Uscita,Irrigazione,Ricarica scheda acqua Associazione irrigua,300.0,Olive ,Saldato
