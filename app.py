@@ -213,7 +213,7 @@ with tab1:
                 num_rows="dynamic", use_container_width=True, key="editor_uscite"
             )
             
-       # ==========================================
+    # ==========================================
     # --- VISUALIZZAZIONE E MODIFICA INTERATTIVA (TAB 1) ---
     # ==========================================
     st.divider()
@@ -231,11 +231,11 @@ with tab1:
         if 'data_dt' in df_display.columns:
             df_display = df_display.drop(columns=['data_dt']) # Rimuoviamo colonne di calcolo
             
-        # Creiamo la tabella interattiva
+       # Creiamo la tabella interattiva
         evento = st.dataframe(
             df_display,
             use_container_width=True,
-            selection_mode="single_row",
+            selection_mode="single-row", # <--- CORRETTO (trattino centrale)
             on_select="rerun",
             hide_index=False # Teniamo l'indice visibile come riferimento
         )
