@@ -240,7 +240,7 @@ with tab1:
             hide_index=False # Teniamo l'indice visibile come riferimento
         )
 
-        # SELEZIONE EFFETTUATA: APERTURA SCHEDA DI MODIFICA
+       # SELEZIONE EFFETTUATA: APERTURA SCHEDA DI MODIFICA O ELIMINAZIONE
         righe_selezionate = evento.selection.rows
         
         if len(righe_selezionate) > 0:
@@ -251,7 +251,7 @@ with tab1:
 
             st.write("")
             with st.container(border=True):
-                st.subheader(f"✏️ Modifica Registrazione (Riga {indice_reale})")
+                st.subheader(f"✏️ Modifica o Elimina Registrazione (Riga {indice_reale})")
                 
                 with st.form("form_modifica"):
                     c1, c2, c3 = st.columns(3)
@@ -264,7 +264,6 @@ with tab1:
 
                     with c1:
                         mod_data = st.date_input("Data", value=data_attuale)
-                        # Assumiamo i tipi e gli stati standard, adattali se ne hai di personalizzati
                         mod_tipo = st.selectbox("Tipo", ["Entrata", "Uscita"], index=0 if riga_da_modificare['tipo'] == 'Entrata' else 1)
                     
                     with c2:
@@ -274,16 +273,23 @@ with tab1:
                     
                     with c3:
                         mod_importo = st.number_input("Importo (€)", value=float(riga_da_modificare['importo']), step=10.0)
-                        # Adatta il metodo se usi un campo specifico per litri/kg nelle rese
                         mod_metodo = st.text_input("Metodo (es. Bonifico/Olio)", value=str(riga_da_modificare.get('metodo_pagamento', '')))
 
                     mod_desc = st.text_input("Descrizione", value=str(riga_da_modificare['descrizione']))
 
-                    col_btn1, col_btn2 = st.columns([1, 4])
-                    salva_modifica = st.form_submit_button("💾 Salva Modifiche", type="primary")
+                    st.divider()
+                    
+                    # --- PULSANTI DI AZIONE ---
+                    col_btn1, col_btn2 = st.columns(2)
+                    
+                    with col_btn1:
+                        salva_modifica = st.form_submit_button("💾 Salva Modifiche", type="primary")
+                    with col_btn2:
+                        # Aggiunto pulsante di eliminazione
+                        elimina_riga = st.form_submit_button("🗑️ Elimina Registrazione", type="secondary")
 
+                    # --- LOGICA DI SALVATAGGIO ---
                     if salva_modifica:
-                        # Aggiorniamo la riga specifica nel dataframe pandas
                         df.at[indice_reale, 'data'] = mod_data.strftime('%Y-%m-%d')
                         df.at[indice_reale, 'tipo'] = mod_tipo
                         df.at[indice_reale, 'categoria'] = mod_cat
@@ -293,9 +299,18 @@ with tab1:
                         if 'metodo_pagamento' in df.columns:
                             df.at[indice_reale, 'metodo_pagamento'] = mod_metodo
                         
-                        # Salvataggio sul database remoto
                         if save_to_github(df, sha, f"Modificata riga {indice_reale}"):
                             st.success("✅ Riga aggiornata con successo! Ricaricamento in corso...")
+                            time.sleep(1)
+                            st.rerun()
+                            
+                    # --- LOGICA DI ELIMINAZIONE ---
+                    elif elimina_riga:
+                        # Rimuoviamo la riga dal dataframe usando l'indice reale
+                        df = df.drop(index=indice_reale)
+                        
+                        if save_to_github(df, sha, f"Eliminata riga {indice_reale}"):
+                            st.error("🗑️ Registrazione eliminata definitivamente!")
                             time.sleep(1)
                             st.rerun()
 
