@@ -213,20 +213,94 @@ with tab1:
                 num_rows="dynamic", use_container_width=True, key="editor_uscite"
             )
             
-        st.divider()
-        if st.button("💾 SALVA MODIFICHE NEL DATABASE", type="primary", use_container_width=True):
-            df_modificato = pd.concat([df_entrate_mod, df_uscite_mod, df_altri], ignore_index=True)
-            df_modificato['data'] = pd.to_datetime(df_modificato['data'], errors='coerce')
-            df_modificato = df_modificato.sort_values(by='data', ascending=False).reset_index(drop=True)
-            df_modificato['data'] = df_modificato['data'].dt.strftime('%Y-%m-%d')
-            
-            if save_to_github(df_modificato, sha, "Modifica da Editor Diviso"):
-                st.success("✅ Modifiche salvate!")
-                time.sleep(1)
-                st.rerun()
-    else:
-        st.info("Nessun dato registrato al momento nel database.")
+       # ==========================================
+    # --- VISUALIZZAZIONE E MODIFICA INTERATTIVA (TAB 1) ---
+    # ==========================================
+    st.divider()
+    st.subheader("📋 Storico Movimenti Recenti")
+    st.markdown("Seleziona una riga dalla tabella cliccando sulla casella a sinistra per modificarne i dati.")
 
+    df, sha = get_github_file()
+
+    if not df.empty:
+        # Assicuriamoci che l'indice sia pulito e tracciabile
+        df = df.reset_index(drop=True)
+        
+        # Mostriamo gli ultimi 50 movimenti ordinati per non appesantire la vista
+        df_display = df.copy()
+        if 'data_dt' in df_display.columns:
+            df_display = df_display.drop(columns=['data_dt']) # Rimuoviamo colonne di calcolo
+            
+        # Creiamo la tabella interattiva
+        evento = st.dataframe(
+            df_display,
+            use_container_width=True,
+            selection_mode="single_row",
+            on_select="rerun",
+            hide_index=False # Teniamo l'indice visibile come riferimento
+        )
+
+        # SELEZIONE EFFETTUATA: APERTURA SCHEDA DI MODIFICA
+        righe_selezionate = evento.selection.rows
+        
+        if len(righe_selezionate) > 0:
+            indice_visualizzato = righe_selezionate[0]
+            # Mappatura: recuperiamo l'indice reale del database originale
+            indice_reale = df_display.index[indice_visualizzato]
+            riga_da_modificare = df.loc[indice_reale]
+
+            st.write("")
+            with st.container(border=True):
+                st.subheader(f"✏️ Modifica Registrazione (Riga {indice_reale})")
+                
+                with st.form("form_modifica"):
+                    c1, c2, c3 = st.columns(3)
+                    
+                    # Pre-compilazione dei campi con i dati esistenti
+                    try:
+                        data_attuale = pd.to_datetime(riga_da_modificare['data']).date()
+                    except:
+                        data_attuale = datetime.today()
+
+                    with c1:
+                        mod_data = st.date_input("Data", value=data_attuale)
+                        # Assumiamo i tipi e gli stati standard, adattali se ne hai di personalizzati
+                        mod_tipo = st.selectbox("Tipo", ["Entrata", "Uscita"], index=0 if riga_da_modificare['tipo'] == 'Entrata' else 1)
+                    
+                    with c2:
+                        mod_cat = st.text_input("Categoria", value=str(riga_da_modificare['categoria']))
+                        mod_stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato", "Da Saldare", "Da Incassare"], 
+                                                 index=["Saldato", "Impegnato", "Da Saldare", "Da Incassare"].index(riga_da_modificare['stato']) if riga_da_modificare['stato'] in ["Saldato", "Impegnato", "Da Saldare", "Da Incassare"] else 0)
+                    
+                    with c3:
+                        mod_importo = st.number_input("Importo (€)", value=float(riga_da_modificare['importo']), step=10.0)
+                        # Adatta il metodo se usi un campo specifico per litri/kg nelle rese
+                        mod_metodo = st.text_input("Metodo (es. Bonifico/Olio)", value=str(riga_da_modificare.get('metodo_pagamento', '')))
+
+                    mod_desc = st.text_input("Descrizione", value=str(riga_da_modificare['descrizione']))
+
+                    col_btn1, col_btn2 = st.columns([1, 4])
+                    salva_modifica = st.form_submit_button("💾 Salva Modifiche", type="primary")
+
+                    if salva_modifica:
+                        # Aggiorniamo la riga specifica nel dataframe pandas
+                        df.at[indice_reale, 'data'] = mod_data.strftime('%Y-%m-%d')
+                        df.at[indice_reale, 'tipo'] = mod_tipo
+                        df.at[indice_reale, 'categoria'] = mod_cat
+                        df.at[indice_reale, 'importo'] = mod_importo
+                        df.at[indice_reale, 'stato'] = mod_stato
+                        df.at[indice_reale, 'descrizione'] = mod_desc
+                        if 'metodo_pagamento' in df.columns:
+                            df.at[indice_reale, 'metodo_pagamento'] = mod_metodo
+                        
+                        # Salvataggio sul database remoto
+                        if save_to_github(df, sha, f"Modificata riga {indice_reale}"):
+                            st.success("✅ Riga aggiornata con successo! Ricaricamento in corso...")
+                            time.sleep(1)
+                            st.rerun()
+
+    else:
+        st.info("Nessun dato presente nel database.")
 # ==========================================
 # --- TAB 2: MANODOPERA (Standard 6 Ore) ---
 # ==========================================
