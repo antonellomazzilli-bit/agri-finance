@@ -770,31 +770,31 @@ with tab6:
                 descrizione_completa = f"{fat_soggetto.strip()} | {fat_descrizione.strip()}"
                 stato_db = "Saldato" if "Saldato" in fat_stato else "Impegnato"
                 
+               # 1. Calcoliamo i valori per le nuove colonne ERP (Rate)
                 totale_fat = fat_importo
                 imp_pagato = fat_importo if stato_db == "Saldato" else 0.0
                 storico_iniziale = f"{data_formattata}|{fat_importo}|Registrazione iniziale" if stato_db == "Saldato" else ""
 
-                nuova_riga = [
-                    data_formattata,       
-                    tipo_db,               
-                    fat_categoria,         
-                    fat_importo,           
-                    stato_db,              
-                    "",                    
-                    descrizione_completa,  
-                    totale_fat,            
-                    imp_pagato,            
-                    storico_iniziale       
-                ]
+                # 2. Creiamo la riga come DIZIONARIO (Metodo Infallibile)
+                nuova_riga = {
+                    'data': data_formattata,
+                    'tipo': tipo_db,
+                    'categoria': fat_categoria,
+                    'descrizione': descrizione_completa,
+                    'importo': fat_importo,
+                    'prodotto': "",
+                    'stato': stato_db,
+                    'totale_fattura': totale_fat,
+                    'importo_pagato': imp_pagato,
+                    'registro_pagamenti': storico_iniziale
+                }
 
-                if len(nuova_riga) != len(df.columns):
-                    st.error(f"Errore Colonne: Il database ha {len(df.columns)} colonne, stiamo cercando di inserirne {len(nuova_riga)}.")
-                else:
-                    df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
-                    
-                    if save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}"): 
-                        st.success("✅ Operazione registrata con successo!")
-                        time.sleep(2)
-                        st.rerun()
+                # 3. Salvataggio intelligente (Senza più contare le colonne!)
+                df = pd.concat([df, pd.DataFrame([nuova_riga])], ignore_index=True)
+                
+                if save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}"): 
+                    st.success("✅ Operazione registrata con successo!")
+                    time.sleep(2)
+                    st.rerun()
             else:
                 st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
