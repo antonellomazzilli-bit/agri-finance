@@ -537,9 +537,21 @@ with tab5:
             ris_operativo_n = tot_a_n - tot_b_n
             ris_operativo_n1 = tot_a_n1 - tot_b_n1
 
+            # --- DIZIONARIO DI MAPPATURA PER L'INTERFACCIA ---
+            mappatura_categorie = {
+                "A.1 - Ricavi delle vendite e prestazioni": "Vendita Olio, Vendita Olive, ecc.",
+                "A.5 - Altri ricavi e proventi (Contributi)": "Contributi AGEA, PAC, ecc.",
+                "B.6 - Per materie prime, sussidiarie, di consumo": "Gasolio, Concimi, Piantine, Materie varie",
+                "B.7 - Costi per servizi": "Frantoio, Molitura, Consulenze, Lavori conto terzi",
+                "B.8 - Per godimento di beni di terzi": "Affitti terreni, Leasing",
+                "B.9 - Costi per il personale": "Manodopera, Buste Paga",
+                "B.10 - Ammortamenti e svalutazioni": "Attrezzature, Macchinari",
+                "B.14 - Oneri diversi di gestione": "Tutte le altre uscite non classificate"
+            }
+
             sub_bil1, sub_bil2 = st.tabs(["💻 Visualizzazione Interattiva (N vs N-1)", "🖨️ Documento Stampabile (PDF Comparato)"])
 
-            # --- SOTTO-SCHEDA 1: CRUSCOTTO VIDEO (COMPARATIVO) ---
+            # --- SOTTO-SCHEDA 1: CRUSCOTTO VIDEO (COMPARATIVO CON SPIEGAZIONI) ---
             with sub_bil1:
                 col_a, col_b = st.columns(2)
                 
@@ -548,7 +560,12 @@ with tab5:
                     for v in voci_a:
                         val_n = entrate_n.get(v, 0.0)
                         val_n1 = entrate_n1.get(v, 0.0)
-                        st.write(f"**{v}**")
+                        spiegazione = mappatura_categorie.get(v, "")
+                        
+                        st.markdown(f"**{v}**")
+                        if spiegazione:
+                            st.markdown(f"<p style='color: gray; font-size: 12px; margin-top: -15px; margin-bottom: 5px;'>Da DB: {spiegazione}</p>", unsafe_allow_html=True)
+                        
                         c1, c2 = st.columns(2)
                         c1.metric(f"Anno {anno_sel}", format_euro(val_n))
                         c2.metric(f"Anno {anno_prec}", format_euro(val_n1), delta=f"{val_n - val_n1:.2f} €", delta_color="normal")
@@ -561,10 +578,14 @@ with tab5:
                     for v in voci_b:
                         val_n = uscite_n.get(v, 0.0)
                         val_n1 = uscite_n1.get(v, 0.0)
-                        st.write(f"**{v}**")
+                        spiegazione = mappatura_categorie.get(v, "")
+                        
+                        st.markdown(f"**{v}**")
+                        if spiegazione:
+                            st.markdown(f"<p style='color: gray; font-size: 12px; margin-top: -15px; margin-bottom: 5px;'>Da DB: {spiegazione}</p>", unsafe_allow_html=True)
+                            
                         c1, c2 = st.columns(2)
                         c1.metric(f"Anno {anno_sel}", format_euro(val_n))
-                        # Inversione colori delta per i costi: se il costo sale (delta positivo) è un peggioramento (rosso)
                         c2.metric(f"Anno {anno_prec}", format_euro(val_n1), delta=f"{val_n - val_n1:.2f} €", delta_color="inverse")
                     st.divider()
                     st.markdown(f"<h4 style='color: #b71c1c;'>TOTALE B ({anno_sel}): {format_euro(tot_b_n)}</h4>", unsafe_allow_html=True)
