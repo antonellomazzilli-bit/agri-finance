@@ -253,11 +253,12 @@ with tab1:
                 
                 with col_dati:
                     st.write("### 📝 Dati Documento")
-                    with st.form("form_modifica_fattura"):
+                   with st.form("form_modifica_fattura"):
                         mod_cat = st.text_input("Categoria", value=str(riga_sel['categoria']))
                         mod_desc = st.text_input("Descrizione Documento", value=str(riga_sel['descrizione']))
                         
                         c_imp1, c_imp2 = st.columns(2)
+                        # Qui modifichi il costo della fattura (se c'era stato un errore)
                         tot_fat_attuale = float(riga_sel['totale_fattura'])
                         mod_totale = c_imp1.number_input("Totale Fattura (€)", value=tot_fat_attuale, step=10.0)
                         
@@ -267,18 +268,31 @@ with tab1:
                             index=["Saldato", "Pagamento Parziale", "Da Saldare", "Da Incassare"].index(riga_sel['stato']) if riga_sel['stato'] in ["Saldato", "Pagamento Parziale", "Da Saldare", "Da Incassare"] else 0
                         )
 
-                        salva_fattura = st.form_submit_button("💾 Salva Modifiche Dati Fattura", type="primary")
+                        # Impaginazione dei due bottoni (Salva e Elimina)
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        c_btn1, c_btn2 = st.columns(2)
+                        salva_fattura = c_btn1.form_submit_button("💾 Salva Modifiche", type="primary")
+                        elimina_fattura = c_btn2.form_submit_button("🗑️ Elimina Registrazione", type="secondary")
                         
                         if salva_fattura:
                             df.at[indice_reale, 'categoria'] = mod_cat
                             df.at[indice_reale, 'descrizione'] = mod_desc
                             df.at[indice_reale, 'totale_fattura'] = mod_totale
-                            df.at[indice_reale, 'importo'] = mod_totale
+                            df.at[indice_reale, 'importo'] = mod_totale # per retrocompatibilità
                             df.at[indice_reale, 'stato'] = mod_stato
                             
-                            if save_to_github(df, sha, f"Modificati dati generali fattura riga {indice_reale}"):
+                            if save_to_github(df, sha, f"Modificati dati riga {indice_reale}"):
                                 st.success("✅ Dati aggiornati!")
                                 time.sleep(1)
+                                st.rerun()
+                                
+                        if elimina_fattura:
+                            # Logica di eliminazione della riga dal database
+                            df = df.drop(index=indice_reale).reset_index(drop=True)
+                            
+                            if save_to_github(df, sha, f"Eliminata registrazione: {riga_sel['descrizione']}"):
+                                st.error("🗑️ Registrazione eliminata con successo dal database!")
+                                time.sleep(1.5)
                                 st.rerun()
 
                 with col_rate:
