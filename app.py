@@ -750,7 +750,9 @@ with tab6:
                 
                
 
-if fat_soggetto != "" and nuovo_importo > 0:
+# SOSTITUISCI IL VECCHIO "if fat_soggetto..." CON QUESTO:
+if nuova_cat != "" and nuovo_importo > 0:
+    
     # 1. Calcoliamo i valori per le nuove colonne delle rate
     totale_fat = nuovo_importo
     imp_pagato = nuovo_importo if nuovo_stato == "Saldato" else 0.0
@@ -777,7 +779,8 @@ if fat_soggetto != "" and nuovo_importo > 0:
         # Aggiunta sicura al database
         df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
         
-        if save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}"): 
+        # HO CORRETTO ANCHE QUI IL NOME DELLA VARIABILE
+        if save_to_github(df, sha, f"Registrata Fattura: {nuova_cat}"): 
             st.success("✅ Operazione registrata con successo!")
             time.sleep(2)
             st.rerun()
