@@ -781,5 +781,5 @@ with tab6:
             time.sleep(2)
             st.rerun()
             
-else:
-    st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
+    else:
+        st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
