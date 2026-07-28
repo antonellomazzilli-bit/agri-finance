@@ -751,35 +751,35 @@ with tab6:
                # --- NUOVA LOGICA DI INSERIMENTO (10 Colonne) ---
 
 # 1. Calcoliamo i valori per le nuove colonne delle rate
-totale_fat = nuovo_importo
-imp_pagato = nuovo_importo if nuovo_stato == "Saldato" else 0.0
-storico_iniziale = f"{nuova_data}|{nuovo_importo}|Registrazione iniziale" if nuovo_stato == "Saldato" else ""
+    totale_fat = nuovo_importo
+    imp_pagato = nuovo_importo if nuovo_stato == "Saldato" else 0.0
+    storico_iniziale = f"{nuova_data}|{nuovo_importo}|Registrazione iniziale" if nuovo_stato == "Saldato" else ""
 
-# 2. Creiamo la riga con TUTTE E 10 le colonne nel giusto ordine
-        nuova_riga = [
-            nuova_data, 
-            nuovo_tipo, 
-            nuova_cat, 
-            nuovo_importo, 
-            nuovo_stato, 
-            nuova_coltura, 
-            nuova_desc, 
-            totale_fat,       # Nuova colonna 8
-            imp_pagato,       # Nuova colonna 9
-            storico_iniziale  # Nuova colonna 10
-        ]
+    # 2. Creiamo la riga con TUTTE E 10 le colonne nel giusto ordine
+    nuova_riga = [
+        nuova_data, 
+        nuovo_tipo, 
+        nuova_cat, 
+        nuovo_importo, 
+        nuovo_stato, 
+        nuova_coltura, 
+        nuova_desc, 
+        totale_fat,       # Nuova colonna 8
+        imp_pagato,       # Nuova colonna 9
+        storico_iniziale  # Nuova colonna 10
+    ]
 
-        # 3. Inseriamo la riga nel database in modo sicuro (Senza df.loc)
-        if len(nuova_riga) != len(df.columns):
-            st.error(f"Errore Colonne: Il database ha {len(df.columns)} colonne, stiamo cercando di inserirne {len(nuova_riga)}.")
-        else:
-            # Aggiunta sicura al database
-            df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
-            
-            if save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}"): 
-                st.success(f"✅ Operazione registrata con successo!")
-                time.sleep(2)
-                st.rerun()
-            
+    # 3. Inseriamo la riga nel database in modo sicuro (Senza df.loc)
+    if len(nuova_riga) != len(df.columns):
+        st.error(f"Errore Colonne: Il database ha {len(df.columns)} colonne, stiamo cercando di inserirne {len(nuova_riga)}.")
     else:
-        st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
+        # Aggiunta sicura al database
+        df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
+        
+        if save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}"): 
+            st.success(f"✅ Operazione registrata con successo!")
+            time.sleep(2)
+            st.rerun()
+            
+else:
+    st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
