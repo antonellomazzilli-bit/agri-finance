@@ -382,11 +382,17 @@ with tab3:
     df, sha = get_github_file()
     
     if not df.empty:
+        # ---> 1. AGGIUNTA SALVAVITA: Forziamo la colonna importo in numeri puri
+        df['importo'] = pd.to_numeric(df['importo'], errors='coerce').fillna(0.0)
+        
         cat_pagamenti = ['Busta Paga', 'Saldo Extra', 'Straordinari', 'Rimborsi']
         tot_versato = df[df['categoria'].isin(cat_pagamenti)]['importo'].sum()
-        gg_totali = sum(estrai_giornate(row['descrizione'], "Iannone Felice") for _, row in df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].iterrows())
+        
+        # ---> 2. AGGIUNTA SALVAVITA: Forziamo la lettura della descrizione come testo (str)
+        gg_totali = sum(estrai_giornate(str(row['descrizione']), "Iannone Felice") for _, row in df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].iterrows())
         valore_lavoro = gg_totali * COSTO_GIORNATA_EXTRA
         
+        # Ora la sottrazione funzionerà sempre senza errori!
         saldo = tot_versato - valore_lavoro
         st.metric("Saldo Dare/Avere Dipendente", format_euro(saldo), delta="Verde = in credito | Rosso = a debito", delta_color="normal" if saldo>=0 else "inverse")
         
