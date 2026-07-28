@@ -753,37 +753,35 @@ with tab6:
 # SOSTITUISCI IL VECCHIO "if fat_soggetto..." CON QUESTO:
 if nuova_cat != "" and nuovo_importo > 0:
     
-    # 1. Calcoliamo i valori per le nuove colonne delle rate
-    totale_fat = nuovo_importo
-    imp_pagato = nuovo_importo if nuovo_stato == "Saldato" else 0.0
-    storico_iniziale = f"{nuova_data}|{nuovo_importo}|Registrazione iniziale" if nuovo_stato == "Saldato" else ""
+   # --- SALVATAGGIO DIRETTO DELLA NUOVA REGISTRAZIONE ---
 
-    # 2. Creiamo la riga con TUTTE E 10 le colonne nel giusto ordine
-    nuova_riga = [
-        nuova_data, 
-        nuovo_tipo, 
-        nuova_cat, 
-        nuovo_importo, 
-        nuovo_stato, 
-        nuova_coltura, 
-        nuova_desc, 
-        totale_fat,       # Nuova colonna 8
-        imp_pagato,       # Nuova colonna 9
-        storico_iniziale  # Nuova colonna 10
-    ]
+# 1. Calcoliamo i valori per le nuove colonne delle rate
+totale_fat = importo # <-- Se la tua variabile si chiama in un altro modo (es. nuovo_importo), usa la tua
+imp_pagato = importo if stato == "Saldato" else 0.0
+storico_iniziale = f"{data}|{importo}|Registrazione iniziale" if stato == "Saldato" else ""
 
-    # 3. Inseriamo la riga nel database in modo sicuro (Senza df.loc)
-    if len(nuova_riga) != len(df.columns):
-        st.error(f"Errore Colonne: Il database ha {len(df.columns)} colonne, stiamo cercando di inserirne {len(nuova_riga)}.")
-    else:
-        # Aggiunta sicura al database
-        df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
-        
-        # HO CORRETTO ANCHE QUI IL NOME DELLA VARIABILE
-        if save_to_github(df, sha, f"Registrata Fattura: {nuova_cat}"): 
-            st.success("✅ Operazione registrata con successo!")
-            time.sleep(2)
-            st.rerun()
-            
+# 2. Creiamo la riga con TUTTE E 10 le colonne nel giusto ordine
+# NOTA: Lascia intatte le prime 7 variabili con i nomi esatti che usi tu nella tua app
+nuova_riga = [
+    data,              # Data
+    tipo,              # Tipo (Entrata/Uscita)
+    categoria,         # Categoria
+    importo,           # Importo
+    stato,             # Stato
+    coltura,           # Coltura / Campo
+    descrizione,       # Descrizione
+    totale_fat,        # Nuova colonna 8
+    imp_pagato,        # Nuova colonna 9
+    storico_iniziale   # Nuova colonna 10
+]
+
+# 3. Controllo colonne e salvataggio automatico su GitHub
+if len(nuova_riga) != len(df.columns):
+    st.error(f"Errore Colonne: Il database ha {len(df.columns)} colonne, stiamo cercando di inserirne {len(nuova_riga)}.")
 else:
-    st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
+    df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
+    
+    if save_to_github(df, sha, "Aggiunta nuova registrazione"): 
+        st.success("✅ Operazione registrata con successo!")
+        time.sleep(2)
+        st.rerun()
