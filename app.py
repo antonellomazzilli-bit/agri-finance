@@ -748,7 +748,30 @@ with tab6:
                 descrizione_completa = f"{fat_soggetto.strip()} | {fat_descrizione.strip()}"
                 stato_db = "Saldato" if "Saldato" in fat_stato else "Impegnato"
                 
-                nuova_riga = [fat_data.strftime('%Y-%m-%d'), tipo_db, fat_categoria, descrizione_completa, float(fat_importo), "Azienda Generale", stato_db]
+               # --- NUOVA LOGICA DI INSERIMENTO (10 Colonne) ---
+
+# 1. Calcoliamo i valori per le nuove colonne delle rate
+totale_fat = nuovo_importo
+imp_pagato = nuovo_importo if nuovo_stato == "Saldato" else 0.0
+storico_iniziale = f"{nuova_data}|{nuovo_importo}|Registrazione iniziale" if nuovo_stato == "Saldato" else ""
+
+# 2. Creiamo la riga con TUTTE E 10 le colonne nel giusto ordine
+# (Assicurati che i nomi delle tue variabili, es. nuova_data, nuovo_tipo, ecc., combacino con le tue)
+nuova_riga = [
+    nuova_data, 
+    nuovo_tipo, 
+    nuova_cat, 
+    nuovo_importo, 
+    nuovo_stato, 
+    nuova_coltura, # O il nome della tua variabile per la 6° colonna (es. 'Olive')
+    nuova_desc, 
+    totale_fat,       # Nuova colonna 8
+    imp_pagato,       # Nuova colonna 9
+    storico_iniziale  # Nuova colonna 10
+]
+
+# 3. Inseriamo la riga nel database
+df.loc[len(df)] = nuova_riga
                 
                 if len(nuova_riga) != len(df.columns):
                     st.error(f"Errore Colonne: Il database ha {len(df.columns)} colonne, stiamo cercando di inserirne {len(nuova_riga)}.")
