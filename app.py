@@ -256,11 +256,15 @@ with tab1:
                 with st.form("form_modifica"):
                     c1, c2, c3 = st.columns(3)
                     
-                    # Pre-compilazione dei campi con i dati esistenti
+                   # Pre-compilazione sicura della data (gestione campi vuoti o NaT)
                     try:
-                        data_attuale = pd.to_datetime(riga_da_modificare['data']).date()
+                        dt_val = pd.to_datetime(riga_da_modificare['data'], errors='coerce')
+                        if pd.isna(dt_val):
+                            data_attuale = pd.Timestamp.today().date()
+                        else:
+                            data_attuale = dt_val.date()
                     except:
-                        data_attuale = datetime.today()
+                        data_attuale = pd.Timestamp.today().date()
 
                     with c1:
                         mod_data = st.date_input("Data", value=data_attuale)
