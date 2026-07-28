@@ -533,6 +533,9 @@ with tab5:
     df_bilancio, _ = get_github_file()
     
     if not df_bilancio.empty:
+        # ---> AGGIUNTA SALVAVITA: Forziamo la colonna importo in numeri puri anche nel Bilancio
+        df_bilancio['importo'] = pd.to_numeric(df_bilancio['importo'], errors='coerce').fillna(0.0)
+        
         df_bilancio['data_dt'] = pd.to_datetime(df_bilancio['data'], errors='coerce')
         df_bilancio = df_bilancio.dropna(subset=['data_dt'])
         anni_disponibili = sorted(df_bilancio['data_dt'].dt.year.unique(), reverse=True)
