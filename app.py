@@ -10,6 +10,7 @@ import time
 # --- CONFIGURAZIONE INIZIALE ---
 st.set_page_config(page_title="AgriFinance Cloud", layout="wide")
 COSTO_GIORNATA_EXTRA = 55.0
+
 # --- MANUALE OPERATIVO (Sidebar) ---
 with st.sidebar:
     st.header("📚 Supporto")
@@ -85,9 +86,8 @@ Seleziona in alto se è un'Uscita o un'Entrata. Questa scelta è reattiva e modi
 Compila Data, Fornitore (es. Consorzio Agrario) e Descrizione (es. "Acquisto Concime").
 
 Assegna la categoria, inserisci l'importo e clicca su Registra. Questi dati andranno ad alimentare istantaneamente i grafici della Tab 5.
-
     """
-   
+    
     st.download_button(
         label="📥 Scarica Manuale Operativo",
         data=testo_manuale,
@@ -100,7 +100,7 @@ Assegna la categoria, inserisci l'importo e clicca su Registra. Questi dati andr
 
 
 # --- FUNZIONI DI CONNESSIONE GITHUB ---
-@st.cache_data(ttl=0) # Forza Streamlit a scaricare dati sempre freschissimi aggirando la cache
+@st.cache_data(ttl=0) 
 def get_github_file():
     """Scarica il database aggiornato da GitHub."""
     try:
@@ -117,14 +117,13 @@ def get_github_file():
             df = pd.read_csv(StringIO(content))
             return df, data['sha']
         else:
-            # Se il file non esiste ancora, crea le colonne base
-            return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'prodotto', 'stato']), ""
+            return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'prodotto', 'stato', 'totale_fattura', 'importo_pagato', 'registro_pagamenti']), ""
     except Exception as e:
         st.error(f"Errore di comunicazione in Lettura: {e}")
-        return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'prodotto', 'stato']), ""
+        return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'prodotto', 'stato', 'totale_fattura', 'importo_pagato', 'registro_pagamenti']), ""
 
 def save_to_github(df, sha, message):
-    """Salva i dati e restituisce True SOLO in caso di successo effettivo confermato dal server."""
+    """Salva i dati e restituisce True SOLO in caso di successo effettivo."""
     try:
         token = st.secrets["GITHUB_TOKEN"]
         repo = "antonellomazzilli-bit/agri-finance"
@@ -144,7 +143,7 @@ def save_to_github(df, sha, message):
         response = requests.put(url, headers=headers, data=json.dumps(payload))
 
         if response.status_code in [200, 201]:
-            st.cache_data.clear() # Svuota la cache dopo il salvataggio
+            st.cache_data.clear() 
             return True
         else:
             st.error(f"❌ Errore Server GitHub: Impossibile salvare. Dettaglio: {response.text}")
@@ -153,15 +152,12 @@ def save_to_github(df, sha, message):
         st.error(f"❌ Errore di Sistema durante il salvataggio: {e}")
         return False
 
+
 # --- FUNZIONI DI UTILITA' ---
 def format_euro(valore):
     """Formatta i numeri in stile italiano: 1.000,50 €"""
-    # 1. Formatta il numero in stile anglosassone (1,234.56)
     importo_str = f"{valore:,.2f}"
-    
-    # 2. Inverte punto e virgola tramite un carattere temporaneo (X)
     importo_str = importo_str.replace(",", "X").replace(".", ",").replace("X", ".")
-    
     return f"€ {importo_str}"
 
 def estrai_giornate(descrizione, dipendente):
@@ -179,6 +175,7 @@ def estrai_giornate(descrizione, dipendente):
 st.title("AgriFinance Cloud")
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Home", "Manodopera", "Cassa", "Rese", "Bilancio", "Fatture"])
 
+
 # ==========================================
 # --- TAB 1: HOME (CON TRACCIAMENTO TRANCHE DI PAGAMENTO) ---
 # ==========================================
@@ -191,18 +188,15 @@ with tab1:
         # 1. AUTO-AGGIORNAMENTO STRUTTURALE DEL DATABASE (MIGRAZIONE SILENZIOSA)
         colonne_modificate = False
         
-        # Se la struttura è quella vecchia, aggiorniamo il file al nuovo formato ERP
         if 'totale_fattura' not in df.columns:
             df['totale_fattura'] = df['importo']
             colonne_modificate = True
         
         if 'importo_pagato' not in df.columns:
-            # Se era "Saldato", consideriamo tutto l'importo come pagato, altrimenti 0
             df['importo_pagato'] = df.apply(lambda row: row['importo'] if row['stato'] == 'Saldato' else 0.0, axis=1)
             colonne_modificate = True
             
         if 'registro_pagamenti' not in df.columns:
-            # Creiamo lo storico vuoto per tutti. Per quelli vecchi saldati inseriamo un riferimento base
             def crea_storico(row):
                 if row['stato'] == 'Saldato':
                     return f"{row['data']}|{row['importo']}"
@@ -210,7 +204,6 @@ with tab1:
             df['registro_pagamenti'] = df.apply(crea_storico, axis=1)
             colonne_modificate = True
             
-        # Se abbiamo fatto la migrazione, salviamo il file su GitHub per stabilizzarlo
         if colonne_modificate:
             save_to_github(df, sha, "Auto-Aggiornamento Struttura Database ERP")
             st.rerun()
@@ -218,7 +211,6 @@ with tab1:
         # 2. CALCOLO DINAMICO DEL RESIDUO
         df['Residuo (€)'] = df['totale_fattura'] - df['importo_pagato']
         
-        # Prepariamo la vista della tabella per la lettura veloce
         df_display = df.copy()
         colonne_da_mostrare = ['data', 'categoria', 'descrizione', 'totale_fattura', 'importo_pagato', 'Residuo (€)', 'stato']
         df_display = df_display[[c for c in colonne_da_mostrare if c in df_display.columns]]
@@ -226,7 +218,6 @@ with tab1:
         st.subheader("📋 Storico Movimenti e Situazione Fatture")
         st.markdown("Seleziona una riga per registrare un nuovo pagamento o modificare la fattura.")
 
-        # Tabella Interattiva
         evento = st.dataframe(
             df_display.reset_index(drop=True),
             use_container_width=True,
@@ -246,8 +237,6 @@ with tab1:
             
             with st.container(border=True):
                 st.subheader(f"💼 Gestione Fattura/Documento: {riga_sel['categoria']}")
-                
-                # Layout a due colonne: A sinistra la fattura base, a destra i pagamenti
                 col_dati, col_rate = st.columns([1.2, 1])
                 
                 with col_dati:
@@ -257,7 +246,6 @@ with tab1:
                         mod_desc = st.text_input("Descrizione Documento", value=str(riga_sel['descrizione']))
                         
                         c_imp1, c_imp2 = st.columns(2)
-                        # Qui modifichi il costo della fattura (se c'era stato un errore)
                         tot_fat_attuale = float(riga_sel['totale_fattura'])
                         mod_totale = c_imp1.number_input("Totale Fattura (€)", value=tot_fat_attuale, step=10.0)
                         
@@ -273,7 +261,7 @@ with tab1:
                             df.at[indice_reale, 'categoria'] = mod_cat
                             df.at[indice_reale, 'descrizione'] = mod_desc
                             df.at[indice_reale, 'totale_fattura'] = mod_totale
-                            df.at[indice_reale, 'importo'] = mod_totale # per retrocompatibilità coi vecchi calcoli
+                            df.at[indice_reale, 'importo'] = mod_totale
                             df.at[indice_reale, 'stato'] = mod_stato
                             
                             if save_to_github(df, sha, f"Modificati dati generali fattura riga {indice_reale}"):
@@ -282,7 +270,6 @@ with tab1:
                                 st.rerun()
 
                 with col_rate:
-                    # Riepilogo Finanziario
                     totale = float(riga_sel['totale_fattura'])
                     pagato = float(riga_sel['importo_pagato'])
                     residuo = totale - pagato
@@ -292,9 +279,6 @@ with tab1:
                     c_fin1.metric("Totale Pagato", format_euro(pagato))
                     c_fin2.metric("Debito Residuo", format_euro(residuo), delta=f"{residuo:.2f} €", delta_color="inverse")
                     
-                    # Estrazione e decodifica dello storico testuale
-                    # Vecchio formato: "Data|Importo"
-                    # Nuovo formato:   "Data|Importo|Nota"
                     storico_txt = str(riga_sel.get('registro_pagamenti', ''))
                     if storico_txt and storico_txt != 'nan':
                         st.write("**Storico Rate Versate:**")
@@ -304,16 +288,13 @@ with tab1:
                             if len(parti) >= 2:
                                 r_data = parti[0]
                                 r_imp = format_euro(float(parti[1]))
-                                # Controllo retrocompatibilità: se c'è la nota la mostra, altrimenti niente
                                 r_nota = f" *(Note: {parti[2]})*" if len(parti) == 3 and parti[2].strip() else ""
-                                
                                 st.markdown(f"- 📅 {r_data}: **{r_imp}**{r_nota}")
                     else:
                         st.info("Nessun pagamento registrato finora.")
 
                     st.divider()
                     
-                    # Form per aggiungere una singola tranche
                     with st.form("form_aggiungi_rata"):
                         st.write("**➕ Registra Nuovo Versamento (Tranche)**")
                         r_col1, r_col2 = st.columns(2)
@@ -322,16 +303,12 @@ with tab1:
                         nuova_data = r_col1.date_input("Data Versamento", value=datetime.date.today())
                         importo_rata = r_col2.number_input("Importo Rata (€)", value=residuo if residuo > 0 else 0.0, step=10.0, min_value=0.0)
                         
-                        # NUOVO CAMPO: Note specifiche per questa rata (opzionale)
                         nota_rata = st.text_input("Metodo / Note (es. Bonifico n.456, Contanti)", placeholder="Facoltativo...")
                         
                         aggiungi_rata = st.form_submit_button("Aggiungi Rata 💸", type="secondary")
                         
                         if aggiungi_rata and importo_rata > 0:
-                            # Pulizia della nota: rimuoviamo i caratteri speciali usati per la struttura dati (; e |)
                             nota_pulita = nota_rata.replace("|", "-").replace(";", ",")
-                            
-                            # Creiamo la nuova stringa nel formato a 3 pezzi
                             nuova_stringa_rata = f"{nuova_data.strftime('%Y-%m-%d')}|{importo_rata}|{nota_pulita}"
                             
                             storico_attuale = str(df.at[indice_reale, 'registro_pagamenti'])
@@ -340,11 +317,9 @@ with tab1:
                             else:
                                 df.at[indice_reale, 'registro_pagamenti'] = nuova_stringa_rata
                             
-                            # Aggiorniamo il totale pagato sommando la nuova rata
                             nuovo_totale_pagato = pagato + importo_rata
                             df.at[indice_reale, 'importo_pagato'] = nuovo_totale_pagato
                             
-                            # Logica intelligente sullo Stato
                             if nuovo_totale_pagato >= totale:
                                 df.at[indice_reale, 'stato'] = "Saldato"
                             elif nuovo_totale_pagato > 0:
@@ -354,6 +329,8 @@ with tab1:
                                 st.success("✅ Rata registrata correttamente!")
                                 time.sleep(1)
                                 st.rerun()
+
+
 # ==========================================
 # --- TAB 2: MANODOPERA (Standard 6 Ore) ---
 # ==========================================
@@ -374,14 +351,19 @@ with tab2:
             df, sha = get_github_file()
             
             righe_nuove = []
+            # STRUTTURA A 10 COLONNE PER IL CORRETTO SALVATAGGIO
             if op_ufficiali > 0:
                 desc_uff = f"{op_nome} | {op_ufficiali:.3f} gg | UFFICIALE: {op_note}"
-                righe_nuove.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera", desc_uff, 0.0, "Olive", "Impegnato"])
+                righe_nuove.append([
+                    op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera", desc_uff, 0.0, "Olive", "Impegnato", 0.0, 0.0, ""
+                ])
             
             gg_extra = op_reali - op_ufficiali
             if abs(gg_extra) > 0.001:
                 desc_extra = f"{op_nome} | {gg_extra:.3f} gg | EXTRA: {op_note}"
-                righe_nuove.append([op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera Extra", desc_extra, 0.0, "Olive", "Impegnato"])
+                righe_nuove.append([
+                    op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera Extra", desc_extra, 0.0, "Olive", "Impegnato", 0.0, 0.0, ""
+                ])
             
             if righe_nuove:
                 df_nuove = pd.DataFrame(righe_nuove, columns=df.columns)
@@ -391,12 +373,13 @@ with tab2:
                     time.sleep(1)
                     st.rerun()
 
+
 # ==========================================
 # --- TAB 3: CASSA ---
 # ==========================================
 with tab3:
     st.subheader("💸 Cassa e Estratto Conto (Euro)")
-    df, _ = get_github_file()
+    df, sha = get_github_file()
     
     if not df.empty:
         cat_pagamenti = ['Busta Paga', 'Saldo Extra', 'Straordinari', 'Rimborsi']
@@ -418,14 +401,21 @@ with tab3:
             
             if st.form_submit_button("Registra Pagamento"):
                 if imp > 0:
-                    nuova_riga = [data_pag.strftime('%Y-%m-%d'), "Uscita", tipo_op, f"Pagamento Iannone Felice | {tipo_op}", float(imp), "Azienda", "Saldato"]
+                    data_f = data_pag.strftime('%Y-%m-%d')
+                    # STRUTTURA A 10 COLONNE PER IL CORRETTO SALVATAGGIO
+                    nuova_riga = [
+                        data_f, "Uscita", tipo_op, f"Pagamento Iannone Felice | {tipo_op}", float(imp), "Azienda", "Saldato", 
+                        float(imp), float(imp), f"{data_f}|{imp}|Erogazione Diretta"
+                    ]
                     df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
+                    
                     if save_to_github(df, sha, f"Pagamento Cassa: {imp}€"):
                         st.success("✅ Pagamento registrato!")
                         time.sleep(1)
                         st.rerun()
                 else:
                     st.warning("L'importo deve essere maggiore di zero.")
+
 
 # ==========================================
 # --- TAB 4: SIMULATORE STRATEGICO E TARGET ---
@@ -445,10 +435,8 @@ with tab4:
             anno_sel = st.selectbox("📅 Basato sulle spese storiche dell'anno:", sorted(anni_disponibili, reverse=True), key="anno_target")
             uscite_totali = df_pareggio[(df_pareggio['data_dt'].dt.year == anno_sel) & (df_pareggio['tipo'] == 'Uscita')]['importo'].sum()
             
-            # --- LAYOUT A SCHEDE (CARDS) ---
             col_fin, col_strat = st.columns([1, 1], gap="large")
             
-            # SCHEDA 1: I SOLDI (Fabbisogno)
             with col_fin:
                 with st.container(border=True):
                     st.subheader("💶 1. Fabbisogno Economico")
@@ -457,7 +445,6 @@ with tab4:
                     utile_desiderato = st.number_input("🟢 Tuo Obiettivo di Guadagno Annuo (€)", min_value=0.0, step=1000.0, value=24000.0)
                     fabbisogno_totale = uscite_totali + utile_desiderato
                     
-                    # Box HTML ad alto impatto visivo per il totale
                     st.markdown(f"""
                     <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; text-align: center; margin-top: 15px; border-left: 5px solid #0f52ba;">
                         <p style="margin: 0; font-size: 14px; color: #555; text-transform: uppercase;">Obiettivo Finanziario Totale</p>
@@ -465,7 +452,6 @@ with tab4:
                     </div>
                     """, unsafe_allow_html=True)
 
-            # SCHEDA 2: LA STRATEGIA E IL MERCATO
             with col_strat:
                 with st.container(border=True):
                     st.subheader("⚖️ 2. Scelta Strategica")
@@ -477,10 +463,9 @@ with tab4:
                         resa_stimata = st.number_input("⚙️ Resa Frantoio (Litri per 100Kg di olive)", min_value=0.0, step=0.5, value=15.0)
                     else:
                         prezzo_attuale = st.number_input("📈 Prezzo Vendita Olive (€ / QUINTALE)", min_value=0.0, step=5.0, value=80.0)
-                        resa_stimata = 1.0 # Variabile tecnica invisibile
+                        resa_stimata = 1.0
             
-            # --- PANNELLO DEI RISULTATI (Aggiornato in Tempo Reale) ---
-            st.write("") # Spazio vuoto
+            st.write("")
             st.markdown("### 🏆 Traguardo Produttivo")
             
             if prezzo_attuale > 0:
@@ -499,7 +484,7 @@ with tab4:
                         else:
                             st.error("⚠️ Inserisci una resa maggiore di zero.")
                             
-                    else: # Scenario Olive
+                    else:
                         quintali_necessari = fabbisogno_totale / prezzo_attuale
                         
                         rc1, rc2, rc3 = st.columns(3)
@@ -533,7 +518,6 @@ with tab5:
             anno_sel = st.selectbox("Seleziona Esercizio Fiscale (N):", anni_disponibili, key="bilancio_anno")
             anno_prec = anno_sel - 1
             
-            # --- MOTORE DI TRADUZIONE CIVILISTICA ---
             def classifica_cee(row):
                 cat = str(row['categoria']).upper()
                 tipo = row['tipo']
@@ -551,27 +535,22 @@ with tab5:
 
             df_bilancio['voce_cee'] = df_bilancio.apply(classifica_cee, axis=1)
 
-            # Estrazione dati Anno N
             df_n = df_bilancio[df_bilancio['data_dt'].dt.year == anno_sel]
             entrate_n = df_n[df_n['tipo'] == 'Entrata'].groupby('voce_cee')['importo'].sum()
             uscite_n = df_n[df_n['tipo'] == 'Uscita'].groupby('voce_cee')['importo'].sum()
             
-            # Estrazione dati Anno N-1
             df_n1 = df_bilancio[df_bilancio['data_dt'].dt.year == anno_prec]
             entrate_n1 = df_n1[df_n1['tipo'] == 'Entrata'].groupby('voce_cee')['importo'].sum()
             uscite_n1 = df_n1[df_n1['tipo'] == 'Uscita'].groupby('voce_cee')['importo'].sum()
 
-            # Elenco univoco delle voci utilizzate in entrambi gli anni
             voci_a = sorted(list(set(entrate_n.index).union(set(entrate_n1.index))))
             voci_b = sorted(list(set(uscite_n.index).union(set(uscite_n1.index))))
 
-            # Calcolo Totali Complessivi
             tot_a_n, tot_a_n1 = entrate_n.sum(), entrate_n1.sum()
             tot_b_n, tot_b_n1 = uscite_n.sum(), uscite_n1.sum()
             ris_operativo_n = tot_a_n - tot_b_n
             ris_operativo_n1 = tot_a_n1 - tot_b_n1
 
-            # --- DIZIONARIO DI MAPPATURA PER L'INTERFACCIA ---
             mappatura_categorie = {
                 "A.1 - Ricavi delle vendite e prestazioni": "Vendita Olio, Vendita Olive, ecc.",
                 "A.5 - Altri ricavi e proventi (Contributi)": "Contributi AGEA, PAC, ecc.",
@@ -585,7 +564,6 @@ with tab5:
 
             sub_bil1, sub_bil2 = st.tabs(["💻 Visualizzazione Interattiva (N vs N-1)", "🖨️ Documento Stampabile (PDF Comparato)"])
 
-            # --- SOTTO-SCHEDA 1: CRUSCOTTO VIDEO (COMPARATIVO CON SPIEGAZIONI) ---
             with sub_bil1:
                 col_a, col_b = st.columns(2)
                 
@@ -631,9 +609,7 @@ with tab5:
                 c_ris1.metric(f"Utile/Perdita {anno_prec}", format_euro(ris_operativo_n1))
                 c_ris2.metric(f"Utile/Perdita {anno_sel}", format_euro(ris_operativo_n), delta=f"{ris_operativo_n - ris_operativo_n1:.2f} €")
 
-            # --- SOTTO-SCHEDA 2: STAMPA HTML CIVILISTICA (A 3 COLONNE) ---
             with sub_bil2:
-                # Creazione righe HTML combinando N e N-1
                 html_righe_a = ""
                 for v in voci_a:
                     html_righe_a += f"<tr><td>{v}</td><td class='right bold'>{format_euro(entrate_n.get(v, 0.0))}</td><td class='right' style='color: #555;'>{format_euro(entrate_n1.get(v, 0.0))}</td></tr>"
@@ -715,6 +691,7 @@ with tab5:
     else:
         st.info("Nessun dato registrato nel database per generare il bilancio.")
 
+
 # ==========================================
 # --- TAB 6: FATTURE E COMMERCIALIZZAZIONE ---
 # ==========================================
@@ -747,31 +724,27 @@ with tab6:
             if fat_importo > 0 and fat_soggetto:
                 df, sha = get_github_file()
                 
-                # Elaborazione dei dati inseriti nel form
                 data_formattata = fat_data.strftime('%Y-%m-%d')
                 descrizione_completa = f"{fat_soggetto.strip()} | {fat_descrizione.strip()}"
                 stato_db = "Saldato" if "Saldato" in fat_stato else "Impegnato"
                 
-                # 1. Calcoliamo i valori per le nuove colonne ERP (Rate)
                 totale_fat = fat_importo
                 imp_pagato = fat_importo if stato_db == "Saldato" else 0.0
                 storico_iniziale = f"{data_formattata}|{fat_importo}|Registrazione iniziale" if stato_db == "Saldato" else ""
 
-                # 2. Creiamo la riga con TUTTE E 10 le colonne
                 nuova_riga = [
-                    data_formattata,       # 1. Data
-                    tipo_db,               # 2. Tipo
-                    fat_categoria,         # 3. Categoria
-                    fat_importo,           # 4. Importo (compatibilità vecchi script)
-                    stato_db,              # 5. Stato
-                    "",                    # 6. Coltura (Campo vuoto perché non usato in questa scheda)
-                    descrizione_completa,  # 7. Descrizione
-                    totale_fat,            # 8. Totale Fattura
-                    imp_pagato,            # 9. Importo Pagato
-                    storico_iniziale       # 10. Storico Pagamenti
+                    data_formattata,       
+                    tipo_db,               
+                    fat_categoria,         
+                    fat_importo,           
+                    stato_db,              
+                    "",                    
+                    descrizione_completa,  
+                    totale_fat,            
+                    imp_pagato,            
+                    storico_iniziale       
                 ]
 
-                # 3. Controllo colonne e salvataggio automatico su GitHub
                 if len(nuova_riga) != len(df.columns):
                     st.error(f"Errore Colonne: Il database ha {len(df.columns)} colonne, stiamo cercando di inserirne {len(nuova_riga)}.")
                 else:
