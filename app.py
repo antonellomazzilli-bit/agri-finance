@@ -748,9 +748,10 @@ with tab6:
                 descrizione_completa = f"{fat_soggetto.strip()} | {fat_descrizione.strip()}"
                 stato_db = "Saldato" if "Saldato" in fat_stato else "Impegnato"
                 
-               # --- NUOVA LOGICA DI INSERIMENTO (10 Colonne) ---
+               
 
-# 1. Calcoliamo i valori per le nuove colonne delle rate
+if fat_soggetto != "" and nuovo_importo > 0:
+    # 1. Calcoliamo i valori per le nuove colonne delle rate
     totale_fat = nuovo_importo
     imp_pagato = nuovo_importo if nuovo_stato == "Saldato" else 0.0
     storico_iniziale = f"{nuova_data}|{nuovo_importo}|Registrazione iniziale" if nuovo_stato == "Saldato" else ""
@@ -777,9 +778,9 @@ with tab6:
         df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
         
         if save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}"): 
-            st.success(f"✅ Operazione registrata con successo!")
+            st.success("✅ Operazione registrata con successo!")
             time.sleep(2)
             st.rerun()
             
-    else:
-        st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
+else:
+    st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
