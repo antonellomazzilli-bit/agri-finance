@@ -714,6 +714,7 @@ with tab5:
                 
     else:
         st.info("Nessun dato registrato nel database per generare il bilancio.")
+
 # ==========================================
 # --- TAB 6: FATTURE E COMMERCIALIZZAZIONE ---
 # ==========================================
@@ -745,43 +746,40 @@ with tab6:
         if st.form_submit_button("Registra Operazione"):
             if fat_importo > 0 and fat_soggetto:
                 df, sha = get_github_file()
+                
+                # Elaborazione dei dati inseriti nel form
+                data_formattata = fat_data.strftime('%Y-%m-%d')
                 descrizione_completa = f"{fat_soggetto.strip()} | {fat_descrizione.strip()}"
                 stato_db = "Saldato" if "Saldato" in fat_stato else "Impegnato"
                 
-               
+                # 1. Calcoliamo i valori per le nuove colonne ERP (Rate)
+                totale_fat = fat_importo
+                imp_pagato = fat_importo if stato_db == "Saldato" else 0.0
+                storico_iniziale = f"{data_formattata}|{fat_importo}|Registrazione iniziale" if stato_db == "Saldato" else ""
 
-# SOSTITUISCI IL VECCHIO "if fat_soggetto..." CON QUESTO:
-if nuova_cat != "" and nuovo_importo > 0:
-    
-   # --- SALVATAGGIO DIRETTO DELLA NUOVA REGISTRAZIONE ---
+                # 2. Creiamo la riga con TUTTE E 10 le colonne
+                nuova_riga = [
+                    data_formattata,       # 1. Data
+                    tipo_db,               # 2. Tipo
+                    fat_categoria,         # 3. Categoria
+                    fat_importo,           # 4. Importo (compatibilità vecchi script)
+                    stato_db,              # 5. Stato
+                    "",                    # 6. Coltura (Campo vuoto perché non usato in questa scheda)
+                    descrizione_completa,  # 7. Descrizione
+                    totale_fat,            # 8. Totale Fattura
+                    imp_pagato,            # 9. Importo Pagato
+                    storico_iniziale       # 10. Storico Pagamenti
+                ]
 
-# 1. Calcoliamo i valori per le nuove colonne delle rate
-totale_fat = importo # <-- Se la tua variabile si chiama in un altro modo (es. nuovo_importo), usa la tua
-imp_pagato = importo if stato == "Saldato" else 0.0
-storico_iniziale = f"{data}|{importo}|Registrazione iniziale" if stato == "Saldato" else ""
-
-# 2. Creiamo la riga con TUTTE E 10 le colonne nel giusto ordine
-# NOTA: Lascia intatte le prime 7 variabili con i nomi esatti che usi tu nella tua app
-nuova_riga = [
-    data,              # Data
-    tipo,              # Tipo (Entrata/Uscita)
-    categoria,         # Categoria
-    importo,           # Importo
-    stato,             # Stato
-    coltura,           # Coltura / Campo
-    descrizione,       # Descrizione
-    totale_fat,        # Nuova colonna 8
-    imp_pagato,        # Nuova colonna 9
-    storico_iniziale   # Nuova colonna 10
-]
-
-# 3. Controllo colonne e salvataggio automatico su GitHub
-if len(nuova_riga) != len(df.columns):
-    st.error(f"Errore Colonne: Il database ha {len(df.columns)} colonne, stiamo cercando di inserirne {len(nuova_riga)}.")
-else:
-    df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
-    
-    if save_to_github(df, sha, "Aggiunta nuova registrazione"): 
-        st.success("✅ Operazione registrata con successo!")
-        time.sleep(2)
-        st.rerun()
+                # 3. Controllo colonne e salvataggio automatico su GitHub
+                if len(nuova_riga) != len(df.columns):
+                    st.error(f"Errore Colonne: Il database ha {len(df.columns)} colonne, stiamo cercando di inserirne {len(nuova_riga)}.")
+                else:
+                    df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
+                    
+                    if save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}"): 
+                        st.success("✅ Operazione registrata con successo!")
+                        time.sleep(2)
+                        st.rerun()
+            else:
+                st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
