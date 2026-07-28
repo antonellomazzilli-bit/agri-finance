@@ -180,143 +180,169 @@ st.title("AgriFinance Cloud")
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Home", "Manodopera", "Cassa", "Rese", "Bilancio", "Fatture"])
 
 # ==========================================
-# --- TAB 1: HOME (Editor Diviso) ---
+# --- TAB 1: HOME (CON TRACCIAMENTO TRANCHE DI PAGAMENTO) ---
 # ==========================================
-
 with tab1:
-    st.header("🏠 Registro Generale (Editor Diviso)")
-    st.markdown("💡 Fai doppio clic sulle celle per modificare e premi Canc per eliminare. Salva per confermare.")
+    st.header("🏠 Database Unificato")
     
     df, sha = get_github_file()
     
     if not df.empty:
-        df['data'] = pd.to_datetime(df['data'], errors='coerce')
-        df = df.sort_values(by='data', ascending=False)
-
-        df_entrate = df[df['tipo'] == 'Entrata'].reset_index(drop=True)
-        df_uscite = df[df['tipo'] == 'Uscita'].reset_index(drop=True)
-        df_altri = df[(df['tipo'] != 'Entrata') & (df['tipo'] != 'Uscita')].reset_index(drop=True)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("🟢 Entrate")
-            df_entrate_mod = st.data_editor(
-                df_entrate, 
-                column_config={"data": st.column_config.DateColumn("Data", format="DD/MM/YYYY")},
-                num_rows="dynamic", use_container_width=True, key="editor_entrate"
-            )
-        with col2:
-            st.subheader("🔴 Uscite")
-            df_uscite_mod = st.data_editor(
-                df_uscite, 
-                column_config={"data": st.column_config.DateColumn("Data", format="DD/MM/YYYY")},
-                num_rows="dynamic", use_container_width=True, key="editor_uscite"
-            )
-            
-    # ==========================================
-    # --- VISUALIZZAZIONE E MODIFICA INTERATTIVA (TAB 1) ---
-    # ==========================================
-    st.divider()
-    st.subheader("📋 Storico Movimenti Recenti")
-    st.markdown("Seleziona una riga dalla tabella cliccando sulla casella a sinistra per modificarne i dati.")
-
-    df, sha = get_github_file()
-
-    if not df.empty:
-        # Assicuriamoci che l'indice sia pulito e tracciabile
-        df = df.reset_index(drop=True)
+        # 1. AUTO-AGGIORNAMENTO STRUTTURALE DEL DATABASE (MIGRAZIONE SILENZIOSA)
+        colonne_modificate = False
         
-        # Mostriamo gli ultimi 50 movimenti ordinati per non appesantire la vista
-        df_display = df.copy()
-        if 'data_dt' in df_display.columns:
-            df_display = df_display.drop(columns=['data_dt']) # Rimuoviamo colonne di calcolo
+        # Se la struttura è quella vecchia, aggiorniamo il file al nuovo formato ERP
+        if 'totale_fattura' not in df.columns:
+            df['totale_fattura'] = df['importo']
+            colonne_modificate = True
+        
+        if 'importo_pagato' not in df.columns:
+            # Se era "Saldato", consideriamo tutto l'importo come pagato, altrimenti 0
+            df['importo_pagato'] = df.apply(lambda row: row['importo'] if row['stato'] == 'Saldato' else 0.0, axis=1)
+            colonne_modificate = True
             
-       # Creiamo la tabella interattiva
+        if 'registro_pagamenti' not in df.columns:
+            # Creiamo lo storico vuoto per tutti. Per quelli vecchi saldati inseriamo un riferimento base
+            def crea_storico(row):
+                if row['stato'] == 'Saldato':
+                    return f"{row['data']}|{row['importo']}"
+                return ""
+            df['registro_pagamenti'] = df.apply(crea_storico, axis=1)
+            colonne_modificate = True
+            
+        # Se abbiamo fatto la migrazione, salviamo il file su GitHub per stabilizzarlo
+        if colonne_modificate:
+            save_to_github(df, sha, "Auto-Aggiornamento Struttura Database ERP")
+            st.rerun()
+
+        # 2. CALCOLO DINAMICO DEL RESIDUO
+        df['Residuo (€)'] = df['totale_fattura'] - df['importo_pagato']
+        
+        # Prepariamo la vista della tabella per la lettura veloce
+        df_display = df.copy()
+        colonne_da_mostrare = ['data', 'categoria', 'descrizione', 'totale_fattura', 'importo_pagato', 'Residuo (€)', 'stato']
+        df_display = df_display[[c for c in colonne_da_mostrare if c in df_display.columns]]
+
+        st.subheader("📋 Storico Movimenti e Situazione Fatture")
+        st.markdown("Seleziona una riga per registrare un nuovo pagamento o modificare la fattura.")
+
+        # Tabella Interattiva
         evento = st.dataframe(
-            df_display,
+            df_display.reset_index(drop=True),
             use_container_width=True,
-            selection_mode="single-row", # <--- CORRETTO (trattino centrale)
+            selection_mode="single-row",
             on_select="rerun",
-            hide_index=False # Teniamo l'indice visibile come riferimento
+            hide_index=False
         )
 
-       # SELEZIONE EFFETTUATA: APERTURA SCHEDA DI MODIFICA O ELIMINAZIONE
         righe_selezionate = evento.selection.rows
         
         if len(righe_selezionate) > 0:
             indice_visualizzato = righe_selezionate[0]
-            # Mappatura: recuperiamo l'indice reale del database originale
-            indice_reale = df_display.index[indice_visualizzato]
-            riga_da_modificare = df.loc[indice_reale]
+            indice_reale = df.index[indice_visualizzato]
+            riga_sel = df.loc[indice_reale]
 
-            st.write("")
+            st.divider()
+            
             with st.container(border=True):
-                st.subheader(f"✏️ Modifica o Elimina Registrazione (Riga {indice_reale})")
+                st.subheader(f"💼 Gestione Fattura/Documento: {riga_sel['categoria']}")
                 
-                with st.form("form_modifica"):
-                    c1, c2, c3 = st.columns(3)
-                    
-                   # Pre-compilazione sicura della data (gestione campi vuoti o NaT)
-                    try:
-                        dt_val = pd.to_datetime(riga_da_modificare['data'], errors='coerce')
-                        if pd.isna(dt_val):
-                            data_attuale = pd.Timestamp.today().date()
-                        else:
-                            data_attuale = dt_val.date()
-                    except:
-                        data_attuale = pd.Timestamp.today().date()
+                # Layout a due colonne: A sinistra la fattura base, a destra i pagamenti
+                col_dati, col_rate = st.columns([1.2, 1])
+                
+                with col_dati:
+                    st.write("### 📝 Dati Documento")
+                    with st.form("form_modifica_fattura"):
+                        mod_cat = st.text_input("Categoria", value=str(riga_sel['categoria']))
+                        mod_desc = st.text_input("Descrizione Documento", value=str(riga_sel['descrizione']))
+                        
+                        c_imp1, c_imp2 = st.columns(2)
+                        # Qui modifichi il costo della fattura (se c'era stato un errore)
+                        tot_fat_attuale = float(riga_sel['totale_fattura'])
+                        mod_totale = c_imp1.number_input("Totale Fattura (€)", value=tot_fat_attuale, step=10.0)
+                        
+                        mod_stato = c_imp2.selectbox(
+                            "Stato Generale", 
+                            ["Saldato", "Pagamento Parziale", "Da Saldare", "Da Incassare"], 
+                            index=["Saldato", "Pagamento Parziale", "Da Saldare", "Da Incassare"].index(riga_sel['stato']) if riga_sel['stato'] in ["Saldato", "Pagamento Parziale", "Da Saldare", "Da Incassare"] else 0
+                        )
 
-                    with c1:
-                        mod_data = st.date_input("Data", value=data_attuale)
-                        mod_tipo = st.selectbox("Tipo", ["Entrata", "Uscita"], index=0 if riga_da_modificare['tipo'] == 'Entrata' else 1)
-                    
-                    with c2:
-                        mod_cat = st.text_input("Categoria", value=str(riga_da_modificare['categoria']))
-                        mod_stato = st.selectbox("Stato Pagamento", ["Saldato", "Impegnato", "Da Saldare", "Da Incassare"], 
-                                                 index=["Saldato", "Impegnato", "Da Saldare", "Da Incassare"].index(riga_da_modificare['stato']) if riga_da_modificare['stato'] in ["Saldato", "Impegnato", "Da Saldare", "Da Incassare"] else 0)
-                    
-                    with c3:
-                        mod_importo = st.number_input("Importo (€)", value=float(riga_da_modificare['importo']), step=10.0)
-                        mod_metodo = st.text_input("Metodo (es. Bonifico/Olio)", value=str(riga_da_modificare.get('metodo_pagamento', '')))
+                        salva_fattura = st.form_submit_button("💾 Salva Modifiche Dati Fattura", type="primary")
+                        
+                        if salva_fattura:
+                            df.at[indice_reale, 'categoria'] = mod_cat
+                            df.at[indice_reale, 'descrizione'] = mod_desc
+                            df.at[indice_reale, 'totale_fattura'] = mod_totale
+                            df.at[indice_reale, 'importo'] = mod_totale # per retrocompatibilità coi vecchi calcoli
+                            df.at[indice_reale, 'stato'] = mod_stato
+                            
+                            if save_to_github(df, sha, f"Modificati dati generali fattura riga {indice_reale}"):
+                                st.success("✅ Dati aggiornati!")
+                                time.sleep(1)
+                                st.rerun()
 
-                    mod_desc = st.text_input("Descrizione", value=str(riga_da_modificare['descrizione']))
+                with col_rate:
+                    # Riepilogo Finanziario
+                    totale = float(riga_sel['totale_fattura'])
+                    pagato = float(riga_sel['importo_pagato'])
+                    residuo = totale - pagato
+                    
+                    st.write("### 💶 Stato Pagamenti")
+                    c_fin1, c_fin2 = st.columns(2)
+                    c_fin1.metric("Totale Pagato", format_euro(pagato))
+                    c_fin2.metric("Debito Residuo", format_euro(residuo), delta=f"{residuo:.2f} €", delta_color="inverse")
+                    
+                    # Estrazione e decodifica dello storico testuale (es. "2026-07-28|150,00;2026-08-10|50,00")
+                    storico_txt = str(riga_sel.get('registro_pagamenti', ''))
+                    if storico_txt and storico_txt != 'nan':
+                        st.write("**Storico Rate Versate:**")
+                        rate = storico_txt.split(';')
+                        for i, rata in enumerate(rate):
+                            if '|' in rata:
+                                r_data, r_imp = rata.split('|')
+                                st.markdown(f"- 📅 {r_data}: **{format_euro(float(r_imp))}**")
+                    else:
+                        st.info("Nessun pagamento registrato finora.")
 
                     st.divider()
                     
-                    # --- PULSANTI DI AZIONE ---
-                    col_btn1, col_btn2 = st.columns(2)
-                    
-                    with col_btn1:
-                        salva_modifica = st.form_submit_button("💾 Salva Modifiche", type="primary")
-                    with col_btn2:
-                        # Aggiunto pulsante di eliminazione
-                        elimina_riga = st.form_submit_button("🗑️ Elimina Registrazione", type="secondary")
-
-                    # --- LOGICA DI SALVATAGGIO ---
-                    if salva_modifica:
-                        df.at[indice_reale, 'data'] = mod_data.strftime('%Y-%m-%d')
-                        df.at[indice_reale, 'tipo'] = mod_tipo
-                        df.at[indice_reale, 'categoria'] = mod_cat
-                        df.at[indice_reale, 'importo'] = mod_importo
-                        df.at[indice_reale, 'stato'] = mod_stato
-                        df.at[indice_reale, 'descrizione'] = mod_desc
-                        if 'metodo_pagamento' in df.columns:
-                            df.at[indice_reale, 'metodo_pagamento'] = mod_metodo
+                    # Form per aggiungere una singola tranche
+                    with st.form("form_aggiungi_rata"):
+                        st.write("**➕ Registra Nuovo Versamento (Tranche)**")
+                        r_col1, r_col2 = st.columns(2)
                         
-                        if save_to_github(df, sha, f"Modificata riga {indice_reale}"):
-                            st.success("✅ Riga aggiornata con successo! Ricaricamento in corso...")
-                            time.sleep(1)
-                            st.rerun()
+                        import datetime
+                        nuova_data = r_col1.date_input("Data Versamento", value=datetime.date.today())
+                        
+                        # Suggerisce in automatico di pagare tutto il residuo
+                        importo_rata = r_col2.number_input("Importo Rata (€)", value=residuo if residuo > 0 else 0.0, step=10.0, min_value=0.0)
+                        
+                        aggiungi_rata = st.form_submit_button("Aggiungi Rata 💸", type="secondary")
+                        
+                        if aggiungi_rata and importo_rata > 0:
+                            # Aggiorniamo la stringa dello storico
+                            nuova_stringa_rata = f"{nuova_data.strftime('%Y-%m-%d')}|{importo_rata}"
                             
-                    # --- LOGICA DI ELIMINAZIONE ---
-                    elif elimina_riga:
-                        # Rimuoviamo la riga dal dataframe usando l'indice reale
-                        df = df.drop(index=indice_reale)
-                        
-                        if save_to_github(df, sha, f"Eliminata riga {indice_reale}"):
-                            st.error("🗑️ Registrazione eliminata definitivamente!")
-                            time.sleep(1)
-                            st.rerun()
+                            storico_attuale = str(df.at[indice_reale, 'registro_pagamenti'])
+                            if storico_attuale and storico_attuale != 'nan' and storico_attuale != '':
+                                df.at[indice_reale, 'registro_pagamenti'] = f"{storico_attuale};{nuova_stringa_rata}"
+                            else:
+                                df.at[indice_reale, 'registro_pagamenti'] = nuova_stringa_rata
+                            
+                            # Aggiorniamo il totale pagato sommando la nuova rata
+                            nuovo_totale_pagato = pagato + importo_rata
+                            df.at[indice_reale, 'importo_pagato'] = nuovo_totale_pagato
+                            
+                            # Logica intelligente sullo Stato
+                            if nuovo_totale_pagato >= totale:
+                                df.at[indice_reale, 'stato'] = "Saldato"
+                            elif nuovo_totale_pagato > 0:
+                                df.at[indice_reale, 'stato'] = "Pagamento Parziale"
+                                
+                            if save_to_github(df, sha, f"Aggiunta tranche di {importo_rata} su riga {indice_reale}"):
+                                st.success("✅ Rata registrata correttamente!")
+                                time.sleep(1)
+                                st.rerun()
 
     else:
         st.info("Nessun dato presente nel database.")
