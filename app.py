@@ -249,11 +249,13 @@ with tab1:
             
             with st.container(border=True):
                 st.subheader(f"💼 Gestione Fattura/Documento: {riga_sel['categoria']}")
+                
+                # Layout a due colonne: A sinistra la fattura base, a destra i pagamenti
                 col_dati, col_rate = st.columns([1.2, 1])
                 
                 with col_dati:
                     st.write("### 📝 Dati Documento")
-                   with st.form("form_modifica_fattura"):
+                    with st.form("form_modifica_fattura"):
                         mod_cat = st.text_input("Categoria", value=str(riga_sel['categoria']))
                         mod_desc = st.text_input("Descrizione Documento", value=str(riga_sel['descrizione']))
                         
