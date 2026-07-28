@@ -292,15 +292,22 @@ with tab1:
                     c_fin1.metric("Totale Pagato", format_euro(pagato))
                     c_fin2.metric("Debito Residuo", format_euro(residuo), delta=f"{residuo:.2f} €", delta_color="inverse")
                     
-                    # Estrazione e decodifica dello storico testuale (es. "2026-07-28|150,00;2026-08-10|50,00")
+                    # Estrazione e decodifica dello storico testuale
+                    # Vecchio formato: "Data|Importo"
+                    # Nuovo formato:   "Data|Importo|Nota"
                     storico_txt = str(riga_sel.get('registro_pagamenti', ''))
                     if storico_txt and storico_txt != 'nan':
                         st.write("**Storico Rate Versate:**")
                         rate = storico_txt.split(';')
-                        for i, rata in enumerate(rate):
-                            if '|' in rata:
-                                r_data, r_imp = rata.split('|')
-                                st.markdown(f"- 📅 {r_data}: **{format_euro(float(r_imp))}**")
+                        for rata in rate:
+                            parti = rata.split('|')
+                            if len(parti) >= 2:
+                                r_data = parti[0]
+                                r_imp = format_euro(float(parti[1]))
+                                # Controllo retrocompatibilità: se c'è la nota la mostra, altrimenti niente
+                                r_nota = f" *(Note: {parti[2]})*" if len(parti) == 3 and parti[2].strip() else ""
+                                
+                                st.markdown(f"- 📅 {r_data}: **{r_imp}**{r_nota}")
                     else:
                         st.info("Nessun pagamento registrato finora.")
 
@@ -313,15 +320,19 @@ with tab1:
                         
                         import datetime
                         nuova_data = r_col1.date_input("Data Versamento", value=datetime.date.today())
-                        
-                        # Suggerisce in automatico di pagare tutto il residuo
                         importo_rata = r_col2.number_input("Importo Rata (€)", value=residuo if residuo > 0 else 0.0, step=10.0, min_value=0.0)
+                        
+                        # NUOVO CAMPO: Note specifiche per questa rata (opzionale)
+                        nota_rata = st.text_input("Metodo / Note (es. Bonifico n.456, Contanti)", placeholder="Facoltativo...")
                         
                         aggiungi_rata = st.form_submit_button("Aggiungi Rata 💸", type="secondary")
                         
                         if aggiungi_rata and importo_rata > 0:
-                            # Aggiorniamo la stringa dello storico
-                            nuova_stringa_rata = f"{nuova_data.strftime('%Y-%m-%d')}|{importo_rata}"
+                            # Pulizia della nota: rimuoviamo i caratteri speciali usati per la struttura dati (; e |)
+                            nota_pulita = nota_rata.replace("|", "-").replace(";", ",")
+                            
+                            # Creiamo la nuova stringa nel formato a 3 pezzi
+                            nuova_stringa_rata = f"{nuova_data.strftime('%Y-%m-%d')}|{importo_rata}|{nota_pulita}"
                             
                             storico_attuale = str(df.at[indice_reale, 'registro_pagamenti'])
                             if storico_attuale and storico_attuale != 'nan' and storico_attuale != '':
@@ -343,9 +354,6 @@ with tab1:
                                 st.success("✅ Rata registrata correttamente!")
                                 time.sleep(1)
                                 st.rerun()
-
-    else:
-        st.info("Nessun dato presente nel database.")
 # ==========================================
 # --- TAB 2: MANODOPERA (Standard 6 Ore) ---
 # ==========================================
