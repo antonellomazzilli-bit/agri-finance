@@ -375,7 +375,7 @@ with tab2:
             op_tipo_paga = st.selectbox("Tipo di Pagamento", ["Nessuno", "Acconto", "Saldo Finale"])
             op_note = st.text_area("Note Attività")
         
-       if st.form_submit_button("Registra Giornate"):
+            if st.form_submit_button("Registra Giornate"):
             df, sha = get_github_file()
             
             righe_nuove = []
