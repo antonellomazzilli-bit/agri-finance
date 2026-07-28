@@ -26,7 +26,6 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato
 2026-01-31,Uscita,Manodopera,Iannone Felice | 13.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Totale Gennaio 2026,0.0,Olive,Saldato
 2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.364 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Totale Gennaio 2026,0.0,Olive,Saldato
 2026-01-01,Entrata,Vendita Olive,Mazzilli Nunzio | Vendite Olive 2025,9000.0,Olive,Da Incassare
-,,,,,,
 2026-06-29,Uscita,Materiale Agricolo (Concimi/Piante),L'Agraria di raimondo G. & C. s.n.c. | fattura Proforma n. 39,1315.55,Azienda Generale,Saldato
 2026-07-11,Uscita,Materiale Agricolo (Concimi/Piante),Racanati | Doc. di consegna 6913/c del 11/07/2026,2522.0,Azienda Generale,Da Saldare
 2026-07-23,Uscita,Altro,"TECSIAL SRL | CORSO FORMAZIONE ART 37, IANNONE FELICE",73.2,Azienda Generale,Saldato
