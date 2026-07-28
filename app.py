@@ -364,8 +364,6 @@ with tab1:
 # ==========================================
 with tab2:
     st.subheader("👥 Registro Manodopera (Giornata standard: 6 ore)")
-    with tab2:
-    st.subheader("👥 Registro Manodopera (Giornata standard: 6 ore)")
     with st.form("operaio_form", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
