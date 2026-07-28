@@ -376,6 +376,7 @@ with tab2:
             op_note = st.text_area("Note Attività")
         
             if st.form_submit_button("Registra Giornate"):
+            # Da qui in giù, TUTTO è indentato di 4 spazi rispetto all'if
             df, sha = get_github_file()
             
             righe_nuove = []
@@ -399,11 +400,11 @@ with tab2:
             if righe_nuove:
                 df_nuove = pd.DataFrame(righe_nuove)
                 df = pd.concat([df, df_nuove], ignore_index=True)
+                
                 if save_to_github(df, sha, "Aggiornamento Manodopera (6h)"):
                     st.success("✅ Giornate lavorative registrate!")
                     time.sleep(1)
                     st.rerun()
-
 
 # ==========================================
 # --- TAB 3: CASSA ---
