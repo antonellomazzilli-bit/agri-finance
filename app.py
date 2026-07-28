@@ -376,35 +376,35 @@ with tab2:
             op_note = st.text_area("Note Attività")
         
             if st.form_submit_button("Registra Giornate"):
-            # Da qui in giù, TUTTO è indentato di 4 spazi rispetto all'if
-            df, sha = get_github_file()
+                df, sha = get_github_file()
+
+righe_nuove = []
+if op_ufficiali > 0:
+    desc_uff = f"{op_nome} | {op_ufficiali:.3f} gg | UFFICIALE: {op_note}"
+    righe_nuove.append({
+        'data': op_data.strftime('%Y-%m-%d'), 'tipo': "Uscita", 'categoria': "Manodopera", 
+        'descrizione': desc_uff, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
+        'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
+    })
+
+gg_extra = op_reali - op_ufficiali
+if abs(gg_extra) > 0.001:
+    desc_extra = f"{op_nome} | {gg_extra:.3f} gg | EXTRA: {op_note}"
+    righe_nuove.append({
+        'data': op_data.strftime('%Y-%m-%d'), 'tipo': "Uscita", 'categoria': "Manodopera Extra", 
+        'descrizione': desc_extra, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
+        'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
+    })
+
+if righe_nuove:
+    df_nuove = pd.DataFrame(righe_nuove)
+    df = pd.concat([df, df_nuove], ignore_index=True)
+    
+    if save_to_github(df, sha, "Aggiornamento Manodopera (6h)"):
+        st.success("✅ Giornate lavorative registrate!")
+        time.sleep(1)
+        st.rerun()
             
-            righe_nuove = []
-            if op_ufficiali > 0:
-                desc_uff = f"{op_nome} | {op_ufficiali:.3f} gg | UFFICIALE: {op_note}"
-                righe_nuove.append({
-                    'data': op_data.strftime('%Y-%m-%d'), 'tipo': "Uscita", 'categoria': "Manodopera", 
-                    'descrizione': desc_uff, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
-                    'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
-                })
-            
-            gg_extra = op_reali - op_ufficiali
-            if abs(gg_extra) > 0.001:
-                desc_extra = f"{op_nome} | {gg_extra:.3f} gg | EXTRA: {op_note}"
-                righe_nuove.append({
-                    'data': op_data.strftime('%Y-%m-%d'), 'tipo': "Uscita", 'categoria': "Manodopera Extra", 
-                    'descrizione': desc_extra, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
-                    'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
-                })
-            
-            if righe_nuove:
-                df_nuove = pd.DataFrame(righe_nuove)
-                df = pd.concat([df, df_nuove], ignore_index=True)
-                
-                if save_to_github(df, sha, "Aggiornamento Manodopera (6h)"):
-                    st.success("✅ Giornate lavorative registrate!")
-                    time.sleep(1)
-                    st.rerun()
 
 # ==========================================
 # --- TAB 3: CASSA ---
