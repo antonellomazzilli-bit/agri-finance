@@ -156,19 +156,19 @@ def save_to_github(df, sha, message):
 # --- FUNZIONI DI UTILITA' ---
 def format_euro(valore):
     """Formatta i numeri in stile italiano: 1.000,50 €"""
-    importo_str = f"{valore:,.2f}"
-    importo_str = importo_str.replace(",", "X").replace(".", ",").replace("X", ".")
-    return f"€ {importo_str}"
-
-def estrai_giornate(descrizione, dipendente):
+    # BLINDATURA: Se il valore non è un numero, forzalo a zero.
     try:
-        if dipendente in descrizione:
-            parti = descrizione.split('|')
-            for p in parti:
-                if 'gg' in p:
-                    return float(p.replace('gg', '').strip())
-        return 0.0
-    except: return 0.0
+        valore = float(valore)
+    except (ValueError, TypeError):
+        valore = 0.0
+        
+    # 1. Formatta il numero in stile anglosassone (1,234.56)
+    importo_str = f"{valore:,.2f}"
+    
+    # 2. Inverte punto e virgola tramite un carattere temporaneo (X)
+    importo_str = importo_str.replace(",", "X").replace(".", ",").replace("X", ".")
+    
+    return f"€ {importo_str}"
 
 
 # --- INTERFACCIA PRINCIPALE (LE 6 TAB) ---
@@ -434,11 +434,16 @@ with tab4:
     df_pareggio, _ = get_github_file()
     
     if not df_pareggio.empty:
+        # ---> AGGIUNTA SALVAVITA: Forziamo la colonna importo in numeri puri
+        df_pareggio['importo'] = pd.to_numeric(df_pareggio['importo'], errors='coerce').fillna(0.0)
+        
         df_pareggio['data_dt'] = pd.to_datetime(df_pareggio['data'], errors='coerce')
         anni_disponibili = df_pareggio['data_dt'].dt.year.dropna().unique()
         
         if len(anni_disponibili) > 0:
             anno_sel = st.selectbox("📅 Basato sulle spese storiche dell'anno:", sorted(anni_disponibili, reverse=True), key="anno_target")
+            
+            # Ora questa somma matematica funzionerà perfettamente
             uscite_totali = df_pareggio[(df_pareggio['data_dt'].dt.year == anno_sel) & (df_pareggio['tipo'] == 'Uscita')]['importo'].sum()
             
             col_fin, col_strat = st.columns([1, 1], gap="large")
