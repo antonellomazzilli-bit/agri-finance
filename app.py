@@ -170,6 +170,18 @@ def format_euro(valore):
     
     return f"€ {importo_str}"
 
+def estrai_giornate(descrizione, dipendente):
+    """Estrae il numero di giornate (gg) dalla descrizione testuale"""
+    try:
+        if dipendente in descrizione:
+            parti = descrizione.split('|')
+            for p in parti:
+                if 'gg' in p:
+                    return float(p.replace('gg', '').strip())
+        return 0.0
+    except: 
+        return 0.0
+
 
 # --- INTERFACCIA PRINCIPALE (LE 6 TAB) ---
 st.title("AgriFinance Cloud")
