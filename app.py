@@ -375,26 +375,29 @@ with tab2:
             op_tipo_paga = st.selectbox("Tipo di Pagamento", ["Nessuno", "Acconto", "Saldo Finale"])
             op_note = st.text_area("Note Attività")
         
-        if st.form_submit_button("Registra Giornate"):
+       if st.form_submit_button("Registra Giornate"):
             df, sha = get_github_file()
             
             righe_nuove = []
-            # STRUTTURA A 10 COLONNE PER IL CORRETTO SALVATAGGIO
             if op_ufficiali > 0:
                 desc_uff = f"{op_nome} | {op_ufficiali:.3f} gg | UFFICIALE: {op_note}"
-                righe_nuove.append([
-                    op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera", desc_uff, 0.0, "Olive", "Impegnato", 0.0, 0.0, ""
-                ])
+                righe_nuove.append({
+                    'data': op_data.strftime('%Y-%m-%d'), 'tipo': "Uscita", 'categoria': "Manodopera", 
+                    'descrizione': desc_uff, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
+                    'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
+                })
             
             gg_extra = op_reali - op_ufficiali
             if abs(gg_extra) > 0.001:
                 desc_extra = f"{op_nome} | {gg_extra:.3f} gg | EXTRA: {op_note}"
-                righe_nuove.append([
-                    op_data.strftime('%Y-%m-%d'), "Uscita", "Manodopera Extra", desc_extra, 0.0, "Olive", "Impegnato", 0.0, 0.0, ""
-                ])
+                righe_nuove.append({
+                    'data': op_data.strftime('%Y-%m-%d'), 'tipo': "Uscita", 'categoria': "Manodopera Extra", 
+                    'descrizione': desc_extra, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
+                    'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
+                })
             
             if righe_nuove:
-                df_nuove = pd.DataFrame(righe_nuove, columns=df.columns)
+                df_nuove = pd.DataFrame(righe_nuove)
                 df = pd.concat([df, df_nuove], ignore_index=True)
                 if save_to_github(df, sha, "Aggiornamento Manodopera (6h)"):
                     st.success("✅ Giornate lavorative registrate!")
@@ -436,12 +439,14 @@ with tab3:
             if st.form_submit_button("Registra Pagamento"):
                 if imp > 0:
                     data_f = data_pag.strftime('%Y-%m-%d')
-                    # STRUTTURA A 10 COLONNE PER IL CORRETTO SALVATAGGIO
-                    nuova_riga = [
-                        data_f, "Uscita", tipo_op, f"Pagamento Iannone Felice | {tipo_op}", float(imp), "Azienda", "Saldato", 
-                        float(imp), float(imp), f"{data_f}|{imp}|Erogazione Diretta"
-                    ]
-                    df = pd.concat([df, pd.DataFrame([nuova_riga], columns=df.columns)], ignore_index=True)
+                    nuova_riga = {
+                        'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
+                        'descrizione': f"Pagamento Iannone Felice | {tipo_op}", 
+                        'importo': float(imp), 'prodotto': "Azienda", 'stato': "Saldato", 
+                        'totale_fattura': float(imp), 'importo_pagato': float(imp), 
+                        'registro_pagamenti': f"{data_f}|{imp}|Erogazione Diretta"
+                    }
+                    df = pd.concat([df, pd.DataFrame([nuova_riga])], ignore_index=True)
                     
                     if save_to_github(df, sha, f"Pagamento Cassa: {imp}€"):
                         st.success("✅ Pagamento registrato!")
