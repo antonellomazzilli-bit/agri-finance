@@ -29,5 +29,5 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-06-29,Uscita,Materiale Agricolo (Concimi/Piante),L'Agraria di raimondo G. & C. s.n.c. | fattura Proforma n. 39,1315.55,Azienda Generale,Saldato,1315.55,1315.55,2026-06-29|1315.55,0.0,
 2026-07-11,Uscita,Materiale Agricolo (Concimi/Piante),Racanati | Doc. di consegna 6913/c del 11/07/2026,2522.0,Azienda Generale,Da Saldare,2522.0,0.0,,2522.0,
 2026-07-23,Uscita,Altro,"TECSIAL SRL | CORSO FORMAZIONE ART 37, IANNONE FELICE",73.2,Azienda Generale,Saldato,73.2,73.2,2026-07-23|73.2,0.0,
-2026-07-28,Uscita,Consulenze/Tasse,tecsial | Fatt. N° 17.309| DWR,610.0,,Saldato,610.0,610.0,2026-07-29|610.0|Bonifico da ING,610.0,
-2026-07-28,Uscita,Consulenze/Tasse,TECSIAL | FATT. N. 17.310|RSPP,366.0,,Impegnato,366.0,0.0,,366.0,
+2026-07-28,Uscita,Consulenze/Tasse,tecsial | Fatt. N° 17.309| DWR,610.0,,Saldato,610.0,610.0,2026-07-29|610.0|Bonifico da ING,0.0,
+2026-07-28,Uscita,Consulenze/Tasse,TECSIAL | FATT. N. 17.310|RSPP,366.0,,Saldato,366.0,366.0,2026-07-29|366.0|Bonifico da ING,366.0,
