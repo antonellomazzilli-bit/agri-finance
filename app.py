@@ -502,12 +502,20 @@ with tab3:
             with c3:
                 tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
                 
-                # Lista dinamica dei mesi lavorati (per il menu a tendina)
-                mesi_lavorati_list = [m for m in dati_mensili.keys() if m != "Pagamenti Pregressi/Non Allocati"]
-                if not mesi_lavorati_list:
-                    mesi_lavorati_list = ["Nessun mese registrato"]
+               # Lista dinamica filtrata: SOLO i mesi con arretrati da pagare
+                mesi_da_pagare = []
+                for mese, dati_mese in dati_mensili.items():
+                    if mese != "Pagamenti Pregressi/Non Allocati":
+                        debito_residuo = dati_mese['Maturato'] - dati_mese['Pagato']
+                        # Se il debito è maggiore di zero (usiamo 0.01 per tollerare i millesimi), mostra il mese
+                        if debito_residuo > 0.01:
+                            mesi_da_pagare.append(mese)
+                
+                # Se tutto è stato pagato o non c'è storico
+                if not mesi_da_pagare:
+                    mesi_da_pagare = ["Nessun arretrato (Versamento Generico/Acconto)"]
                     
-                mese_rif = st.selectbox("Mese di Riferimento del Pagamento", mesi_lavorati_list)
+                mese_rif = st.selectbox("Mese di Riferimento del Pagamento", mesi_da_pagare)
             
             if st.form_submit_button("Registra Pagamento e Copri il Mese", type="primary"):
                 if imp > 0:
