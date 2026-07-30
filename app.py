@@ -503,58 +503,90 @@ with tab3:
             st.info("Nessun dato lavorativo o di pagamento registrato.")
             saldo_globale = 0.0
             
-        st.divider()
+       st.divider()
         
-        # 4. IL NUOVO FORM DI PAGAMENTO (Con assegnazione del mese)
+        # 4. IL NUOVO FORM DI PAGAMENTO (Con ripartizione a cascata)
         with st.form("cassa_form", clear_on_submit=True):
             st.write("### ➕ Registra un pagamento al dipendente")
             
-            c1, c2, c3 = st.columns([1, 1, 1.5])
+            c1, c2 = st.columns(2)
             with c1:
                 data_pag = st.date_input("Data del Bonifico/Contanti", format="DD/MM/YYYY")
-            with c2:
-                imp = st.number_input("Importo Erogato (€)", min_value=0.0, step=10.0, format="%.2f", value=abs(saldo_globale) if saldo_globale < 0 else 0.0)
-            with c3:
                 tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
+            with c2:
+                # L'importo suggerito è già il totale degli arretrati globale
+                importo_consigliato = abs(saldo_globale) if saldo_globale < 0 else 0.0
+                imp = st.number_input("Importo Totale Erogato (€)", min_value=0.0, step=10.0, format="%.2f", value=importo_consigliato)
                 
-               # Lista dinamica filtrata: SOLO i mesi con arretrati da pagare
-                mesi_da_pagare = []
-                for mese, dati_mese in dati_mensili.items():
-                    if mese != "Pagamenti Pregressi/Non Allocati":
-                        debito_residuo = dati_mese['Maturato'] - dati_mese['Pagato']
-                        # Se il debito è maggiore di zero (usiamo 0.01 per tollerare i millesimi), mostra il mese
-                        if debito_residuo > 0.01:
-                            mesi_da_pagare.append(mese)
-                
-                # Se tutto è stato pagato o non c'è storico
-                if not mesi_da_pagare:
-                    mesi_da_pagare = ["Nessun arretrato (Versamento Generico/Acconto)"]
-                    
-                mese_rif = st.selectbox("Mese di Riferimento del Pagamento", mesi_da_pagare)
+                # La checkbox "magica" (già attiva di default)
+                st.markdown("<br>", unsafe_allow_html=True)
+                saldo_automatico = st.checkbox("🪄 Spalma in automatico sui mesi scoperti", value=True)
             
-            if st.form_submit_button("Registra Pagamento e Copri il Mese", type="primary"):
+            # Lista dei mesi per la modalità manuale
+            mesi_da_pagare = []
+            for mese, dati_mese in dati_mensili.items():
+                if mese != "Pagamenti Pregressi/Non Allocati":
+                    if (dati_mese['Maturato'] - dati_mese['Pagato']) > 0.01:
+                        mesi_da_pagare.append(mese)
+            if not mesi_da_pagare:
+                mesi_da_pagare = ["Nessun arretrato"]
+                
+            mese_rif = st.selectbox("📌 Mese specifico (usato SOLO se togli la spunta sopra):", mesi_da_pagare)
+            
+            if st.form_submit_button("Registra Pagamento", type="primary"):
                 if imp > 0:
                     data_f = data_pag.strftime('%Y-%m-%d')
+                    righe_nuove = []
                     
-                    # Costruiamo la descrizione in modo che contenga il mese chiave per i calcoli futuri
-                    descrizione_estesa = f"Pagamento Iannone Felice | {tipo_op} | Rif: {mese_rif}"
+                    if saldo_automatico:
+                        importo_rimanente = float(imp)
+                        
+                        # Cicliamo i mesi in ordine cronologico
+                        for mese, dati_mese in dati_mensili.items():
+                            if mese != "Pagamenti Pregressi/Non Allocati" and importo_rimanente > 0:
+                                debito_mese = dati_mese['Maturato'] - dati_mese['Pagato']
+                                
+                                if debito_mese > 0.01:
+                                    # Diamo a questo mese il minimo tra quello che gli spetta e i soldi rimasti
+                                    pagamento_mese = min(debito_mese, importo_rimanente)
+                                    
+                                    righe_nuove.append({
+                                        'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
+                                        'descrizione': f"Pagamento Iannone Felice | {tipo_op} | Rif: {mese}", 
+                                        'importo': float(pagamento_mese), 'prodotto': "Azienda", 'stato': "Saldato", 
+                                        'totale_fattura': float(pagamento_mese), 'importo_pagato': float(pagamento_mese), 
+                                        'registro_pagamenti': f"{data_f}|{pagamento_mese}|Erogazione Diretta"
+                                    })
+                                    importo_rimanente -= pagamento_mese
+                        
+                        # Se ha pagato di più del debito totale, l'eccesso diventa un Anticipo
+                        if importo_rimanente > 0.01:
+                            righe_nuove.append({
+                                'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
+                                'descrizione': f"Pagamento Iannone Felice | {tipo_op} | Rif: Anticipo/Extra", 
+                                'importo': float(importo_rimanente), 'prodotto': "Azienda", 'stato': "Saldato", 
+                                'totale_fattura': float(importo_rimanente), 'importo_pagato': float(importo_rimanente), 
+                                'registro_pagamenti': f"{data_f}|{importo_rimanente}|Erogazione Diretta"
+                            })
+                    else:
+                        # Modalità manuale classica
+                        righe_nuove.append({
+                            'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
+                            'descrizione': f"Pagamento Iannone Felice | {tipo_op} | Rif: {mese_rif}", 
+                            'importo': float(imp), 'prodotto': "Azienda", 'stato': "Saldato", 
+                            'totale_fattura': float(imp), 'importo_pagato': float(imp), 
+                            'registro_pagamenti': f"{data_f}|{imp}|Erogazione Diretta"
+                        })
                     
-                    nuova_riga = {
-                        'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
-                        'descrizione': descrizione_estesa, 
-                        'importo': float(imp), 'prodotto': "Azienda", 'stato': "Saldato", 
-                        'totale_fattura': float(imp), 'importo_pagato': float(imp), 
-                        'registro_pagamenti': f"{data_f}|{imp}|Erogazione Diretta"
-                    }
-                    df = pd.concat([df, pd.DataFrame([nuova_riga])], ignore_index=True)
-                    
-                    if save_to_github(df, sha, f"Pagato: {imp}€ per {mese_rif}"):
-                        st.success(f"✅ Pagamento di {imp}€ registrato a copertura di {mese_rif}!")
-                        time.sleep(1.5)
-                        st.rerun()
+                    if righe_nuove:
+                        df_nuove = pd.DataFrame(righe_nuove)
+                        df = pd.concat([df, df_nuove], ignore_index=True)
+                        if save_to_github(df, sha, f"Pagamento dipendente distribuito: {imp}€"):
+                            st.success(f"✅ Pagamento di {format_euro(imp)} registrato con successo!")
+                            time.sleep(1.5)
+                            st.rerun()
                 else:
                     st.warning("L'importo deve essere maggiore di zero.")
-
 
 # ==========================================
 # --- TAB 4: SIMULATORE STRATEGICO E TARGET ---
