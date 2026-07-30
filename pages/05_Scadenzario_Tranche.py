@@ -65,7 +65,7 @@ if not df.empty:
         
         with st.form("form_tranche"):
             data_pagamento = st.date_input("Data di questo pagamento", format="DD/MM/YYYY")
-            importo_tranche = st.number_input("Importo della tranche da pagare (€)", min_value=0.01, max_value=float(riga_selezionata['importo']), step=10.0, format="%.2f")
+            importo_tranche = st.number_input("Importo della tranche da pagare (€)", min_value=0.01, step=10.0, format="%.2f")
             nota_tranche = st.text_input("Nota sul pagamento (es. Pagato con bonifico, Assegno num...)")
             
             paga_button = st.form_submit_button("💳 Registra Pagamento Tranche")
