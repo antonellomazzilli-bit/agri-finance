@@ -31,3 +31,4 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-07-23,Uscita,Consulenze/Tasse,"TECSIAL SRL | CORSO FORMAZIONE ART 37, IANNONE FELICE",73.2,Azienda Generale,Saldato,73.2,73.2,2026-07-23|73.2,0.0,
 2026-07-28,Uscita,Consulenze/Tasse,tecsial | Fatt. N° 17.309| DWR,610.0,,Saldato,610.0,610.0,2026-07-29|610.0|Bonifico da ING,0.0,
 2026-07-28,Uscita,Consulenze/Tasse,TECSIAL | FATT. N. 17.310|RSPP,366.0,,Saldato,366.0,366.0,2026-07-29|366.0|Bonifico da ING,0.0,
+2026-07-29,Uscita,Attrezzature,Ferrante Antonio | Fatt. n. 5 | Trattorista | Lavori Vari,2090.0,,Saldato,2090.0,2090.0,2026-07-29|2090.0|Registrazione iniziale,,
