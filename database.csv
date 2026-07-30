@@ -1,5 +1,4 @@
 data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_pagato,registro_pagamenti,Residuo (€),prodotto,data_dt
-2026-07-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Pagamento Busta Paga Giugno 2026 - ,734.0,Olive,Saldato,734.0,734.0,2026-07-04|734.0,0.0,,2026-07-04
 2026-07-03,Uscita,Oneri,"F.24 dipendente mese di Giugno 2026, pagato da Zurich",160.42,Olive,Saldato,160.42,160.42,2026-07-03|160.42,0.0,,2026-07-03
 2026-06-30,Uscita,Manodopera Extra,Iannone Felice | 1.090 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato,0.0,0.0,2026-06-30|0.0,0.0,,2026-06-30
 2026-06-30,Uscita,Manodopera,Iannone Felice | 10.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato,0.0,0.0,2026-06-30|0.0,0.0,,2026-06-30
