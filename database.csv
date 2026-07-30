@@ -32,4 +32,5 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-02-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Gennaio 2026,914.29,,Saldato,914.29,914.29,2026-02-02|914.29|Erogazione Diretta,0.0,Azienda,2026-02-02
 2026-03-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Febbraio 2026,989.2,,Saldato,989.2,989.2,2026-03-02|989.2|Erogazione Diretta,0.0,Azienda,2026-03-02
 2026-04-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Marzo 2026,1058.67,,Saldato,1058.67,1058.67,2026-04-02|1058.67|Erogazione Diretta,0.0,Azienda,2026-04-02
-2026-05-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Aprile 2026,641.63,,Saldato,641.63,641.63,2026-05-02|641.63|Erogazione Diretta,0.0,Azienda,
+2026-05-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Aprile 2026,641.63,,Saldato,641.63,641.63,2026-05-02|641.63|Erogazione Diretta,0.0,Azienda,2026-05-02
+2026-07-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Giugno 2026,734.0,,Saldato,734.0,734.0,2026-07-02|734.0|Erogazione Diretta,,Azienda,
