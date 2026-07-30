@@ -509,7 +509,7 @@ with tab3:
         with st.form("cassa_form", clear_on_submit=True):
              st.write("### ➕ Registra un pagamento al dipendente")
             
-            c1, c2 = st.columns(2)
+             c1, c2 = st.columns(2)
             with c1:
                 data_pag = st.date_input("Data del Bonifico/Contanti", format="DD/MM/YYYY")
                 tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
