@@ -406,51 +406,128 @@ with tab2:
             
 
 # ==========================================
-# --- TAB 3: CASSA ---
+# --- TAB 3: CASSA E CONTROLLO MESI ARRETRATI ---
 # ==========================================
 with tab3:
-    st.subheader("💸 Cassa e Estratto Conto (Euro)")
+    st.subheader("💸 Cassa e Estratto Conto Mensile (Euro)")
     df, sha = get_github_file()
     
     if not df.empty:
-        # ---> 1. AGGIUNTA SALVAVITA: Forziamo la colonna importo in numeri puri
+        # 1. Blindatura numerica e conversione date
         df['importo'] = pd.to_numeric(df['importo'], errors='coerce').fillna(0.0)
+        df['data_dt'] = pd.to_datetime(df['data'], errors='coerce')
         
-        cat_pagamenti = ['Busta Paga', 'Saldo Extra', 'Straordinari', 'Rimborsi']
-        tot_versato = df[df['categoria'].isin(cat_pagamenti)]['importo'].sum()
+        # 2. MOTORE DI CALCOLO DELLE PENDENZE MENSILI
+        # Creiamo un dizionario per raccogliere i dati mese per mese
+        dati_mensili = {}
+        mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
         
-        # ---> 2. AGGIUNTA SALVAVITA: Forziamo la lettura della descrizione come testo (str)
-        gg_totali = sum(estrai_giornate(str(row['descrizione']), "Iannone Felice") for _, row in df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].iterrows())
-        valore_lavoro = gg_totali * COSTO_GIORNATA_EXTRA
+        # Fase A: Raccogliamo tutto il lavoro effettuato (Tab 2)
+        lavoro_df = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
+        for index, row in lavoro_df.iterrows():
+            if pd.notna(row['data_dt']):
+                mese_num = row['data_dt'].month
+                anno_num = row['data_dt'].year
+                chiave_mese = f"{mesi_nomi[mese_num]} {anno_num}"
+                
+                gg_lavorati = estrai_giornate(str(row['descrizione']), "Iannone Felice")
+                valore_maturato = gg_lavorati * COSTO_GIORNATA_EXTRA
+                
+                if chiave_mese not in dati_mensili:
+                    dati_mensili[chiave_mese] = {'Maturato': 0.0, 'Pagato': 0.0}
+                dati_mensili[chiave_mese]['Maturato'] += valore_maturato
+
+        # Fase B: Raccogliamo tutti i pagamenti effettuati (Tab 3) e li associamo al mese
+        # N.B. D'ora in poi cerchiamo il mese nella descrizione del pagamento
+        cat_pagamenti = ['Busta Paga', 'Saldo Extra', 'Rimborsi']
+        pagamenti_df = df[df['categoria'].isin(cat_pagamenti)]
         
-        # Ora la sottrazione funzionerà sempre senza errori!
-        saldo = tot_versato - valore_lavoro
-        st.metric("Saldo Dare/Avere Dipendente", format_euro(saldo), delta="Verde = in credito | Rosso = a debito", delta_color="normal" if saldo>=0 else "inverse")
-        
-        with st.form("cassa_form", clear_on_submit=True):
-            st.write("Registra un pagamento al dipendente:")
-            c1, c2 = st.columns(2)
-            with c1:
-                data_pag = st.date_input("Data Pagamento", format="DD/MM/YYYY")
-                tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
-            with c2:
-                imp = st.number_input("Importo Erogato (€)", min_value=0.0, step=10.0, format="%.2f")
+        for index, row in pagamenti_df.iterrows():
+            importo_pagato = row['importo']
+            descrizione = str(row['descrizione'])
             
-            if st.form_submit_button("Registra Pagamento"):
+            # Cerchiamo se c'è un "Mese Riferimento:" nella descrizione
+            mese_trovato = False
+            for chiave in dati_mensili.keys():
+                if chiave in descrizione:
+                    dati_mensili[chiave]['Pagato'] += importo_pagato
+                    mese_trovato = True
+                    break
+            
+            # Se è un pagamento vecchio (senza mese esplicito), lo mettiamo in un calderone generico
+            if not mese_trovato:
+                if "Pagamenti Pregressi/Non Allocati" not in dati_mensili:
+                    dati_mensili["Pagamenti Pregressi/Non Allocati"] = {'Maturato': 0.0, 'Pagato': 0.0}
+                dati_mensili["Pagamenti Pregressi/Non Allocati"]['Pagato'] += importo_pagato
+
+        # 3. VISUALIZZAZIONE DELLE PENDENZE
+        st.markdown("### 📊 Situazione Arretrati e Saldi per Mese")
+        
+        # Trasformiamo il dizionario in una tabella per la visualizzazione
+        if dati_mensili:
+            df_riepilogo = pd.DataFrame.from_dict(dati_mensili, orient='index')
+            df_riepilogo['Stato Mensile'] = df_riepilogo['Pagato'] - df_riepilogo['Maturato']
+            
+            # Formattazione per la lettura
+            df_display = df_riepilogo.copy()
+            for col in df_display.columns:
+                df_display[col] = df_display[col].apply(format_euro)
+                
+            st.dataframe(df_display, use_container_width=True)
+            
+            # Calcolo del totale Globale
+            totale_maturato = df_riepilogo['Maturato'].sum()
+            totale_pagato = df_riepilogo['Pagato'].sum()
+            saldo_globale = totale_pagato - totale_maturato
+            
+            if saldo_globale < 0:
+                st.error(f"⚠️ ATTENZIONE: Il dipendente risulta in credito totale (arretrati) per: **{format_euro(abs(saldo_globale))}**")
+            else:
+                st.success(f"✅ Situazione regolare. Saldo globale: **{format_euro(saldo_globale)}**")
+        else:
+            st.info("Nessun dato lavorativo o di pagamento registrato.")
+            saldo_globale = 0.0
+            
+        st.divider()
+        
+        # 4. IL NUOVO FORM DI PAGAMENTO (Con assegnazione del mese)
+        with st.form("cassa_form", clear_on_submit=True):
+            st.write("### ➕ Registra un pagamento al dipendente")
+            
+            c1, c2, c3 = st.columns([1, 1, 1.5])
+            with c1:
+                data_pag = st.date_input("Data del Bonifico/Contanti", format="DD/MM/YYYY")
+            with c2:
+                imp = st.number_input("Importo Erogato (€)", min_value=0.0, step=10.0, format="%.2f", value=abs(saldo_globale) if saldo_globale < 0 else 0.0)
+            with c3:
+                tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
+                
+                # Lista dinamica dei mesi lavorati (per il menu a tendina)
+                mesi_lavorati_list = [m for m in dati_mensili.keys() if m != "Pagamenti Pregressi/Non Allocati"]
+                if not mesi_lavorati_list:
+                    mesi_lavorati_list = ["Nessun mese registrato"]
+                    
+                mese_rif = st.selectbox("Mese di Riferimento del Pagamento", mesi_lavorati_list)
+            
+            if st.form_submit_button("Registra Pagamento e Copri il Mese", type="primary"):
                 if imp > 0:
                     data_f = data_pag.strftime('%Y-%m-%d')
+                    
+                    # Costruiamo la descrizione in modo che contenga il mese chiave per i calcoli futuri
+                    descrizione_estesa = f"Pagamento Iannone Felice | {tipo_op} | Rif: {mese_rif}"
+                    
                     nuova_riga = {
                         'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
-                        'descrizione': f"Pagamento Iannone Felice | {tipo_op}", 
+                        'descrizione': descrizione_estesa, 
                         'importo': float(imp), 'prodotto': "Azienda", 'stato': "Saldato", 
                         'totale_fattura': float(imp), 'importo_pagato': float(imp), 
                         'registro_pagamenti': f"{data_f}|{imp}|Erogazione Diretta"
                     }
                     df = pd.concat([df, pd.DataFrame([nuova_riga])], ignore_index=True)
                     
-                    if save_to_github(df, sha, f"Pagamento Cassa: {imp}€"):
-                        st.success("✅ Pagamento registrato!")
-                        time.sleep(1)
+                    if save_to_github(df, sha, f"Pagato: {imp}€ per {mese_rif}"):
+                        st.success(f"✅ Pagamento di {imp}€ registrato a copertura di {mese_rif}!")
+                        time.sleep(1.5)
                         st.rerun()
                 else:
                     st.warning("L'importo deve essere maggiore di zero.")
