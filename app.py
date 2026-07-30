@@ -503,11 +503,11 @@ with tab3:
             st.info("Nessun dato lavorativo o di pagamento registrato.")
             saldo_globale = 0.0
             
-       st.divider()
+        st.divider()
         
         # 4. IL NUOVO FORM DI PAGAMENTO (Con ripartizione a cascata)
         with st.form("cassa_form", clear_on_submit=True):
-            st.write("### ➕ Registra un pagamento al dipendente")
+             st.write("### ➕ Registra un pagamento al dipendente")
             
             c1, c2 = st.columns(2)
             with c1:
