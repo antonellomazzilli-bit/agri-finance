@@ -510,10 +510,10 @@ with tab3:
              st.write("### ➕ Registra un pagamento al dipendente")
             
              c1, c2 = st.columns(2)
-            with c1:
+             with c1:
                 data_pag = st.date_input("Data del Bonifico/Contanti", format="DD/MM/YYYY")
                 tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
-            with c2:
+             with c2:
                 # L'importo suggerito è già il totale degli arretrati globale
                 importo_consigliato = abs(saldo_globale) if saldo_globale < 0 else 0.0
                 imp = st.number_input("Importo Totale Erogato (€)", min_value=0.0, step=10.0, format="%.2f", value=importo_consigliato)
@@ -523,17 +523,17 @@ with tab3:
                 saldo_automatico = st.checkbox("🪄 Spalma in automatico sui mesi scoperti", value=True)
             
             # Lista dei mesi per la modalità manuale
-            mesi_da_pagare = []
-            for mese, dati_mese in dati_mensili.items():
+             mesi_da_pagare = []
+             for mese, dati_mese in dati_mensili.items():
                 if mese != "Pagamenti Pregressi/Non Allocati":
                     if (dati_mese['Maturato'] - dati_mese['Pagato']) > 0.01:
                         mesi_da_pagare.append(mese)
-            if not mesi_da_pagare:
+             if not mesi_da_pagare:
                 mesi_da_pagare = ["Nessun arretrato"]
                 
-            mese_rif = st.selectbox("📌 Mese specifico (usato SOLO se togli la spunta sopra):", mesi_da_pagare)
+             mese_rif = st.selectbox("📌 Mese specifico (usato SOLO se togli la spunta sopra):", mesi_da_pagare)
             
-            if st.form_submit_button("Registra Pagamento", type="primary"):
+             if st.form_submit_button("Registra Pagamento", type="primary"):
                 if imp > 0:
                     data_f = data_pag.strftime('%Y-%m-%d')
                     righe_nuove = []
