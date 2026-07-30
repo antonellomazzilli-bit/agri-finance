@@ -460,11 +460,26 @@ with tab3:
                     dati_mensili["Pagamenti Pregressi/Non Allocati"] = {'Maturato': 0.0, 'Pagato': 0.0}
                 dati_mensili["Pagamenti Pregressi/Non Allocati"]['Pagato'] += importo_pagato
 
-        # 3. VISUALIZZAZIONE DELLE PENDENZE
+       # 3. VISUALIZZAZIONE DELLE PENDENZE
         st.markdown("### 📊 Situazione Arretrati e Saldi per Mese")
         
+        # MOTORE DI ORDINAMENTO CRONOLOGICO
+        mesi_ordine = {'Gennaio': 1, 'Febbraio': 2, 'Marzo': 3, 'Aprile': 4, 'Maggio': 5, 'Giugno': 6, 'Luglio': 7, 'Agosto': 8, 'Settembre': 9, 'Ottobre': 10, 'Novembre': 11, 'Dicembre': 12}
+        
+        def ordina_mesi(chiave):
+            if chiave == "Pagamenti Pregressi/Non Allocati":
+                return (0, 0) # Mettiamo le voci non assegnate sempre in cima
+            try:
+                mese, anno = chiave.split()
+                return (int(anno), mesi_ordine.get(mese, 0))
+            except:
+                return (9999, 99) # In caso di stringhe anomale le mette in fondo
+
         # Trasformiamo il dizionario in una tabella per la visualizzazione
         if dati_mensili:
+            # Riordiniamo i dati matematicamente prima di mostrarli
+            dati_mensili = dict(sorted(dati_mensili.items(), key=lambda item: ordina_mesi(item[0])))
+            
             df_riepilogo = pd.DataFrame.from_dict(dati_mensili, orient='index')
             df_riepilogo['Stato Mensile'] = df_riepilogo['Pagato'] - df_riepilogo['Maturato']
             
