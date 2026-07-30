@@ -22,7 +22,6 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-03-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Febbraio - ,989.2,Olive,Saldato,989.2,989.2,2026-03-04|989.2,0.0,,2026-03-04
 2026-02-28,Uscita,Manodopera,Iannone Felice | 14.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riepilogo Febbraio 2026,0.0,Olive,Saldato,0.0,0.0,2026-02-28|0.0,0.0,,2026-02-28
 2026-02-28,Uscita,Manodopera Extra,Iannone Felice | 9.454 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riepilogo Febbraio 2026,0.0,Olive,Saldato,0.0,0.0,2026-02-28|0.0,0.0,,2026-02-28
-2026-02-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Gennaio - ,914.29,Olive,Saldato,914.29,914.29,2026-02-04|914.29,0.0,,2026-02-04
 2026-01-31,Uscita,Manodopera,Iannone Felice | 13.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Totale Gennaio 2026,0.0,Olive,Saldato,0.0,0.0,2026-01-31|0.0,0.0,,2026-01-31
 2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.364 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Totale Gennaio 2026,0.0,Olive,Saldato,0.0,0.0,2026-01-31|0.0,0.0,,2026-01-31
 2026-01-01,Entrata,Vendita Olive,Mazzilli Nunzio | Vendite Olive 2025,9000.0,Olive,Saldato,9000.0,9000.0,2026-01-01|9000.0,0.0,,2026-01-01
@@ -31,10 +30,10 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-07-23,Uscita,Consulenze/Tasse,"TECSIAL SRL | CORSO FORMAZIONE ART 37, IANNONE FELICE",73.2,Azienda Generale,Saldato,73.2,73.2,2026-07-23|73.2,0.0,,2026-07-23
 2026-07-28,Uscita,Consulenze/Tasse,tecsial | Fatt. N° 17.309| DWR,610.0,,Saldato,610.0,610.0,2026-07-29|610.0|Bonifico da ING,0.0,,2026-07-28
 2026-07-28,Uscita,Consulenze/Tasse,TECSIAL | FATT. N. 17.310|RSPP,366.0,,Saldato,366.0,366.0,2026-07-29|366.0|Bonifico da ING,0.0,,2026-07-28
-2026-07-29,Uscita,Attrezzature,Ferrante Antonio | Fatt. n. 5 | Trattorista | Lavori Vari,2090.0,,Saldato,2090.0,2090.0,2026-07-29|2090.0|Registrazione iniziale,,,2026-07-29
-2026-07-31,Uscita,Manodopera,Iannone Felice | 15.000 gg | UFFICIALE: Giornate Luglio 2026,0.0,,Impegnato,0.0,0.0,,,Olive,2026-07-31
-2026-07-31,Uscita,Manodopera Extra,Iannone Felice | -14.334 gg | EXTRA: Giornate Luglio 2026,0.0,,Impegnato,0.0,0.0,,,Olive,2026-07-31
-2026-02-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Gennaio 2026,914.29,,Saldato,914.29,914.29,2026-02-02|914.29|Erogazione Diretta,,Azienda,2026-02-02
-2026-03-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Febbraio 2026,989.2,,Saldato,989.2,989.2,2026-03-02|989.2|Erogazione Diretta,,Azienda,2026-03-02
-2026-04-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Marzo 2026,1058.67,,Saldato,1058.67,1058.67,2026-04-02|1058.67|Erogazione Diretta,,Azienda,2026-04-02
-2026-05-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Aprile 2026,641.63,,Saldato,641.63,641.63,2026-05-02|641.63|Erogazione Diretta,,Azienda,
+2026-07-29,Uscita,Attrezzature,Ferrante Antonio | Fatt. n. 5 | Trattorista | Lavori Vari,2090.0,,Saldato,2090.0,2090.0,2026-07-29|2090.0|Registrazione iniziale,0.0,,2026-07-29
+2026-07-31,Uscita,Manodopera,Iannone Felice | 15.000 gg | UFFICIALE: Giornate Luglio 2026,0.0,,Impegnato,0.0,0.0,,0.0,Olive,2026-07-31
+2026-07-31,Uscita,Manodopera Extra,Iannone Felice | -14.334 gg | EXTRA: Giornate Luglio 2026,0.0,,Impegnato,0.0,0.0,,0.0,Olive,2026-07-31
+2026-02-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Gennaio 2026,914.29,,Saldato,914.29,914.29,2026-02-02|914.29|Erogazione Diretta,0.0,Azienda,2026-02-02
+2026-03-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Febbraio 2026,989.2,,Saldato,989.2,989.2,2026-03-02|989.2|Erogazione Diretta,0.0,Azienda,2026-03-02
+2026-04-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Marzo 2026,1058.67,,Saldato,1058.67,1058.67,2026-04-02|1058.67|Erogazione Diretta,0.0,Azienda,2026-04-02
+2026-05-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Aprile 2026,641.63,,Saldato,641.63,641.63,2026-05-02|641.63|Erogazione Diretta,0.0,Azienda,
