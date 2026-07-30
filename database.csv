@@ -12,7 +12,6 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-06-05,Uscita,Altro,"Pagamento provvigioni apertura azienda agricola e partita IVA, infoagri",90.0,Olive ,Saldato,90.0,90.0,2026-06-05|90.0,0.0,,2026-06-05
 2026-05-31,Uscita,Manodopera Extra,Iannone Felice | 10.818 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato,0.0,0.0,2026-05-31|0.0,0.0,,2026-05-31
 2026-05-18,Uscita,Oneri,ONERI MESE DI APRILE,133.34,Olive,Saldato,133.34,133.34,2026-05-18|133.34,0.0,,2026-05-18
-2026-05-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Aprile - ,641.63,Olive,Saldato,641.63,641.63,2026-05-04|641.63,0.0,,2026-05-04
 2026-04-30,Uscita,Manodopera,Iannone Felice | 9.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato,0.0,0.0,2026-04-30|0.0,0.0,,2026-04-30
 2026-04-30,Uscita,Manodopera Extra,Iannone Felice | 18.181 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato,0.0,0.0,2026-04-30|0.0,0.0,,2026-04-30
 2026-04-16,Uscita,Oneri,ONERI MESE DI MARZO,234.47,Olive,Saldato,234.47,234.47,2026-04-16|234.47,0.0,,2026-04-16
