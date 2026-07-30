@@ -35,4 +35,5 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-07-31,Uscita,Manodopera,Iannone Felice | 15.000 gg | UFFICIALE: Giornate Luglio 2026,0.0,,Impegnato,0.0,0.0,,,Olive,2026-07-31
 2026-07-31,Uscita,Manodopera Extra,Iannone Felice | -14.334 gg | EXTRA: Giornate Luglio 2026,0.0,,Impegnato,0.0,0.0,,,Olive,2026-07-31
 2026-02-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Gennaio 2026,914.29,,Saldato,914.29,914.29,2026-02-02|914.29|Erogazione Diretta,,Azienda,2026-02-02
-2026-03-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Febbraio 2026,989.2,,Saldato,989.2,989.2,2026-03-02|989.2|Erogazione Diretta,,Azienda,
+2026-03-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Febbraio 2026,989.2,,Saldato,989.2,989.2,2026-03-02|989.2|Erogazione Diretta,,Azienda,2026-03-02
+2026-04-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Marzo 2026,1058.67,,Saldato,1058.67,1058.67,2026-04-02|1058.67|Erogazione Diretta,,Azienda,
