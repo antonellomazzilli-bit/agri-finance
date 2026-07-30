@@ -16,7 +16,6 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-04-30,Uscita,Manodopera,Iannone Felice | 9.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato,0.0,0.0,2026-04-30|0.0,0.0,,2026-04-30
 2026-04-30,Uscita,Manodopera Extra,Iannone Felice | 18.181 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato,0.0,0.0,2026-04-30|0.0,0.0,,2026-04-30
 2026-04-16,Uscita,Oneri,ONERI MESE DI MARZO,234.47,Olive,Saldato,234.47,234.47,2026-04-16|234.47,0.0,,2026-04-16
-2026-04-04,Uscita,Busta Paga,Iannone Felice | 0 gg | Busta Paga (Ufficiale) | Stipendio Marzo - ,1058.67,Olive,Saldato,1058.67,1058.67,2026-04-04|1058.67,0.0,,2026-04-04
 2026-03-31,Uscita,Manodopera,Iannone Felice | 15.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato,0.0,0.0,2026-03-31|0.0,0.0,,2026-03-31
 2026-03-31,Uscita,Manodopera Extra,Iannone Felice | 21.363 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato,0.0,0.0,2026-03-31|0.0,0.0,,2026-03-31
 2026-02-28,Uscita,Manodopera,Iannone Felice | 14.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riepilogo Febbraio 2026,0.0,Olive,Saldato,0.0,0.0,2026-02-28|0.0,0.0,,2026-02-28
