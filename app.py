@@ -419,42 +419,33 @@ with tab2:
         else:
             st.warning("Nessun dato valido inserito (Giornate a zero).")
 
-   # --- SEZIONE 2: REPORT E STAMPA PRESENZE (CON IMPORTI DINAMICI) ---
+  # --- SEZIONE 2: REPORT E STAMPA PRESENZE (DATI REALI DA DATABASE) ---
     st.divider()
-    st.subheader("🖨️ Stampa Riepilogo Presenze e Costi")
+    st.subheader("🖨️ Stampa Riepilogo Presenze e Costi Reali")
     
     if not df.empty:
-        # Filtri base
         c_filtro1, c_filtro2 = st.columns(2)
         with c_filtro1:
             sel_dipendente = st.selectbox("Seleziona Dipendente per il Report", ["Iannone Felice"])
         
-        df_lavoro = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].copy()
-        df_lavoro['data_dt'] = pd.to_datetime(df_lavoro['data'], errors='coerce')
-        df_lavoro = df_lavoro.dropna(subset=['data_dt'])
+        # Preparazione di tutto il database per l'estrazione temporale
+        df['data_dt'] = pd.to_datetime(df['data'], errors='coerce')
+        df_valido = df.dropna(subset=['data_dt'])
         
-        anni_disp = df_lavoro['data_dt'].dt.year.unique().tolist()
+        anni_disp = df_valido['data_dt'].dt.year.unique().tolist()
         if not anni_disp:
             anni_disp = [datetime.now().year]
             
         with c_filtro2:
             sel_anno = st.selectbox("Seleziona Anno di Riferimento", sorted(anni_disp, reverse=True))
 
-        # ⚙️ NUOVO: PANNELLO TARIFFE DEL COMMERCIALISTA
-        st.markdown("**⚙️ Parametri Economici per il Calcolo (Inserisci i dati del commercialista)**")
-        c_param1, c_param2, c_param3 = st.columns(3)
-        with c_param1:
-            tariffa_extra = st.number_input("Costo Giornata EXTRA (€)", value=55.0, step=1.0, help="Fisso per le 6 ore")
-        with c_param2:
-            tariffa_uff = st.number_input("Costo Giornata UFFICIALE (€)", value=0.0, step=1.0)
-        with c_param3:
-            oneri_uff = st.number_input("ONERI per Giornata Ufficiale (€)", value=0.0, step=1.0, help="Quota oneri su singola giornata")
-
         if st.button("Genera Report Dettagliato", type="primary"):
-            df_anno = df_lavoro[df_lavoro['data_dt'].dt.year == sel_anno]
+            df_anno = df_valido[df_valido['data_dt'].dt.year == sel_anno]
             dati_puliti = []
             
-            for idx, row in df_anno.iterrows():
+            # 1. ESTRAZIONE DELLE PRESENZE (Giornate Lavorate)
+            df_lavoro = df_anno[df_anno['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
+            for idx, row in df_lavoro.iterrows():
                 desc = str(row['descrizione'])
                 if sel_dipendente in desc:
                     parti = desc.split("|")
@@ -464,23 +455,11 @@ with tab2:
                             tipo = "Ufficiale" if "UFFICIALE:" in desc else ("Extra" if "EXTRA:" in desc else "Altro")
                             note = desc.split(":", 1)[1].strip() if ":" in desc else ""
                             
-                            # Calcolo dinamico basato sugli input appena inseriti
-                            importo = 0.0
-                            oneri = 0.0
-                            if tipo == "Ufficiale":
-                                importo = giornate * tariffa_uff
-                                oneri = giornate * oneri_uff
-                            elif tipo == "Extra":
-                                importo = giornate * tariffa_extra
-                                oneri = 0.0 # Niente oneri sull'extra
-                            
                             dati_puliti.append({
                                 'Data': row['data_dt'],
                                 'Mese_Num': row['data_dt'].month,
                                 'Giornate': giornate,
                                 'Tipo': tipo,
-                                'Importo (€)': importo,
-                                'Oneri (€)': oneri,
                                 'Note': note
                             })
                         except:
@@ -490,37 +469,52 @@ with tab2:
                 st.warning(f"Nessuna presenza trovata per {sel_dipendente} nell'anno {sel_anno}.")
             else:
                 df_report = pd.DataFrame(dati_puliti)
-                
-                # Resoconto Globale Anno
-                tot_gg = df_report['Giornate'].sum()
-                tot_imp = df_report['Importo (€)'].sum()
-                tot_oneri = df_report['Oneri (€)'].sum()
-                costo_totale_azienda = tot_imp + tot_oneri
-                
-                st.success(f"### 🏆 Riepilogo Globale {sel_anno} - {sel_dipendente}\n"
-                           f"**Tot. Giornate:** {tot_gg:.2f} gg | **Tot. Retribuzioni:** {tot_imp:,.2f} € | **Tot. Oneri:** {tot_oneri:,.2f} €\n\n"
-                           f"**🔥 COSTO TOTALE AZIENDALE:** {costo_totale_azienda:,.2f} €")
-                
                 mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 
                              7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
                 
+                tot_busta_anno = 0.0
+                tot_oneri_anno = 0.0
+                tot_extra_anno = 0.0
+                
+                # 2. INCROCIO CON I DATI FINANZIARI (Mese per Mese)
                 for mese in sorted(df_report['Mese_Num'].unique()):
+                    nome_mese = mesi_nomi[mese]
+                    chiave_ricerca = f"Rif: {nome_mese} {sel_anno}"
+                    
                     df_mese = df_report[df_report['Mese_Num'] == mese].sort_values(by='Data')
+                    mese_uff = df_mese[df_mese['Tipo'] == 'Ufficiale']['Giornate'].sum()
+                    mese_ext = df_mese[df_mese['Tipo'] == 'Extra']['Giornate'].sum()
                     
-                    mese_gg = df_mese['Giornate'].sum()
-                    mese_imp = df_mese['Importo (€)'].sum()
-                    mese_oneri = df_mese['Oneri (€)'].sum()
-                    mese_tot = mese_imp + mese_oneri
+                    # Interroga il database per cercare i bonifici e gli F24 relativi a questo mese
+                    pagamenti_mese = df_anno[df_anno['descrizione'].str.contains(chiave_ricerca, na=False, case=False)]
                     
-                    st.markdown(f"#### 📅 {mesi_nomi[mese]} {sel_anno} *(Giornate: {mese_gg:.2f} | Retribuzione: {mese_imp:,.2f} € | Oneri: {mese_oneri:,.2f} €)*")
+                    importo_busta = pd.to_numeric(pagamenti_mese[pagamenti_mese['categoria'] == 'Busta Paga']['importo'], errors='coerce').sum()
+                    importo_extra = pd.to_numeric(pagamenti_mese[pagamenti_mese['categoria'] == 'Saldo Extra']['importo'], errors='coerce').sum()
+                    importo_oneri = pd.to_numeric(pagamenti_mese[pagamenti_mese['categoria'].isin(['Oneri', 'F24', 'Contributi'])]['importo'], errors='coerce').sum()
                     
-                    df_display = df_mese[['Data', 'Tipo', 'Giornate', 'Importo (€)', 'Oneri (€)', 'Note']].copy()
+                    tot_busta_anno += importo_busta
+                    tot_oneri_anno += importo_oneri
+                    tot_extra_anno += importo_extra
+                    
+                    # Layout del singolo mese
+                    st.markdown(f"#### 📅 {nome_mese} {sel_anno}")
+                    st.write(f"**Presenze Registrate:** {mese_uff:.2f} gg Ufficiali | {mese_ext:.2f} gg Extra")
+                    
+                    # Box riassuntivo con i dati pescati dalla cassa
+                    st.info(f"💰 **Estratto dal Database (Pagamenti):** Busta Paga: {importo_busta:,.2f} € | Extra Pagato: {importo_extra:,.2f} € | Oneri/F24: {importo_oneri:,.2f} €")
+                    
+                    df_display = df_mese[['Data', 'Tipo', 'Giornate', 'Note']].copy()
                     df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
-                    
-                    df_display['Importo (€)'] = df_display['Importo (€)'].map("{:,.2f} €".format)
-                    df_display['Oneri (€)'] = df_display['Oneri (€)'].map("{:,.2f} €".format)
-                    
                     st.dataframe(df_display, use_container_width=True, hide_index=True)
+                    st.write("---")
+
+                # 3. RESOCONTO ANNUALE AZIENDALE
+                costo_totale_azienda = tot_busta_anno + tot_extra_anno + tot_oneri_anno
+                st.success(f"### 🏆 Riepilogo Finanziario Globale {sel_anno} - {sel_dipendente}\n"
+                           f"**Totale Buste Paga Erogate:** {tot_busta_anno:,.2f} €\n\n"
+                           f"**Totale Extra Erogato:** {tot_extra_anno:,.2f} €\n\n"
+                           f"**Totale Oneri Versati:** {tot_oneri_anno:,.2f} €\n\n"
+                           f"**🔥 COSTO TOTALE AZIENDALE REGISTRATO:** {costo_totale_azienda:,.2f} €")
 # ==========================================
 # --- TAB 3: CASSA E CONTROLLO MESI ARRETRATI ---
 # ==========================================
