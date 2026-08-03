@@ -360,14 +360,12 @@ with tab1:
 
 
 # ==========================================
-# --- TAB 2: MANODOPERA (INSERIMENTO E STAMPA) ---
+# --- TAB 2: MANODOPERA (SOLO INSERIMENTO) ---
 # ==========================================
 with tab2:
     st.header("🚜 Gestione Manodopera")
     df, sha = get_github_file()
     
-    # --- SEZIONE 1: INSERIMENTO DATI ---
-    # Il blocco form gestisce SOLO l'input visivo dell'utente
     with st.form("form_registrazione_manodopera", clear_on_submit=True):
         st.subheader("📝 Registra Nuova Giornata")
         
@@ -381,15 +379,10 @@ with tab2:
             op_reali = st.number_input("Giornate Reali Effettuate", min_value=0.0, step=0.5, format="%.2f")
             
         op_note = st.text_input("Note (Lavoro svolto)")
-        
-        # L'azione di click viene salvata nella variabile 'inviato'
         inviato = st.form_submit_button("Registra Giornate", type="primary")
         
-    # --- LOGICA DI SALVATAGGIO (Eseguita fuori dal blocco form) ---
     if inviato:
         righe_nuove = []
-        
-        # Generazione riga per giornate ufficiali
         if op_ufficiali > 0:
             desc_uff = f"{op_nome} | {op_ufficiali:.3f} gg | UFFICIALE: {op_note}"
             righe_nuove.append({
@@ -398,7 +391,6 @@ with tab2:
                 'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
             })
         
-        # Generazione riga calcolata per giornate extra
         gg_extra = op_reali - op_ufficiali
         if abs(gg_extra) > 0.001:
             desc_extra = f"{op_nome} | {gg_extra:.3f} gg | EXTRA: {op_note}"
@@ -418,116 +410,6 @@ with tab2:
                 st.rerun()
         else:
             st.warning("Nessun dato valido inserito (Giornate a zero).")
-
- # --- SEZIONE 2: REPORT E STAMPA PRESENZE (CONFRONTO UFFICIALE VS EXTRA) ---
-    st.divider()
-    st.subheader("🖨️ Stampa Riepilogo Presenze e Calcolo Extra")
-    
-    # Parametro Fisso (Tariffa Extra per le 6 ore)
-    COSTO_EXTRA = 55.0
-    
-    if not df.empty:
-        c_filtro1, c_filtro2 = st.columns(2)
-        with c_filtro1:
-            sel_dipendente = st.selectbox("Seleziona Dipendente per il Report", ["Iannone Felice"])
-        
-        # Preparazione database
-        df['data_dt'] = pd.to_datetime(df['data'], errors='coerce')
-        df_valido = df.dropna(subset=['data_dt'])
-        
-        anni_disp = df_valido['data_dt'].dt.year.unique().tolist()
-        if not anni_disp:
-            anni_disp = [datetime.now().year]
-            
-        with c_filtro2:
-            sel_anno = st.selectbox("Seleziona Anno di Riferimento", sorted(anni_disp, reverse=True))
-
-        if st.button("Genera Report Dettagliato", type="primary"):
-            df_anno = df_valido[df_valido['data_dt'].dt.year == sel_anno]
-            dati_puliti = []
-            
-            # 1. ESTRAZIONE DELLE PRESENZE E CALCOLO EXTRA RIGA PER RIGA
-            df_lavoro = df_anno[df_anno['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
-            for idx, row in df_lavoro.iterrows():
-                desc = str(row['descrizione'])
-                if sel_dipendente in desc:
-                    parti = desc.split("|")
-                    if len(parti) >= 2:
-                        try:
-                            giornate = float(parti[1].replace("gg", "").strip())
-                            tipo = "Ufficiale" if "UFFICIALE:" in desc else ("Extra" if "EXTRA:" in desc else "Altro")
-                            note = desc.split(":", 1)[1].strip() if ":" in desc else ""
-                            
-                            # Calcolo Immediato dell'Importo Extra riga per riga
-                            valore_extra_riga = giornate * COSTO_EXTRA if tipo == "Extra" else 0.0
-                            
-                            dati_puliti.append({
-                                'Data': row['data_dt'],
-                                'Mese_Num': row['data_dt'].month,
-                                'Giornate': giornate,
-                                'Tipo': tipo,
-                                'Valore Extra': valore_extra_riga,
-                                'Note': note
-                            })
-                        except:
-                            pass
-                            
-            if not dati_puliti:
-                st.warning(f"Nessuna presenza trovata per {sel_dipendente} nell'anno {sel_anno}.")
-            else:
-                df_report = pd.DataFrame(dati_puliti)
-                mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 
-                             7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
-                
-                tot_busta_anno = 0.0
-                tot_extra_maturato_anno = 0.0
-                
-                # 2. CALCOLI MESE PER MESE
-                for mese in sorted(df_report['Mese_Num'].unique()):
-                    nome_mese = mesi_nomi[mese]
-                    chiave_ricerca = f"Rif: {nome_mese} {sel_anno}"
-                    
-                    df_mese = df_report[df_report['Mese_Num'] == mese].sort_values(by='Data')
-                    mese_uff = df_mese[df_mese['Tipo'] == 'Ufficiale']['Giornate'].sum()
-                    mese_ext = df_mese[df_mese['Tipo'] == 'Extra']['Giornate'].sum()
-                    
-                    # Estrazione Busta Paga (Dal Database Tab 3)
-                    pagamenti_mese = df_anno[df_anno['descrizione'].str.contains(chiave_ricerca, na=False, case=False)]
-                    importo_busta = pd.to_numeric(pagamenti_mese[pagamenti_mese['categoria'] == 'Busta Paga']['importo'], errors='coerce').sum()
-                    
-                    # Totali
-                    valore_extra_mese = mese_ext * COSTO_EXTRA
-                    totale_giornate_reali = mese_uff + mese_ext
-                    differenza_giorni = totale_giornate_reali - mese_uff # La differenza tra ufficiale e totale (ovvero le ore extra)
-                    
-                    tot_extra_maturato_anno += valore_extra_mese
-                    tot_busta_anno += importo_busta
-                    
-                    st.markdown(f"#### 📅 {nome_mese} {sel_anno}")
-                    
-                    # Box Riassuntivo Mensile: La Differenza netta
-                    colA, colB = st.columns(2)
-                    with colA:
-                        st.info(f"**DATI UFFICIALI (Busta Paga):**\nGiornate: {mese_uff:.2f} gg\nImporto Busta: {importo_busta:,.2f} €")
-                    with colB:
-                        st.error(f"**DIFFERENZA EXTRA (Lavoro Reale - Ufficiale):**\nDifferenza Giorni: {differenza_giorni:.2f} gg\n**Da Saldare (x {COSTO_EXTRA}€): {valore_extra_mese:,.2f} €**")
-
-                    # Preparazione Tabella per la visualizzazione
-                    df_display = df_mese[['Data', 'Tipo', 'Giornate', 'Valore Extra', 'Note']].copy()
-                    df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
-                    
-                    # Formattazione per mostrare i soldi solo sulle righe extra
-                    df_display['Valore Extra'] = df_display.apply(
-                        lambda x: f"{x['Valore Extra']:,.2f} €" if x['Tipo'] == 'Extra' else "-", axis=1
-                    )
-                    
-                    st.dataframe(df_display, use_container_width=True, hide_index=True)
-                    st.write("---")
-
-                # 3. RESOCONTO ANNUALE AZIENDALE
-                st.markdown(f"### 🏆 Riepilogo Annuale {sel_anno} - {sel_dipendente}")
-                st.write(f"**Totale Buste Paga Erogate (da Database Cassa):** {tot_busta_anno:,.2f} €")
-                st.write(f"**Totale Extra Maturato (Differenza complessiva a {COSTO_EXTRA}€/gg):** {tot_extra_maturato_anno:,.2f} €")
 # ==========================================
 # --- TAB 3: CASSA E CONTROLLO MESI ARRETRATI ---
 # ==========================================
@@ -611,7 +493,17 @@ with tab3:
             for col in df_display.columns:
                 df_display[col] = df_display[col].apply(format_euro)
                 
-            st.dataframe(df_display, use_container_width=True)
+          st.dataframe(df_display, use_container_width=True)
+            
+            # --- NUOVO: PULSANTE DI STAMPA/ESPORTAZIONE ---
+            csv = df_display.to_csv(index=True).encode('utf-8')
+            st.download_button(
+                label="📥 Stampa / Scarica Tabella Arretrati (CSV per Excel)",
+                data=csv,
+                file_name='Situazione_Arretrati_Dipendente.csv',
+                mime='text/csv',
+                type="primary"
+            )
             
             # Calcolo del totale Globale
             totale_maturato = df_riepilogo['Maturato'].sum()
