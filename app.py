@@ -403,7 +403,88 @@ with tab2:
                     st.success("✅ Giornate lavorative registrate!")
                     time.sleep(1)
                     st.rerun()
+            # ==========================================
+        # --- SEZIONE: STAMPA E REPORT PRESENZE ---
+        # ==========================================
+        st.divider()
+        st.subheader("🖨️ Stampa Riepilogo Presenze (Annuale e Mensile)")
+        
+        # 1. Filtri di ricerca
+        c_filtro1, c_filtro2 = st.columns(2)
+        with c_filtro1:
+            sel_dipendente = st.selectbox("Seleziona Dipendente per il Report", ["Iannone Felice"])
+        
+        # Estraiamo gli anni disponibili dal database per il filtro
+        df_lavoro = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].copy()
+        df_lavoro['data_dt'] = pd.to_datetime(df_lavoro['data'], errors='coerce')
+        df_lavoro = df_lavoro.dropna(subset=['data_dt'])
+        
+        anni_disp = df_lavoro['data_dt'].dt.year.unique().tolist()
+        if not anni_disp:
+            anni_disp = [datetime.now().year]
             
+        with c_filtro2:
+            sel_anno = st.selectbox("Seleziona Anno di Riferimento", sorted(anni_disp, reverse=True))
+
+        if st.button("Genera Report Dettagliato", type="primary"):
+            # 2. Motore di Estrazione Dati
+            df_anno = df_lavoro[df_lavoro['data_dt'].dt.year == sel_anno]
+            dati_puliti = []
+            
+            for idx, row in df_anno.iterrows():
+                desc = str(row['descrizione'])
+                if sel_dipendente in desc:
+                    # Smontiamo la stringa per estrarre le giornate pure
+                    parti = desc.split("|")
+                    if len(parti) >= 2:
+                        try:
+                            giornate = float(parti[1].replace("gg", "").strip())
+                            tipo = "Ufficiale" if "UFFICIALE:" in desc else ("Extra" if "EXTRA:" in desc else "Altro")
+                            note = desc.split(":", 1)[1].strip() if ":" in desc else ""
+                            
+                            dati_puliti.append({
+                                'Data': row['data_dt'],
+                                'Mese_Num': row['data_dt'].month,
+                                'Giornate': giornate,
+                                'Tipo': tipo,
+                                'Note': note
+                            })
+                        except:
+                            pass
+                            
+            # 3. Impaginazione e Visualizzazione
+            if not dati_puliti:
+                st.warning(f"Nessuna presenza trovata per {sel_dipendente} nell'anno {sel_anno}.")
+            else:
+                df_report = pd.DataFrame(dati_puliti)
+                
+                # Calcolo Totali Annuali
+                tot_uff = df_report[df_report['Tipo'] == 'Ufficiale']['Giornate'].sum()
+                tot_ext = df_report[df_report['Tipo'] == 'Extra']['Giornate'].sum()
+                
+                st.success(f"### 🏆 Riepilogo Globale {sel_anno} - {sel_dipendente}\n"
+                           f"**Totale Giornate Ufficiali:** {tot_uff:.2f} gg | **Totale Giornate Extra:** {tot_ext:.2f} gg")
+                
+                # Scomposizione Mese per Mese
+                mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 
+                             7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
+                
+                # Ciclo che crea una tabella per ogni mese lavorato
+                for mese in sorted(df_report['Mese_Num'].unique()):
+                    df_mese = df_report[df_report['Mese_Num'] == mese].sort_values(by='Data')
+                    
+                    mese_uff = df_mese[df_mese['Tipo'] == 'Ufficiale']['Giornate'].sum()
+                    mese_ext = df_mese[df_mese['Tipo'] == 'Extra']['Giornate'].sum()
+                    
+                    # Intestazione del singolo mese
+                    st.markdown(f"#### 📅 {mesi_nomi[mese]} {sel_anno} *(Ufficiali: {mese_uff:.2f} gg - Extra: {mese_ext:.2f} gg)*")
+                    
+                    # Preparazione estetica della tabella
+                    df_display = df_mese[['Data', 'Tipo', 'Giornate', 'Note']].copy()
+                    df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
+                    
+                    # Mostra a schermo (con possibilità di download nativo)
+                    st.dataframe(df_display, use_container_width=True, hide_index=True)
 
 # ==========================================
 # --- TAB 3: CASSA E CONTROLLO MESI ARRETRATI ---
