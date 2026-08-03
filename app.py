@@ -589,91 +589,117 @@ with tab3:
                     st.warning("L'importo deve essere maggiore di zero.")
 
 # ==========================================
-# --- TAB 4: SIMULATORE STRATEGICO E TARGET ---
+# --- TAB 4: STAMPE E REPORT DIPENDENTI ---
 # ==========================================
 with tab4:
-    st.title("🎯 Simulatore Strategico & Break-Even")
-    st.markdown("Pianifica la campagna olearia: definisci il tuo **obiettivo di reddito** e scopri i volumi fisici (olive/olio) necessari in tempo reale.")
-    st.divider()
-
-    df_pareggio, _ = get_github_file()
+    st.subheader("🖨️ Stampa Foglio Presenze Dipendente")
+    st.markdown("Seleziona il mese e l'anno per generare il riepilogo delle giornate lavorate.")
     
-    if not df_pareggio.empty:
-        # ---> AGGIUNTA SALVAVITA: Forziamo la colonna importo in numeri puri
-        df_pareggio['importo'] = pd.to_numeric(df_pareggio['importo'], errors='coerce').fillna(0.0)
+    df, _ = get_github_file()
+    
+    if not df.empty:
+        # Assicuriamoci che le date siano leggibili
+        df['data_dt'] = pd.to_datetime(df['data'], errors='coerce')
+        df_valido = df.dropna(subset=['data_dt'])
         
-        df_pareggio['data_dt'] = pd.to_datetime(df_pareggio['data'], errors='coerce')
-        anni_disponibili = df_pareggio['data_dt'].dt.year.dropna().unique()
-        
-        if len(anni_disponibili) > 0:
-            anno_sel = st.selectbox("📅 Basato sulle spese storiche dell'anno:", sorted(anni_disponibili, reverse=True), key="anno_target")
-            
-            # Ora questa somma matematica funzionerà perfettamente
-            uscite_totali = df_pareggio[(df_pareggio['data_dt'].dt.year == anno_sel) & (df_pareggio['tipo'] == 'Uscita')]['importo'].sum()
-            
-            col_fin, col_strat = st.columns([1, 1], gap="large")
-            
-            with col_fin:
-                with st.container(border=True):
-                    st.subheader("💶 1. Fabbisogno Economico")
-                    st.metric("🔴 Spese Vive (dal database)", format_euro(uscite_totali))
-                    
-                    utile_desiderato = st.number_input("🟢 Tuo Obiettivo di Guadagno Annuo (€)", min_value=0.0, step=1000.0, value=24000.0)
-                    fabbisogno_totale = uscite_totali + utile_desiderato
-                    
-                    st.markdown(f"""
-                    <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; text-align: center; margin-top: 15px; border-left: 5px solid #0f52ba;">
-                        <p style="margin: 0; font-size: 14px; color: #555; text-transform: uppercase;">Obiettivo Finanziario Totale</p>
-                        <h2 style="margin: 0; color: #0f52ba; font-size: 32px;">{format_euro(fabbisogno_totale)}</h2>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-            with col_strat:
-                with st.container(border=True):
-                    st.subheader("⚖️ 2. Scelta Strategica")
-                    strategia = st.radio("Cosa decidi di vendere?", ["Olio (Molitura)", "Olive (Vendita Diretta)"], horizontal=True)
-                    
-                    st.markdown("---")
-                    if "Olio" in strategia:
-                        prezzo_attuale = st.number_input("📈 Prezzo di Vendita Olio (€ / Litro)", min_value=0.0, step=0.5, value=8.50)
-                        resa_stimata = st.number_input("⚙️ Resa Frantoio (Litri per 100Kg di olive)", min_value=0.0, step=0.5, value=15.0)
-                    else:
-                        prezzo_attuale = st.number_input("📈 Prezzo Vendita Olive (€ / QUINTALE)", min_value=0.0, step=5.0, value=80.0)
-                        resa_stimata = 1.0
-            
-            st.write("")
-            st.markdown("### 🏆 Traguardo Produttivo")
-            
-            if prezzo_attuale > 0:
-                with st.container(border=True):
-                    if "Olio" in strategia:
-                        if resa_stimata > 0:
-                            litri_necessari = fabbisogno_totale / prezzo_attuale
-                            quintali_necessari = litri_necessari / resa_stimata
-                            
-                            rc1, rc2, rc3 = st.columns(3)
-                            rc1.metric("🫒 Olive da Raccogliere", f"{quintali_necessari:,.0f} Quintali", "Materia Prima")
-                            rc2.metric("🍾 Olio da Produrre", f"{litri_necessari:,.0f} Litri", "Prodotto Finito")
-                            rc3.metric("📊 Fatturato Target", format_euro(fabbisogno_totale), "Copertura Raggiunta")
-                            
-                            st.info(f"💡 **Piano d'Azione:** Per garantirti uno stipendio di **{format_euro(utile_desiderato)}** pagando tutte le spese, devi raccogliere circa **{quintali_necessari:,.0f} quintali**. Con una resa di {resa_stimata} L/q, otterrai i {litri_necessari:,.0f} litri necessari per incassare il totale vendendoli a {prezzo_attuale} €/L.")
-                        else:
-                            st.error("⚠️ Inserisci una resa maggiore di zero.")
-                            
-                    else:
-                        quintali_necessari = fabbisogno_totale / prezzo_attuale
-                        
-                        rc1, rc2, rc3 = st.columns(3)
-                        rc1.metric("🫒 Olive da Vendere", f"{quintali_necessari:,.0f} Quintali")
-                        rc2.metric("⚖️ Equivalente in Kg", f"{quintali_necessari * 100:,.0f} Kg")
-                        rc3.metric("📊 Fatturato Target", format_euro(fabbisogno_totale), "Copertura Raggiunta")
-                        
-                        st.info(f"💡 **Piano d'Azione:** Per garantirti uno stipendio di **{format_euro(utile_desiderato)}** pagando tutte le spese, devi vendere ai commercianti almeno **{quintali_necessari:,.0f} quintali** di olive al prezzo di {prezzo_attuale} €/q.")
-            else:
-                st.warning("⚠️ Imposta un Prezzo di Mercato maggiore di zero per visualizzare i traguardi.")
+        if not df_valido.empty:
+            # Layout filtri in cima
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                dipendente_sel = st.selectbox("👤 Dipendente", ["Iannone Felice"])
+            with c2:
+                # Estrae i mesi e anni disponibili dal database per evitare selezioni vuote
+                mesi_disp = sorted(df_valido['data_dt'].dt.month.unique())
+                mese_sel = st.selectbox("📅 Mese", mesi_disp, index=len(mesi_disp)-1 if mesi_disp else 0)
+            with c3:
+                anni_disp = sorted(df_valido['data_dt'].dt.year.unique(), reverse=True)
+                anno_sel = st.selectbox("📆 Anno", anni_disp)
                 
-    else:
-        st.info("Nessun dato finanziario registrato nel database per attivare il simulatore.")
+            st.divider()
+            
+            # Filtriamo il database in base alle scelte dell'utente
+            df_filtrato = df_valido[
+                (df_valido['categoria'].isin(['Manodopera', 'Manodopera Extra'])) & 
+                (df_valido['data_dt'].dt.month == mese_sel) & 
+                (df_valido['data_dt'].dt.year == anno_sel) &
+                (df_valido['descrizione'].str.contains(dipendente_sel, na=False))
+            ].sort_values(by='data_dt') # Ordina dalla data più vecchia alla più recente
+            
+            if not df_filtrato.empty:
+                st.markdown(f"### 📋 Riepilogo: {dipendente_sel} - Mese {mese_sel}/{anno_sel}")
+                
+                dettaglio_righe = []
+                tot_ufficiali = 0.0
+                tot_extra = 0.0
+                
+                # Analizziamo riga per riga per estrarre il valore esatto
+                for _, row in df_filtrato.iterrows():
+                    data_str = row['data_dt'].strftime('%d/%m/%Y')
+                    cat = row['categoria']
+                    desc = str(row['descrizione'])
+                    
+                    # Blindatura anti-errore: cerchiamo di estrarre le giornate dal testo
+                    try:
+                        parti = desc.split('|')
+                        gg_str = parti[1].replace('gg', '').strip()
+                        gg = float(gg_str)
+                        note = parti[2].strip() if len(parti) > 2 else "Nessuna nota"
+                    except:
+                        gg = 0.0
+                        note = f"⚠️ Errore lettura: {desc}"
+                        
+                    # Smistamento tra ufficiali ed extra
+                    if "Extra" in cat:
+                        tot_extra += gg
+                        tipo_gg = "🔴 Extra"
+                    else:
+                        tot_ufficiali += gg
+                        tipo_gg = "🟢 Ufficiale"
+                        
+                    dettaglio_righe.append({
+                        "Data": data_str,
+                        "Tipologia": tipo_gg,
+                        "Giornate": gg,
+                        "Note / Dettaglio": note
+                    })
+                    
+                # Mostriamo la tabella a schermo
+                df_stampa = pd.DataFrame(dettaglio_righe)
+                st.dataframe(df_stampa, use_container_width=True, hide_index=True)
+                
+                # BOX RIASSUNTIVO FINALE
+                st.markdown("---")
+                c_tot1, c_tot2, c_tot3 = st.columns(3)
+                c_tot1.metric(label="Giornate UFFICIALI", value=f"{tot_ufficiali:.3f}")
+                c_tot2.metric(label="Giornate EXTRA", value=f"{tot_extra:.3f}")
+                c_tot3.metric(label="TOTALE GENERALE", value=f"{tot_ufficiali + tot_extra:.3f} gg")
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                # Funzione per convertire il file per il download
+                @st.cache_data
+                def convert_df_to_csv(df):
+                    # Formattato per aprirsi perfettamente in Excel in italiano
+                    return df.to_csv(index=False, sep=';', decimal=',').encode('utf-8')
+                    
+                csv_data = convert_df_to_csv(df_stampa)
+                
+                c_btn1, c_btn2 = st.columns([1, 2])
+                with c_btn1:
+                    st.download_button(
+                        label="📥 Scarica in Excel (CSV)",
+                        data=csv_data,
+                        file_name=f"Presenze_{dipendente_sel.replace(' ', '_')}_{mese_sel}_{anno_sel}.csv",
+                        mime="text/csv",
+                        type="primary"
+                    )
+                with c_btn2:
+                    st.info("💡 **Vuoi stamparlo su carta?** Usa la scorciatoia da tastiera **Ctrl + P** (o Cmd + P) per stampare direttamente questa schermata pulita.")
+                    
+            else:
+                st.warning(f"Nessuna giornata registrata per {dipendente_sel} nel mese {mese_sel}/{anno_sel}.")
+        else:
+            st.warning("Il database non contiene date valide.")
 
 
 # ==========================================
