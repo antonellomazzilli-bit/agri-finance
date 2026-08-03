@@ -419,11 +419,11 @@ with tab2:
         else:
             st.warning("Nessun dato valido inserito (Giornate a zero).")
 
-  # --- SEZIONE 2: REPORT E STAMPA PRESENZE (CONFRONTO UFFICIALE VS EXTRA) ---
+ # --- SEZIONE 2: REPORT E STAMPA PRESENZE (CONFRONTO UFFICIALE VS EXTRA) ---
     st.divider()
-    st.subheader("🖨️ Stampa Riepilogo Presenze (Ufficiale vs Extra)")
+    st.subheader("🖨️ Stampa Riepilogo Presenze e Calcolo Extra")
     
-    # Parametro Fisso (Puoi cambiarlo qui se in futuro aumenta)
+    # Parametro Fisso (Tariffa Extra per le 6 ore)
     COSTO_EXTRA = 55.0
     
     if not df.empty:
@@ -446,7 +446,7 @@ with tab2:
             df_anno = df_valido[df_valido['data_dt'].dt.year == sel_anno]
             dati_puliti = []
             
-            # 1. ESTRAZIONE DELLE PRESENZE
+            # 1. ESTRAZIONE DELLE PRESENZE E CALCOLO EXTRA RIGA PER RIGA
             df_lavoro = df_anno[df_anno['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
             for idx, row in df_lavoro.iterrows():
                 desc = str(row['descrizione'])
@@ -458,11 +458,15 @@ with tab2:
                             tipo = "Ufficiale" if "UFFICIALE:" in desc else ("Extra" if "EXTRA:" in desc else "Altro")
                             note = desc.split(":", 1)[1].strip() if ":" in desc else ""
                             
+                            # Calcolo Immediato dell'Importo Extra riga per riga
+                            valore_extra_riga = giornate * COSTO_EXTRA if tipo == "Extra" else 0.0
+                            
                             dati_puliti.append({
                                 'Data': row['data_dt'],
                                 'Mese_Num': row['data_dt'].month,
                                 'Giornate': giornate,
                                 'Tipo': tipo,
+                                'Valore Extra': valore_extra_riga,
                                 'Note': note
                             })
                         except:
@@ -486,41 +490,44 @@ with tab2:
                     df_mese = df_report[df_report['Mese_Num'] == mese].sort_values(by='Data')
                     mese_uff = df_mese[df_mese['Tipo'] == 'Ufficiale']['Giornate'].sum()
                     mese_ext = df_mese[df_mese['Tipo'] == 'Extra']['Giornate'].sum()
-                    totale_giornate_reali = mese_uff + mese_ext
                     
-                    # Calcolo Valore Extra (Matematico)
-                    valore_extra_mese = mese_ext * COSTO_EXTRA
-                    tot_extra_maturato_anno += valore_extra_mese
-                    
-                    # Estrazione Busta Paga (Dal Database)
+                    # Estrazione Busta Paga (Dal Database Tab 3)
                     pagamenti_mese = df_anno[df_anno['descrizione'].str.contains(chiave_ricerca, na=False, case=False)]
                     importo_busta = pd.to_numeric(pagamenti_mese[pagamenti_mese['categoria'] == 'Busta Paga']['importo'], errors='coerce').sum()
+                    
+                    # Totali
+                    valore_extra_mese = mese_ext * COSTO_EXTRA
+                    totale_giornate_reali = mese_uff + mese_ext
+                    differenza_giorni = totale_giornate_reali - mese_uff # La differenza tra ufficiale e totale (ovvero le ore extra)
+                    
+                    tot_extra_maturato_anno += valore_extra_mese
                     tot_busta_anno += importo_busta
                     
-                    # Differenza (Giornate non ufficiali)
-                    differenza_giorni = totale_giornate_reali - mese_uff
-                    
-                    # Layout del mese
                     st.markdown(f"#### 📅 {nome_mese} {sel_anno}")
                     
-                    # Box Faccia a Faccia
-                    colA, colB, colC = st.columns(3)
+                    # Box Riassuntivo Mensile: La Differenza netta
+                    colA, colB = st.columns(2)
                     with colA:
-                        st.success(f"🟢 **UFFICIALE**\n\nGiornate: **{mese_uff:.2f} gg**\n\nBusta Paga: **{importo_busta:,.2f} €**")
+                        st.info(f"**DATI UFFICIALI (Busta Paga):**\nGiornate: {mese_uff:.2f} gg\nImporto Busta: {importo_busta:,.2f} €")
                     with colB:
-                        st.error(f"🔴 **EXTRA**\n\nGiornate: **{mese_ext:.2f} gg**\n\nMaturato: **{valore_extra_mese:,.2f} €**")
-                    with colC:
-                        st.info(f"⚖️ **DIFFERENZA / REALE**\n\nTot. Reale: **{totale_giornate_reali:.2f} gg**\n\nDiff (Reale - Uff): **{differenza_giorni:.2f} gg**")
+                        st.error(f"**DIFFERENZA EXTRA (Lavoro Reale - Ufficiale):**\nDifferenza Giorni: {differenza_giorni:.2f} gg\n**Da Saldare (x {COSTO_EXTRA}€): {valore_extra_mese:,.2f} €**")
 
-                    df_display = df_mese[['Data', 'Tipo', 'Giornate', 'Note']].copy()
+                    # Preparazione Tabella per la visualizzazione
+                    df_display = df_mese[['Data', 'Tipo', 'Giornate', 'Valore Extra', 'Note']].copy()
                     df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
+                    
+                    # Formattazione per mostrare i soldi solo sulle righe extra
+                    df_display['Valore Extra'] = df_display.apply(
+                        lambda x: f"{x['Valore Extra']:,.2f} €" if x['Tipo'] == 'Extra' else "-", axis=1
+                    )
+                    
                     st.dataframe(df_display, use_container_width=True, hide_index=True)
                     st.write("---")
 
                 # 3. RESOCONTO ANNUALE AZIENDALE
                 st.markdown(f"### 🏆 Riepilogo Annuale {sel_anno} - {sel_dipendente}")
-                st.write(f"**Totale Buste Paga Erogate (Database):** {tot_busta_anno:,.2f} €")
-                st.write(f"**Totale Valore Extra Maturato (Calcolato a {COSTO_EXTRA}€/gg):** {tot_extra_maturato_anno:,.2f} €")
+                st.write(f"**Totale Buste Paga Erogate (da Database Cassa):** {tot_busta_anno:,.2f} €")
+                st.write(f"**Totale Extra Maturato (Differenza complessiva a {COSTO_EXTRA}€/gg):** {tot_extra_maturato_anno:,.2f} €")
 # ==========================================
 # --- TAB 3: CASSA E CONTROLLO MESI ARRETRATI ---
 # ==========================================
