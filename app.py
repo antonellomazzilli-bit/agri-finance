@@ -414,20 +414,18 @@ with tab2:
 # --- TAB 3: CASSA E CONTROLLO MESI ARRETRATI ---
 # ==========================================
 with tab3:
-    st.subheader("💸 Cassa e Estratto Conto Mensile (Euro)")
+    st.subheader("💸 Cassa e Estratto Conto Mensile")
     df, sha = get_github_file()
     
     if not df.empty:
-        # 1. Blindatura numerica e conversione date
+        # 1. Preparazione Dati
         df['importo'] = pd.to_numeric(df['importo'], errors='coerce').fillna(0.0)
         df['data_dt'] = pd.to_datetime(df['data'], errors='coerce')
         
-        # 2. MOTORE DI CALCOLO DELLE PENDENZE MENSILI
-        # Creiamo un dizionario per raccogliere i dati mese per mese
         dati_mensili = {}
         mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
         
-        # Fase A: Raccogliamo tutto il lavoro effettuato (Tab 2)
+        # 2. Calcolo Maturato (Lavoro svolto)
         lavoro_df = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
         for index, row in lavoro_df.iterrows():
             if pd.notna(row['data_dt']):
@@ -436,22 +434,19 @@ with tab3:
                 chiave_mese = f"{mesi_nomi[mese_num]} {anno_num}"
                 
                 gg_lavorati = estrai_giornate(str(row['descrizione']), "Iannone Felice")
-                valore_maturato = gg_lavorati * COSTO_GIORNATA_EXTRA
+                valore_maturato = gg_lavorati * 55.0  # Usiamo 55 come base standard per il controllo
                 
                 if chiave_mese not in dati_mensili:
                     dati_mensili[chiave_mese] = {'Maturato': 0.0, 'Pagato': 0.0}
                 dati_mensili[chiave_mese]['Maturato'] += valore_maturato
 
-        # Fase B: Raccogliamo tutti i pagamenti effettuati (Tab 3) e li associamo al mese
-        # N.B. D'ora in poi cerchiamo il mese nella descrizione del pagamento
+        # 3. Associazione Pagamenti al Mese
         cat_pagamenti = ['Busta Paga', 'Saldo Extra', 'Rimborsi']
         pagamenti_df = df[df['categoria'].isin(cat_pagamenti)]
         
         for index, row in pagamenti_df.iterrows():
             importo_pagato = row['importo']
             descrizione = str(row['descrizione'])
-            
-            # Cerchiamo se c'è un "Mese Riferimento:" nella descrizione
             mese_trovato = False
             for chiave in dati_mensili.keys():
                 if chiave in descrizione:
@@ -459,147 +454,93 @@ with tab3:
                     mese_trovato = True
                     break
             
-            # Se è un pagamento vecchio (senza mese esplicito), lo mettiamo in un calderone generico
             if not mese_trovato:
                 if "Pagamenti Pregressi/Non Allocati" not in dati_mensili:
                     dati_mensili["Pagamenti Pregressi/Non Allocati"] = {'Maturato': 0.0, 'Pagato': 0.0}
                 dati_mensili["Pagamenti Pregressi/Non Allocati"]['Pagato'] += importo_pagato
 
-       # 3. VISUALIZZAZIONE DELLE PENDENZE
+        # 4. Visualizzazione e Stampa (IL PULSANTE È QUI)
         st.markdown("### 📊 Situazione Arretrati e Saldi per Mese")
+        saldo_globale = 0.0
         
-        # MOTORE DI ORDINAMENTO CRONOLOGICO
-        mesi_ordine = {'Gennaio': 1, 'Febbraio': 2, 'Marzo': 3, 'Aprile': 4, 'Maggio': 5, 'Giugno': 6, 'Luglio': 7, 'Agosto': 8, 'Settembre': 9, 'Ottobre': 10, 'Novembre': 11, 'Dicembre': 12}
-        
-        def ordina_mesi(chiave):
-            if chiave == "Pagamenti Pregressi/Non Allocati":
-                return (0, 0) # Mettiamo le voci non assegnate sempre in cima
-            try:
-                mese, anno = chiave.split()
-                return (int(anno), mesi_ordine.get(mese, 0))
-            except:
-                return (9999, 99) # In caso di stringhe anomale le mette in fondo
-
-        # Trasformiamo il dizionario in una tabella per la visualizzazione
         if dati_mensili:
-            # Riordiniamo i dati matematicamente prima di mostrarli
-            dati_mensili = dict(sorted(dati_mensili.items(), key=lambda item: ordina_mesi(item[0])))
-            
             df_riepilogo = pd.DataFrame.from_dict(dati_mensili, orient='index')
             df_riepilogo['Stato Mensile'] = df_riepilogo['Pagato'] - df_riepilogo['Maturato']
             
-            # Formattazione per la lettura
-            df_display = df_riepilogo.copy()
-            for col in df_display.columns:
-                df_display[col] = df_display[col].apply(format_euro)
-                
-          st.dataframe(df_display, use_container_width=True)
-            
-            # --- NUOVO: PULSANTE DI STAMPA/ESPORTAZIONE ---
-            csv = df_display.to_csv(index=True).encode('utf-8')
+            # ---> PULSANTE DI DOWNLOAD (Creato sui numeri puri) <---
+            csv = df_riepilogo.to_csv(index=True).encode('utf-8')
             st.download_button(
-                label="📥 Stampa / Scarica Tabella Arretrati (CSV per Excel)",
+                label="📥 Scarica Tabella Arretrati (CSV per Excel)",
                 data=csv,
                 file_name='Situazione_Arretrati_Dipendente.csv',
                 mime='text/csv',
                 type="primary"
             )
             
-            # Calcolo del totale Globale
+            # Formattazione estetica a schermo (aggiungiamo gli Euro)
+            df_display = df_riepilogo.copy()
+            for col in df_display.columns:
+                df_display[col] = df_display[col].apply(lambda x: f"{x:,.2f} €")
+                
+            st.dataframe(df_display, use_container_width=True)
+            
+            # Totali globali
             totale_maturato = df_riepilogo['Maturato'].sum()
             totale_pagato = df_riepilogo['Pagato'].sum()
             saldo_globale = totale_pagato - totale_maturato
             
             if saldo_globale < 0:
-                st.error(f"⚠️ ATTENZIONE: Il dipendente risulta in credito totale (arretrati) per: **{format_euro(abs(saldo_globale))}**")
+                st.error(f"⚠️ ATTENZIONE: Il dipendente risulta in credito totale (arretrati) per: **{abs(saldo_globale):,.2f} €**")
             else:
-                st.success(f"✅ Situazione regolare. Saldo globale: **{format_euro(saldo_globale)}**")
+                st.success(f"✅ Situazione regolare. Saldo globale: **{saldo_globale:,.2f} €**")
         else:
             st.info("Nessun dato lavorativo o di pagamento registrato.")
-            saldo_globale = 0.0
             
         st.divider()
         
-        # 4. IL NUOVO FORM DI PAGAMENTO (Con ripartizione a cascata)
+        # 5. Modulo di Pagamento Cassa
         with st.form("cassa_form", clear_on_submit=True):
-             st.write("### ➕ Registra un pagamento al dipendente")
+            st.write("### ➕ Registra un pagamento al dipendente")
             
-             c1, c2 = st.columns(2)
-             with c1:
+            c1, c2, c3 = st.columns([1, 1, 1.5])
+            with c1:
                 data_pag = st.date_input("Data del Bonifico/Contanti", format="DD/MM/YYYY")
+            with c2:
+                imp = st.number_input("Importo Erogato (€)", min_value=0.0, step=10.0, format="%.2f", value=float(abs(saldo_globale) if saldo_globale < 0 else 0.0))
+            with c3:
                 tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
-             with c2:
-                # L'importo suggerito è già il totale degli arretrati globale
-                importo_consigliato = abs(saldo_globale) if saldo_globale < 0 else 0.0
-                imp = st.number_input("Importo Totale Erogato (€)", min_value=0.0, step=10.0, format="%.2f", value=importo_consigliato)
                 
-                # La checkbox "magica" (già attiva di default)
-                st.markdown("<br>", unsafe_allow_html=True)
-                saldo_automatico = st.checkbox("🪄 Spalma in automatico sui mesi scoperti", value=True)
-            
-            # Lista dei mesi per la modalità manuale
-             mesi_da_pagare = []
-             for mese, dati_mese in dati_mensili.items():
-                if mese != "Pagamenti Pregressi/Non Allocati":
-                    if (dati_mese['Maturato'] - dati_mese['Pagato']) > 0.01:
-                        mesi_da_pagare.append(mese)
-             if not mesi_da_pagare:
-                mesi_da_pagare = ["Nessun arretrato"]
+                # Calcolo per mostrare nel menu a tendina solo i mesi non ancora saldati
+                mesi_da_pagare = []
+                for mese, dati_mese in dati_mensili.items():
+                    if mese != "Pagamenti Pregressi/Non Allocati":
+                        debito_residuo = dati_mese['Maturato'] - dati_mese['Pagato']
+                        if debito_residuo > 0.01:
+                            mesi_da_pagare.append(mese)
                 
-             mese_rif = st.selectbox("📌 Mese specifico (usato SOLO se togli la spunta sopra):", mesi_da_pagare)
+                if not mesi_da_pagare:
+                    mesi_da_pagare = ["Nessun arretrato (Versamento Generico)"]
+                    
+                mese_rif = st.selectbox("Mese di Riferimento del Pagamento", mesi_da_pagare)
             
-             if st.form_submit_button("Registra Pagamento", type="primary"):
+            if st.form_submit_button("Registra Pagamento e Copri il Mese", type="primary"):
                 if imp > 0:
                     data_f = data_pag.strftime('%Y-%m-%d')
-                    righe_nuove = []
+                    descrizione_estesa = f"Pagamento Iannone Felice | {tipo_op} | Rif: {mese_rif}"
                     
-                    if saldo_automatico:
-                        importo_rimanente = float(imp)
-                        
-                        # Cicliamo i mesi in ordine cronologico
-                        for mese, dati_mese in dati_mensili.items():
-                            if mese != "Pagamenti Pregressi/Non Allocati" and importo_rimanente > 0:
-                                debito_mese = dati_mese['Maturato'] - dati_mese['Pagato']
-                                
-                                if debito_mese > 0.01:
-                                    # Diamo a questo mese il minimo tra quello che gli spetta e i soldi rimasti
-                                    pagamento_mese = min(debito_mese, importo_rimanente)
-                                    
-                                    righe_nuove.append({
-                                        'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
-                                        'descrizione': f"Pagamento Iannone Felice | {tipo_op} | Rif: {mese}", 
-                                        'importo': float(pagamento_mese), 'prodotto': "Azienda", 'stato': "Saldato", 
-                                        'totale_fattura': float(pagamento_mese), 'importo_pagato': float(pagamento_mese), 
-                                        'registro_pagamenti': f"{data_f}|{pagamento_mese}|Erogazione Diretta"
-                                    })
-                                    importo_rimanente -= pagamento_mese
-                        
-                        # Se ha pagato di più del debito totale, l'eccesso diventa un Anticipo
-                        if importo_rimanente > 0.01:
-                            righe_nuove.append({
-                                'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
-                                'descrizione': f"Pagamento Iannone Felice | {tipo_op} | Rif: Anticipo/Extra", 
-                                'importo': float(importo_rimanente), 'prodotto': "Azienda", 'stato': "Saldato", 
-                                'totale_fattura': float(importo_rimanente), 'importo_pagato': float(importo_rimanente), 
-                                'registro_pagamenti': f"{data_f}|{importo_rimanente}|Erogazione Diretta"
-                            })
-                    else:
-                        # Modalità manuale classica
-                        righe_nuove.append({
-                            'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
-                            'descrizione': f"Pagamento Iannone Felice | {tipo_op} | Rif: {mese_rif}", 
-                            'importo': float(imp), 'prodotto': "Azienda", 'stato': "Saldato", 
-                            'totale_fattura': float(imp), 'importo_pagato': float(imp), 
-                            'registro_pagamenti': f"{data_f}|{imp}|Erogazione Diretta"
-                        })
+                    nuova_riga = {
+                        'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
+                        'descrizione': descrizione_estesa, 
+                        'importo': float(imp), 'prodotto': "Azienda", 'stato': "Saldato", 
+                        'totale_fattura': float(imp), 'importo_pagato': float(imp), 
+                        'registro_pagamenti': f"{data_f}|{imp}|Erogazione Diretta"
+                    }
+                    df = pd.concat([df, pd.DataFrame([nuova_riga])], ignore_index=True)
                     
-                    if righe_nuove:
-                        df_nuove = pd.DataFrame(righe_nuove)
-                        df = pd.concat([df, df_nuove], ignore_index=True)
-                        if save_to_github(df, sha, f"Pagamento dipendente distribuito: {imp}€"):
-                            st.success(f"✅ Pagamento di {format_euro(imp)} registrato con successo!")
-                            time.sleep(1.5)
-                            st.rerun()
+                    if save_to_github(df, sha, f"Pagato: {imp}€ per {mese_rif}"):
+                        st.success(f"✅ Pagamento di {imp}€ registrato a copertura di {mese_rif}!")
+                        time.sleep(1.5)
+                        st.rerun()
                 else:
                     st.warning("L'importo deve essere maggiore di zero.")
 
