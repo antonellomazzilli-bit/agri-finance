@@ -6,6 +6,7 @@ import json
 import re
 from io import StringIO
 import time
+from fpdf import FPDF
 
 # --- CONFIGURAZIONE INIZIALE ---
 st.set_page_config(page_title="AgriFinance Cloud", layout="wide")
@@ -434,7 +435,7 @@ with tab3:
                 chiave_mese = f"{mesi_nomi[mese_num]} {anno_num}"
                 
                 gg_lavorati = estrai_giornate(str(row['descrizione']), "Iannone Felice")
-                valore_maturato = gg_lavorati * 55.0  # Usiamo 55 come base standard per il controllo
+                valore_maturato = gg_lavorati * 55.0
                 
                 if chiave_mese not in dati_mensili:
                     dati_mensili[chiave_mese] = {'Maturato': 0.0, 'Pagato': 0.0}
@@ -459,7 +460,7 @@ with tab3:
                     dati_mensili["Pagamenti Pregressi/Non Allocati"] = {'Maturato': 0.0, 'Pagato': 0.0}
                 dati_mensili["Pagamenti Pregressi/Non Allocati"]['Pagato'] += importo_pagato
 
-        # 4. Visualizzazione e Stampa (IL PULSANTE È QUI)
+        # 4. Visualizzazione e GENERAZIONE PDF
         st.markdown("### 📊 Situazione Arretrati e Saldi per Mese")
         saldo_globale = 0.0
         
@@ -467,27 +468,66 @@ with tab3:
             df_riepilogo = pd.DataFrame.from_dict(dati_mensili, orient='index')
             df_riepilogo['Stato Mensile'] = df_riepilogo['Pagato'] - df_riepilogo['Maturato']
             
-            # ---> PULSANTE DI DOWNLOAD (Creato sui numeri puri) <---
-            csv = df_riepilogo.to_csv(index=True).encode('utf-8')
+            # Calcolo dei totali
+            totale_maturato = df_riepilogo['Maturato'].sum()
+            totale_pagato = df_riepilogo['Pagato'].sum()
+            saldo_globale = totale_pagato - totale_maturato
+            
+            # --- MOTORE DI DISEGNO DEL PDF ---
+            pdf = FPDF()
+            pdf.add_page()
+            
+            # Titolo
+            pdf.set_font("Arial", 'B', 16)
+            pdf.cell(190, 10, txt="Estratto Conto Arretrati - Iannone Felice", ln=True, align='C')
+            pdf.set_font("Arial", size=10)
+            pdf.cell(190, 10, txt=f"Generato il: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='C')
+            pdf.ln(5)
+            
+            # Intestazione Tabella
+            pdf.set_font("Arial", 'B', 11)
+            pdf.cell(55, 10, "Mese Riferimento", 1, 0, 'C')
+            pdf.cell(45, 10, "Maturato", 1, 0, 'C')
+            pdf.cell(45, 10, "Pagato", 1, 0, 'C')
+            pdf.cell(45, 10, "Saldo Mese", 1, 1, 'C')
+            
+            # Righe Tabella
+            pdf.set_font("Arial", size=11)
+            for mese, row in df_riepilogo.iterrows():
+                pdf.cell(55, 10, str(mese), 1, 0, 'L')
+                pdf.cell(45, 10, f"{row['Maturato']:,.2f} Euro", 1, 0, 'R')
+                pdf.cell(45, 10, f"{row['Pagato']:,.2f} Euro", 1, 0, 'R')
+                pdf.cell(45, 10, f"{row['Stato Mensile']:,.2f} Euro", 1, 1, 'R')
+                
+            pdf.ln(10)
+            
+            # Esito Globale nel PDF
+            pdf.set_font("Arial", 'B', 12)
+            if saldo_globale < 0:
+                pdf.set_text_color(220, 53, 69) # Rosso scuro
+                pdf.cell(190, 10, txt=f"ATTENZIONE: Arretrati da pagare per {abs(saldo_globale):,.2f} Euro", ln=True)
+            else:
+                pdf.set_text_color(40, 167, 69) # Verde scuro
+                pdf.cell(190, 10, txt=f"Situazione Regolare. Saldo finale: {saldo_globale:,.2f} Euro", ln=True)
+                
+            pdf.set_text_color(0, 0, 0) # Ritorno al nero
+            
+            # --- PULSANTE DI DOWNLOAD DEL PDF ---
+            pdf_bytes = pdf.output(dest='S').encode('latin-1')
             st.download_button(
-                label="📥 Scarica Tabella Arretrati (CSV per Excel)",
-                data=csv,
-                file_name='Situazione_Arretrati_Dipendente.csv',
-                mime='text/csv',
+                label="📄 Scarica Tabella Arretrati (PDF)",
+                data=pdf_bytes,
+                file_name=f'Arretrati_Iannone_{datetime.now().strftime("%Y_%m")}.pdf',
+                mime='application/pdf',
                 type="primary"
             )
             
-            # Formattazione estetica a schermo (aggiungiamo gli Euro)
+            # Formattazione estetica a schermo
             df_display = df_riepilogo.copy()
             for col in df_display.columns:
                 df_display[col] = df_display[col].apply(lambda x: f"{x:,.2f} €")
                 
             st.dataframe(df_display, use_container_width=True)
-            
-            # Totali globali
-            totale_maturato = df_riepilogo['Maturato'].sum()
-            totale_pagato = df_riepilogo['Pagato'].sum()
-            saldo_globale = totale_pagato - totale_maturato
             
             if saldo_globale < 0:
                 st.error(f"⚠️ ATTENZIONE: Il dipendente risulta in credito totale (arretrati) per: **{abs(saldo_globale):,.2f} €**")
@@ -510,7 +550,6 @@ with tab3:
             with c3:
                 tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
                 
-                # Calcolo per mostrare nel menu a tendina solo i mesi non ancora saldati
                 mesi_da_pagare = []
                 for mese, dati_mese in dati_mensili.items():
                     if mese != "Pagamenti Pregressi/Non Allocati":
