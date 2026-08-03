@@ -7,6 +7,7 @@ import re
 from io import StringIO
 import time
 from fpdf import FPDF
+from datetime import datetime
 
 # --- CONFIGURAZIONE INIZIALE ---
 st.set_page_config(page_title="AgriFinance Cloud", layout="wide")
