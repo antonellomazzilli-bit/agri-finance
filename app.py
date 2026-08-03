@@ -403,7 +403,12 @@ with tab2:
                     st.success("✅ Giornate lavorative registrate!")
                     time.sleep(1)
                     st.rerun()
-            # ==========================================
+       
+        with st.form("form_registrazione_manodopera"):
+            op_nome = st.text_input("Nome")
+            st.form_submit_button("Registra Giornate")
+        
+        # ==========================================
         # --- SEZIONE: STAMPA E REPORT PRESENZE ---
         # ==========================================
         st.divider()
