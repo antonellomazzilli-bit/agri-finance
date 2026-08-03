@@ -419,17 +419,16 @@ with tab2:
         else:
             st.warning("Nessun dato valido inserito (Giornate a zero).")
 
-    # --- SEZIONE 2: REPORT E STAMPA PRESENZE ---
+   # --- SEZIONE 2: REPORT E STAMPA PRESENZE (CON IMPORTI DINAMICI) ---
     st.divider()
-    st.subheader("🖨️ Stampa Riepilogo Presenze (Annuale e Mensile)")
+    st.subheader("🖨️ Stampa Riepilogo Presenze e Costi")
     
     if not df.empty:
-        # Filtri dinamici
+        # Filtri base
         c_filtro1, c_filtro2 = st.columns(2)
         with c_filtro1:
             sel_dipendente = st.selectbox("Seleziona Dipendente per il Report", ["Iannone Felice"])
         
-        # Isolamento del solo storico manodopera
         df_lavoro = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].copy()
         df_lavoro['data_dt'] = pd.to_datetime(df_lavoro['data'], errors='coerce')
         df_lavoro = df_lavoro.dropna(subset=['data_dt'])
@@ -441,12 +440,20 @@ with tab2:
         with c_filtro2:
             sel_anno = st.selectbox("Seleziona Anno di Riferimento", sorted(anni_disp, reverse=True))
 
-        # Bottone isolato (non crea conflitti col form soprastante)
-        if st.button("Genera Report Dettagliato"):
+        # ⚙️ NUOVO: PANNELLO TARIFFE DEL COMMERCIALISTA
+        st.markdown("**⚙️ Parametri Economici per il Calcolo (Inserisci i dati del commercialista)**")
+        c_param1, c_param2, c_param3 = st.columns(3)
+        with c_param1:
+            tariffa_extra = st.number_input("Costo Giornata EXTRA (€)", value=55.0, step=1.0, help="Fisso per le 6 ore")
+        with c_param2:
+            tariffa_uff = st.number_input("Costo Giornata UFFICIALE (€)", value=0.0, step=1.0)
+        with c_param3:
+            oneri_uff = st.number_input("ONERI per Giornata Ufficiale (€)", value=0.0, step=1.0, help="Quota oneri su singola giornata")
+
+        if st.button("Genera Report Dettagliato", type="primary"):
             df_anno = df_lavoro[df_lavoro['data_dt'].dt.year == sel_anno]
             dati_puliti = []
             
-            # Motore di scansione testuale per l'estrazione
             for idx, row in df_anno.iterrows():
                 desc = str(row['descrizione'])
                 if sel_dipendente in desc:
@@ -457,42 +464,61 @@ with tab2:
                             tipo = "Ufficiale" if "UFFICIALE:" in desc else ("Extra" if "EXTRA:" in desc else "Altro")
                             note = desc.split(":", 1)[1].strip() if ":" in desc else ""
                             
+                            # Calcolo dinamico basato sugli input appena inseriti
+                            importo = 0.0
+                            oneri = 0.0
+                            if tipo == "Ufficiale":
+                                importo = giornate * tariffa_uff
+                                oneri = giornate * oneri_uff
+                            elif tipo == "Extra":
+                                importo = giornate * tariffa_extra
+                                oneri = 0.0 # Niente oneri sull'extra
+                            
                             dati_puliti.append({
                                 'Data': row['data_dt'],
                                 'Mese_Num': row['data_dt'].month,
                                 'Giornate': giornate,
                                 'Tipo': tipo,
+                                'Importo (€)': importo,
+                                'Oneri (€)': oneri,
                                 'Note': note
                             })
                         except:
                             pass
                             
-            # Processo di impaginazione
             if not dati_puliti:
                 st.warning(f"Nessuna presenza trovata per {sel_dipendente} nell'anno {sel_anno}.")
             else:
                 df_report = pd.DataFrame(dati_puliti)
                 
                 # Resoconto Globale Anno
-                tot_uff = df_report[df_report['Tipo'] == 'Ufficiale']['Giornate'].sum()
-                tot_ext = df_report[df_report['Tipo'] == 'Extra']['Giornate'].sum()
+                tot_gg = df_report['Giornate'].sum()
+                tot_imp = df_report['Importo (€)'].sum()
+                tot_oneri = df_report['Oneri (€)'].sum()
+                costo_totale_azienda = tot_imp + tot_oneri
                 
                 st.success(f"### 🏆 Riepilogo Globale {sel_anno} - {sel_dipendente}\n"
-                           f"**Totale Giornate Ufficiali:** {tot_uff:.2f} gg | **Totale Giornate Extra:** {tot_ext:.2f} gg")
+                           f"**Tot. Giornate:** {tot_gg:.2f} gg | **Tot. Retribuzioni:** {tot_imp:,.2f} € | **Tot. Oneri:** {tot_oneri:,.2f} €\n\n"
+                           f"**🔥 COSTO TOTALE AZIENDALE:** {costo_totale_azienda:,.2f} €")
                 
                 mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 
                              7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
                 
-                # Iterazione ordinata Mese per Mese
                 for mese in sorted(df_report['Mese_Num'].unique()):
                     df_mese = df_report[df_report['Mese_Num'] == mese].sort_values(by='Data')
-                    mese_uff = df_mese[df_mese['Tipo'] == 'Ufficiale']['Giornate'].sum()
-                    mese_ext = df_mese[df_mese['Tipo'] == 'Extra']['Giornate'].sum()
                     
-                    st.markdown(f"#### 📅 {mesi_nomi[mese]} {sel_anno} *(Ufficiali: {mese_uff:.2f} gg - Extra: {mese_ext:.2f} gg)*")
+                    mese_gg = df_mese['Giornate'].sum()
+                    mese_imp = df_mese['Importo (€)'].sum()
+                    mese_oneri = df_mese['Oneri (€)'].sum()
+                    mese_tot = mese_imp + mese_oneri
                     
-                    df_display = df_mese[['Data', 'Tipo', 'Giornate', 'Note']].copy()
+                    st.markdown(f"#### 📅 {mesi_nomi[mese]} {sel_anno} *(Giornate: {mese_gg:.2f} | Retribuzione: {mese_imp:,.2f} € | Oneri: {mese_oneri:,.2f} €)*")
+                    
+                    df_display = df_mese[['Data', 'Tipo', 'Giornate', 'Importo (€)', 'Oneri (€)', 'Note']].copy()
                     df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
+                    
+                    df_display['Importo (€)'] = df_display['Importo (€)'].map("{:,.2f} €".format)
+                    df_display['Oneri (€)'] = df_display['Oneri (€)'].map("{:,.2f} €".format)
                     
                     st.dataframe(df_display, use_container_width=True, hide_index=True)
 # ==========================================
