@@ -604,18 +604,28 @@ with tab4:
         if len(anni_disponibili) > 0:
             anno_sel = st.selectbox("📅 Basato sulle spese storiche dell'anno:", sorted(anni_disponibili, reverse=True), key="anno_target")
             
-            # Ora questa somma matematica funzionerà perfettamente
-            uscite_totali = df_pareggio[(df_pareggio['data_dt'].dt.year == anno_sel) & (df_pareggio['tipo'] == 'Uscita')]['importo'].sum()
+            # --- MODIFICA RICHIESTA: Calcolo Uscite, Entrate e Spesa Netta ---
+            df_anno_sel = df_pareggio[df_pareggio['data_dt'].dt.year == anno_sel]
+            
+            uscite_totali = df_anno_sel[df_anno_sel['tipo'] == 'Uscita']['importo'].sum()
+            entrate_totali = df_anno_sel[df_anno_sel['tipo'] == 'Entrata']['importo'].sum()
+            
+            # Spesa netta (Differenza tra uscite ed entrate)
+            spesa_netta = uscite_totali - entrate_totali
             
             col_fin, col_strat = st.columns([1, 1], gap="large")
             
             with col_fin:
                 with st.container(border=True):
                     st.subheader("💶 1. Fabbisogno Economico")
-                    st.metric("🔴 Spese Vive (dal database)", format_euro(uscite_totali))
+                    st.metric("🔴 Uscite Vive", format_euro(uscite_totali))
+                    st.metric("🟢 Entrate Registrate", format_euro(entrate_totali))
+                    st.metric("⚖️ Spesa Netta (Uscite - Entrate)", format_euro(spesa_netta))
                     
                     utile_desiderato = st.number_input("🟢 Tuo Obiettivo di Guadagno Annuo (€)", min_value=0.0, step=1000.0, value=24000.0)
-                    fabbisogno_totale = uscite_totali + utile_desiderato
+                    
+                    # Il fabbisogno ora si basa sulla spesa netta + l'utile desiderato
+                    fabbisogno_totale = spesa_netta + utile_desiderato
                     
                     st.markdown(f"""
                     <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; text-align: center; margin-top: 15px; border-left: 5px solid #0f52ba;">
@@ -652,7 +662,7 @@ with tab4:
                             rc2.metric("🍾 Olio da Produrre", f"{litri_necessari:,.0f} Litri", "Prodotto Finito")
                             rc3.metric("📊 Fatturato Target", format_euro(fabbisogno_totale), "Copertura Raggiunta")
                             
-                            st.info(f"💡 **Piano d'Azione:** Per garantirti uno stipendio di **{format_euro(utile_desiderato)}** pagando tutte le spese, devi raccogliere circa **{quintali_necessari:,.0f} quintali**. Con una resa di {resa_stimata} L/q, otterrai i {litri_necessari:,.0f} litri necessari per incassare il totale vendendoli a {prezzo_attuale} €/L.")
+                            st.info(f"💡 **Piano d'Azione:** Per coprire la spesa netta e garantirti uno stipendio di **{format_euro(utile_desiderato)}**, devi raccogliere circa **{quintali_necessari:,.0f} quintali**. Con una resa di {resa_stimata} L/q, otterrai i {litri_necessari:,.0f} litri necessari vendendoli a {prezzo_attuale} €/L.")
                         else:
                             st.error("⚠️ Inserisci una resa maggiore di zero.")
                             
@@ -664,7 +674,7 @@ with tab4:
                         rc2.metric("⚖️ Equivalente in Kg", f"{quintali_necessari * 100:,.0f} Kg")
                         rc3.metric("📊 Fatturato Target", format_euro(fabbisogno_totale), "Copertura Raggiunta")
                         
-                        st.info(f"💡 **Piano d'Azione:** Per garantirti uno stipendio di **{format_euro(utile_desiderato)}** pagando tutte le spese, devi vendere ai commercianti almeno **{quintali_necessari:,.0f} quintali** di olive al prezzo di {prezzo_attuale} €/q.")
+                        st.info(f"💡 **Piano d'Azione:** Per coprire la spesa netta e garantirti uno stipendio di **{format_euro(utile_desiderato)}**, devi vendere ai commercianti almeno **{quintali_necessari:,.0f} quintali** di olive al prezzo di {prezzo_attuale} €/q.")
             else:
                 st.warning("⚠️ Imposta un Prezzo di Mercato maggiore di zero per visualizzare i traguardi.")
                 
