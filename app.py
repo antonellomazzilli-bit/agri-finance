@@ -360,66 +360,76 @@ with tab1:
 
 
 # ==========================================
-# --- TAB 2: MANODOPERA (Standard 6 Ore) ---
+# --- TAB 2: MANODOPERA (INSERIMENTO E STAMPA) ---
 # ==========================================
 with tab2:
-    st.subheader("👥 Registro Manodopera (Giornata standard: 6 ore)")
-    with st.form("operaio_form", clear_on_submit=True):
-        c1, c2 = st.columns(2)
+    st.header("🚜 Gestione Manodopera")
+    df, sha = get_github_file()
+    
+    # --- SEZIONE 1: INSERIMENTO DATI ---
+    # Il blocco form gestisce SOLO l'input visivo dell'utente
+    with st.form("form_registrazione_manodopera", clear_on_submit=True):
+        st.subheader("📝 Registra Nuova Giornata")
+        
+        c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
-            op_data = st.date_input("Data Registrazione", format="DD/MM/YYYY")
-            op_nome = st.selectbox("Seleziona Dipendente:", ["Iannone Felice"])
-            op_reali = st.number_input("🔴 Giornate REALI (6h = 1.000)", min_value=0.0, step=0.167, value=1.0, format="%.3f")
-            op_ufficiali = st.number_input("🟢 Di cui UFFICIALI", min_value=0.0, step=0.167, value=1.0, format="%.3f")
+            op_nome = st.selectbox("Operatore", ["Iannone Felice"])
+            op_data = st.date_input("Data Lavoro", format="DD/MM/YYYY")
         with c2:
-            op_tipo_paga = st.selectbox("Tipo di Pagamento", ["Nessuno", "Acconto", "Saldo Finale"])
-            op_note = st.text_area("Note Attività")
-        
-        if st.form_submit_button("Registra Giornate"):
-            df, sha = get_github_file()
+            op_ufficiali = st.number_input("Giornate Ufficiali", min_value=0.0, step=0.5, format="%.2f")
+        with c3:
+            op_reali = st.number_input("Giornate Reali Effettuate", min_value=0.0, step=0.5, format="%.2f")
             
-            righe_nuove = []
-            if op_ufficiali > 0:
-                desc_uff = f"{op_nome} | {op_ufficiali:.3f} gg | UFFICIALE: {op_note}"
-                righe_nuove.append({
-                    'data': op_data.strftime('%Y-%m-%d'), 'tipo': "Uscita", 'categoria': "Manodopera", 
-                    'descrizione': desc_uff, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
-                    'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
-                })
-            
-            gg_extra = op_reali - op_ufficiali
-            if abs(gg_extra) > 0.001:
-                desc_extra = f"{op_nome} | {gg_extra:.3f} gg | EXTRA: {op_note}"
-                righe_nuove.append({
-                    'data': op_data.strftime('%Y-%m-%d'), 'tipo': "Uscita", 'categoria': "Manodopera Extra", 
-                    'descrizione': desc_extra, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
-                    'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
-                })
-            
-            if righe_nuove:
-                df_nuove = pd.DataFrame(righe_nuove)
-                df = pd.concat([df, df_nuove], ignore_index=True)
-                if save_to_github(df, sha, "Aggiornamento Manodopera (6h)"):
-                    st.success("✅ Giornate lavorative registrate!")
-                    time.sleep(1)
-                    st.rerun()
-       
-        with st.form("form_registrazione_manodopera"):
-            op_nome = st.text_input("Nome")
-            st.form_submit_button("Registra Giornate")
+        op_note = st.text_input("Note (Lavoro svolto)")
         
-        # ==========================================
-        # --- SEZIONE: STAMPA E REPORT PRESENZE ---
-        # ==========================================
-        st.divider()
-        st.subheader("🖨️ Stampa Riepilogo Presenze (Annuale e Mensile)")
+        # L'azione di click viene salvata nella variabile 'inviato'
+        inviato = st.form_submit_button("Registra Giornate", type="primary")
         
-        # 1. Filtri di ricerca
+    # --- LOGICA DI SALVATAGGIO (Eseguita fuori dal blocco form) ---
+    if inviato:
+        righe_nuove = []
+        
+        # Generazione riga per giornate ufficiali
+        if op_ufficiali > 0:
+            desc_uff = f"{op_nome} | {op_ufficiali:.3f} gg | UFFICIALE: {op_note}"
+            righe_nuove.append({
+                'data': op_data.strftime('%Y-%m-%d'), 'tipo': "Uscita", 'categoria': "Manodopera", 
+                'descrizione': desc_uff, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
+                'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
+            })
+        
+        # Generazione riga calcolata per giornate extra
+        gg_extra = op_reali - op_ufficiali
+        if abs(gg_extra) > 0.001:
+            desc_extra = f"{op_nome} | {gg_extra:.3f} gg | EXTRA: {op_note}"
+            righe_nuove.append({
+                'data': op_data.strftime('%Y-%m-%d'), 'tipo': "Uscita", 'categoria': "Manodopera Extra", 
+                'descrizione': desc_extra, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
+                'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
+            })
+        
+        if righe_nuove:
+            df_nuove = pd.DataFrame(righe_nuove)
+            df = pd.concat([df, df_nuove], ignore_index=True)
+            
+            if save_to_github(df, sha, "Aggiornamento Manodopera"):
+                st.success("✅ Giornate lavorative registrate con successo!")
+                time.sleep(1)
+                st.rerun()
+        else:
+            st.warning("Nessun dato valido inserito (Giornate a zero).")
+
+    # --- SEZIONE 2: REPORT E STAMPA PRESENZE ---
+    st.divider()
+    st.subheader("🖨️ Stampa Riepilogo Presenze (Annuale e Mensile)")
+    
+    if not df.empty:
+        # Filtri dinamici
         c_filtro1, c_filtro2 = st.columns(2)
         with c_filtro1:
             sel_dipendente = st.selectbox("Seleziona Dipendente per il Report", ["Iannone Felice"])
         
-        # Estraiamo gli anni disponibili dal database per il filtro
+        # Isolamento del solo storico manodopera
         df_lavoro = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].copy()
         df_lavoro['data_dt'] = pd.to_datetime(df_lavoro['data'], errors='coerce')
         df_lavoro = df_lavoro.dropna(subset=['data_dt'])
@@ -431,15 +441,15 @@ with tab2:
         with c_filtro2:
             sel_anno = st.selectbox("Seleziona Anno di Riferimento", sorted(anni_disp, reverse=True))
 
-        if st.button("Genera Report Dettagliato", type="primary"):
-            # 2. Motore di Estrazione Dati
+        # Bottone isolato (non crea conflitti col form soprastante)
+        if st.button("Genera Report Dettagliato"):
             df_anno = df_lavoro[df_lavoro['data_dt'].dt.year == sel_anno]
             dati_puliti = []
             
+            # Motore di scansione testuale per l'estrazione
             for idx, row in df_anno.iterrows():
                 desc = str(row['descrizione'])
                 if sel_dipendente in desc:
-                    # Smontiamo la stringa per estrarre le giornate pure
                     parti = desc.split("|")
                     if len(parti) >= 2:
                         try:
@@ -457,40 +467,34 @@ with tab2:
                         except:
                             pass
                             
-            # 3. Impaginazione e Visualizzazione
+            # Processo di impaginazione
             if not dati_puliti:
                 st.warning(f"Nessuna presenza trovata per {sel_dipendente} nell'anno {sel_anno}.")
             else:
                 df_report = pd.DataFrame(dati_puliti)
                 
-                # Calcolo Totali Annuali
+                # Resoconto Globale Anno
                 tot_uff = df_report[df_report['Tipo'] == 'Ufficiale']['Giornate'].sum()
                 tot_ext = df_report[df_report['Tipo'] == 'Extra']['Giornate'].sum()
                 
                 st.success(f"### 🏆 Riepilogo Globale {sel_anno} - {sel_dipendente}\n"
                            f"**Totale Giornate Ufficiali:** {tot_uff:.2f} gg | **Totale Giornate Extra:** {tot_ext:.2f} gg")
                 
-                # Scomposizione Mese per Mese
                 mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 
                              7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
                 
-                # Ciclo che crea una tabella per ogni mese lavorato
+                # Iterazione ordinata Mese per Mese
                 for mese in sorted(df_report['Mese_Num'].unique()):
                     df_mese = df_report[df_report['Mese_Num'] == mese].sort_values(by='Data')
-                    
                     mese_uff = df_mese[df_mese['Tipo'] == 'Ufficiale']['Giornate'].sum()
                     mese_ext = df_mese[df_mese['Tipo'] == 'Extra']['Giornate'].sum()
                     
-                    # Intestazione del singolo mese
                     st.markdown(f"#### 📅 {mesi_nomi[mese]} {sel_anno} *(Ufficiali: {mese_uff:.2f} gg - Extra: {mese_ext:.2f} gg)*")
                     
-                    # Preparazione estetica della tabella
                     df_display = df_mese[['Data', 'Tipo', 'Giornate', 'Note']].copy()
                     df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
                     
-                    # Mostra a schermo (con possibilità di download nativo)
                     st.dataframe(df_display, use_container_width=True, hide_index=True)
-
 # ==========================================
 # --- TAB 3: CASSA E CONTROLLO MESI ARRETRATI ---
 # ==========================================
