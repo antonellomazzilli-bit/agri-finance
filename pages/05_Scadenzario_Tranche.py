@@ -93,7 +93,7 @@ if not df.empty:
                 
                 # 1. Creiamo la riga della Tranche clonando l'originale
                 nuova_tranche_dict = riga_selezionata.to_dict()
-                nuova_tranche_dict['data'] = data_pagamento.strftime('%Y-%m-%d')
+                nuova_tranche_dict['data'] = data_pagamento.strftime('%d-%m-%Y')
                 nuova_tranche_dict['descrizione'] = f"TRANCHE di: {riga_selezionata['descrizione']} | Note: {nota_tranche}"
                 nuova_tranche_dict['importo'] = importo_tranche
                 nuova_tranche_dict['stato'] = 'Saldato'
