@@ -74,7 +74,7 @@ if not df.empty:
         importo_originario = float(riga_selezionata['importo'])
         
         st.divider()
-        st.subheader(f"Pagamento Tranche per: {riga_selezionata['categoria']}")
+        st.subheader(f"Pagamento Intero/Tranche per: {riga_selezionata['categoria']}")
         st.info(f"Dettagli spesa originaria: {riga_selezionata['descrizione']} di complessivi {format_euro(importo_originario)}")
         
         with st.form("form_tranche"):
