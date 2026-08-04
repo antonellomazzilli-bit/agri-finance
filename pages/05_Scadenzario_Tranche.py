@@ -54,9 +54,10 @@ if not df.empty:
     df['data'] = df['data'].fillna("Data Sconosciuta").astype(str)
     df['categoria'] = df['categoria'].fillna("Generica").astype(str)
     
-    # --- FILTRO GLOBALE ---
-    # Prende tutte le Uscite che NON contengono la parola 'Saldato'
-    df_impegnati = df[(df['stato'] != 'Saldato') & (df['tipo'] == 'Uscita')].copy()
+   # --- FILTRO GLOBALE (ISOLAMENTO HR) ---
+    # Prende le Uscite NON saldate, ma IGNORA le categorie gestite a parte nell'Estratto Conto Dipendenti
+    cat_escluse = ['Manodopera', 'Manodopera Extra', 'Busta Paga', 'Saldo Extra']
+    df_impegnati = df[(df['stato'] != 'Saldato') & (df['tipo'] == 'Uscita') & (~df['categoria'].isin(cat_escluse))].copy()
     
     if df_impegnati.empty:
         st.success("🎉 Ottimo! Non ci sono pagamenti in sospeso. Tutto saldato.")
