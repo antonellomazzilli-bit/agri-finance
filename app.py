@@ -500,7 +500,7 @@ with tab3:
             pdf.set_font("Arial", 'B', 16)
             pdf.cell(190, 10, txt="Estratto Conto Arretrati - Iannone Felice", ln=True, align='C')
             pdf.set_font("Arial", size=10)
-            pdf.cell(190, 10, txt=f"Generato il: {datetime.datetime.now().strftime('%d/%m/%Y')}", ln=True, align='C')
+            pdf.cell(190, 10, txt=f"Generato il: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='C')
             pdf.ln(5)
             
             # Intestazione Tabella
