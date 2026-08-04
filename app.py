@@ -536,7 +536,7 @@ with tab3:
             st.download_button(
                 label="📄 Scarica Tabella Arretrati (PDF)",
                 data=pdf_bytes,
-                file_name=f'Arretrati_Iannone_{datetime.now().strftime("%Y_%m")}.pdf',
+                file_name=f'Arretrati_Iannone_{datetime.datetime.now().strftime("%Y_%m")}.pdf',
                 mime='application/pdf',
                 type="primary"
             )
