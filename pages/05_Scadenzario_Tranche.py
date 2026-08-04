@@ -6,7 +6,7 @@ import io
 from datetime import datetime
 import time
 
-st.set_page_config(page_title="Scadenzario e Tranche", layout="wide")
+st.set_page_config(page_title="Pagamento Sospesi", layout="wide")
 
 # --- CONFIGURAZIONE ARCHITETTURALE ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
