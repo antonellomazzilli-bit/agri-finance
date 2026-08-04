@@ -43,11 +43,30 @@ st.markdown("Analisi finanziaria per annata agricola. I dati sono calcolati in t
 df_git = load_github_data()
 
 if not df_git.empty:
-    # --- PRE-PROCESSING DATI ---
+   # --- PRE-PROCESSING DATI ---
     df_git['data_dt'] = pd.to_datetime(df_git['data'], errors='coerce')
     df_git = df_git.dropna(subset=['data_dt'])
     df_git['Anno'] = df_git['data_dt'].dt.year
     df_git['importo'] = pd.to_numeric(df_git['importo'], errors='coerce').fillna(0.0)
+
+    # Gestione di sicurezza: se 'coltura_id' non esiste, creiamo una colonna fittizia
+    if 'coltura_id' not in df_git.columns:
+        df_git['coltura_id'] = 'Generica'
+
+    # --- 🧹 NUOVO MOTORE DI PULIZIA E ACCORPAMENTO COLTURE ---
+    
+    # 1. Normalizzazione: rimuove spazi vuoti invisibili e mette l'iniziale maiuscola
+    df_git['coltura_id'] = df_git['coltura_id'].astype(str).str.strip().str.title()
+    
+    # 2. Dizionario per fondere voci diverse sotto un unico nome (Modificalo a tuo piacimento)
+    dizionario_fusioni = {
+        "Olive Coratina": "Olive",
+        "Olive Da Mensa": "Olive",
+        "Olio": "Olive",
+        "Nan": "Generica",      # Cattura eventuali celle vuote
+        "Nessuna": "Generica"
+    }
+    df_git['coltura_id'] = df_git['coltura_id'].replace(dizionario_fusioni)
 
     # Gestione di sicurezza: se 'coltura_id' non esiste, creiamo una colonna fittizia
     if 'coltura_id' not in df_git.columns:
