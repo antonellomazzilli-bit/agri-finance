@@ -412,6 +412,7 @@ with tab2:
                 st.rerun()
         else:
             st.warning("Nessun dato valido inserito (Giornate a zero).")
+
 # ==========================================
 # --- TAB 3: CASSA E CONTROLLO MESI ARRETRATI ---
 # ==========================================
@@ -466,6 +467,23 @@ with tab3:
         saldo_globale = 0.0
         
         if dati_mensili:
+            # --- NUOVO: MOTORE DI ORDINAMENTO CRONOLOGICO ---
+            mesi_ordine = {'Gennaio': 1, 'Febbraio': 2, 'Marzo': 3, 'Aprile': 4, 'Maggio': 5, 'Giugno': 6, 'Luglio': 7, 'Agosto': 8, 'Settembre': 9, 'Ottobre': 10, 'Novembre': 11, 'Dicembre': 12}
+            
+            def chiave_ordinamento(item):
+                chiave = item[0]
+                if chiave == "Pagamenti Pregressi/Non Allocati":
+                    return (0, 0) # Lo mettiamo forzatamente in cima (Anno 0, Mese 0)
+                try:
+                    mese_testo, anno_testo = chiave.split()
+                    return (int(anno_testo), mesi_ordine.get(mese_testo, 0))
+                except:
+                    return (9999, 99) # Se c'è un errore imprevisto, va in fondo alla lista
+                    
+            # Riordiniamo il dizionario prima di creare la tabella
+            dati_mensili = dict(sorted(dati_mensili.items(), key=chiave_ordinamento))
+            # ------------------------------------------------
+        
             df_riepilogo = pd.DataFrame.from_dict(dati_mensili, orient='index')
             df_riepilogo['Stato Mensile'] = df_riepilogo['Pagato'] - df_riepilogo['Maturato']
             
