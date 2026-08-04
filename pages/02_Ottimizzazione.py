@@ -47,6 +47,11 @@ if not df_git.empty:
     df_git['data_dt'] = pd.to_datetime(df_git['data'], errors='coerce')
     df_git = df_git.dropna(subset=['data_dt'])
     df_git['Anno'] = df_git['data_dt'].dt.year
+    df_git['importo'] = pd.to_numeric(df_git['importo'], errors='coerce').fillna(0.0)
+
+    # Gestione di sicurezza: se 'coltura_id' non esiste, creiamo una colonna fittizia
+    if 'coltura_id' not in df_git.columns:
+        df_git['coltura_id'] = 'Generica'
 
     # --- SELEZIONE ANNATA E COLTURA ---
     anni_disponibili = sorted(df_git['Anno'].unique(), reverse=True)
@@ -77,23 +82,32 @@ if not df_git.empty:
         margine = ricavi_totali - costi_totali
         kg_raccolti = df_rese['importo'].sum()
 
-        # --- ESTRAZIONE DATI MANODOPERA (GIORNATE/ORE) ---
+        # --- ESTRAZIONE DATI MANODOPERA CORRETTA ---
+        # 1. Costi Reali (Buste, Extra, F24, Oneri)
+        cat_costi_lavoro = ['Busta Paga', 'Saldo Extra', 'Oneri', 'F24', 'Contributi']
+        costo_manodopera = df_uscite[df_uscite['categoria'].isin(cat_costi_lavoro)]['importo'].sum()
+        
+        # 2. Giornate e Ore Lavorate (Pesca sia ufficiali che extra)
+        df_presenze = df_anno[df_anno['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
         giornate_totali = 0.0
         ore_totali = 0.0
-        costo_manodopera = df_uscite[df_uscite['categoria'] == 'Manodopera']['importo'].sum()
         
-        for _, row in df_uscite[df_uscite['categoria'] == 'Manodopera'].iterrows():
+        for _, row in df_presenze.iterrows():
             gg, ore = parse_descrizione_operaio(row['descrizione'])
             giornate_totali += gg
-            ore_totali += ore
+            # Se nel database non ci sono scritte le ore, calcoliamo in automatico 6 ore per ogni giornata
+            if ore == 0.0 and gg > 0:
+                ore_totali += gg * 6.0
+            else:
+                ore_totali += ore
 
         # --- LAYOUT: SINTESI FINANZIARIA ---
         st.subheader(f"📊 Sintesi Economica Globale ({anno_sel})")
         k1, k2, k3, k4 = st.columns(4)
         k1.metric("🔴 Costi Totali", format_euro(costi_totali))
         k2.metric("🟢 Ricavi Totali", format_euro(ricavi_totali))
-        k3.metric("💶 Margine Operativo Lordo", format_euro(margine), delta=f"{margine:,.2f} €".replace(",", "X").replace(".", ",").replace("X", "."))
-        k4.metric("📦 Produzione (Resa Totale)", f"{kg_raccolti:,.0f} Kg".replace(",", "."))
+        k3.metric("💶 Margine Operativo", format_euro(margine), delta=f"{margine:,.2f} €".replace(",", "X").replace(".", ",").replace("X", "."))
+        k4.metric("📦 Resa Totale", f"{kg_raccolti:,.0f} Kg".replace(",", "."))
 
         st.divider()
 
@@ -103,21 +117,20 @@ if not df_git.empty:
         
         with c_kpi1:
             costo_kg = (costi_totali / kg_raccolti) if kg_raccolti > 0 else 0.0
-            st.metric("🎯 Costo di Produzione Base", f"{costo_kg:,.2f} €/Kg".replace(".", ","), help="Indica quanto ti costa fisicamente produrre 1 Kg di olive (Uscite totali / Resa totale).")
+            st.metric("🎯 Costo di Produzione", f"{costo_kg:,.2f} €/Kg".replace(".", ","), help="Indica quanto ti costa produrre 1 Kg di prodotto (Uscite totali / Resa totale).")
             
         with c_kpi2:
             incidenza_mano = (costo_manodopera / costi_totali * 100) if costi_totali > 0 else 0.0
-            st.metric("🧑‍🌾 Incidenza Costo Lavoro", f"{incidenza_mano:,.1f} %".replace(".", ","), help="Indica la percentuale assorbita dalla manodopera rispetto al totale delle tue spese.")
+            st.metric("🧑‍🌾 Incidenza Costo Lavoro", f"{incidenza_mano:,.1f} %".replace(".", ","), help="Percentuale assorbita dai costi della manodopera rispetto al totale delle uscite.")
             
         with c_kpi3:
             costo_ora = (costo_manodopera / ore_totali) if ore_totali > 0 else 0.0
-            st.metric("⏱️ Costo Orario Medio Lavoro", format_euro(costo_ora), help="Rapporto tra l'importo totale pagato agli operai e le ore effettive lavorate estratte dal registro.")
+            st.metric("⏱️ Costo Orario Medio Lavoro", format_euro(costo_ora), help="Rapporto tra l'importo totale pagato agli operai (buste, extra, oneri) e le ore stimate/lavorate.")
 
         # --- LAYOUT: RIPARTIZIONE DEI COSTI ---
         st.divider()
         st.subheader("🥧 Distribuzione e Analisi delle Uscite")
         if not df_uscite.empty:
-            # Raggruppamento dinamico (Pandas Groupby)
             costi_per_cat = df_uscite.groupby('categoria')['importo'].sum().reset_index()
             costi_per_cat = costi_per_cat.sort_values(by='importo', ascending=False)
             costi_per_cat = costi_per_cat.rename(columns={'categoria': 'Categoria', 'importo': 'Importo (€)'})
@@ -130,7 +143,7 @@ if not df_git.empty:
                 df_view['Importo (€)'] = df_view['Importo (€)'].apply(lambda x: format_euro(x))
                 st.dataframe(df_view, use_container_width=True, hide_index=True)
             
-            st.info(f"💡 **Insight Forza Lavoro:** Nel corso dell'annata {anno_sel}, sono state rilevate **{giornate_totali:,.1f} giornate** lavorative, equivalenti a **{ore_totali:,.1f} ore** di fatica registrata per la coltura '{coltura_sel}'.")
+            st.info(f"💡 **Insight Forza Lavoro:** Nel corso dell'annata {anno_sel}, sono state rilevate **{giornate_totali:,.1f} giornate** lavorative, equivalenti a **{ore_totali:,.1f} ore** di impiego per la coltura selezionata.")
         else:
             st.write("Nessuna uscita registrata per i filtri selezionati.")
 
