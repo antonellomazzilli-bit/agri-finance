@@ -36,3 +36,4 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-07-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Giugno 2026,734.0,,Saldato,734.0,734.0,2026-07-02|734.0|Erogazione Diretta,,Azienda,2026-07-02
 2026-08-05,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Luglio 2026,1092.0,,Saldato,1092.0,1092.0,2026-08-05|1092.0|Erogazione Diretta,,Azienda,
 2026-08-05,Uscita,Oneri,Iannone Felice | Oneri Luglio 2026,244.15,,Saldato,244.15,244.15,2026-08-05|244.15|Registrazione iniziale,,,
+2026-08-25,Uscita,Irrigazione,Associazione Irrigua | Ricarica scheda per irrigazione,500.0,,Saldato,500.0,500.0,2026-08-25|500.0|Registrazione iniziale,,,
