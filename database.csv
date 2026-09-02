@@ -39,3 +39,5 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-08-25,Uscita,Irrigazione,Associazione Irrigua | Ricarica scheda per irrigazione,500.0,,Saldato,500.0,500.0,2026-08-25|500.0|Registrazione iniziale,0.0,,
 2026-09-02,Uscita,Oneri,Iannone Felice | Oneri mese di Agosto,238.8,,Impegnato,238.8,0.0,,238.8,,
 2026-09-02,Uscita,Oneri,Iannone Felice | Oneri Inps 1° Trimestre 2026,834.01,,Impegnato,834.01,0.0,,834.01,,
+2026-08-31,Uscita,Manodopera,Iannone Felice | 15.000 gg | UFFICIALE: Giornate mese di Agosto 2026,0.0,,Impegnato,0.0,0.0,,,Olive,
+2026-08-31,Uscita,Manodopera Extra,Iannone Felice | -15.000 gg | EXTRA: Giornate mese di Agosto 2026,0.0,,Impegnato,0.0,0.0,,,Olive,
