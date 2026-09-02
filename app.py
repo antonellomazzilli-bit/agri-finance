@@ -362,7 +362,7 @@ with tab1:
 
 
 # ==========================================
-# --- TAB 2: MANODOPERA (SOLO INSERIMENTO) ---
+# --- TAB 2: MANODOPERA (CON RIEPILOGO MATEMATICO) ---
 # ==========================================
 with tab2:
     st.header("🚜 Gestione Manodopera")
@@ -408,10 +408,42 @@ with tab2:
             
             if save_to_github(df, sha, "Aggiornamento Manodopera"):
                 st.success("✅ Giornate lavorative registrate con successo!")
+                import time
                 time.sleep(1)
                 st.rerun()
         else:
             st.warning("Nessun dato valido inserito (Giornate a zero).")
+
+    # --- NUOVO SCHERMO: RIEPILOGO TAB 2 ---
+    st.divider()
+    st.subheader("📊 Riepilogo Giornate Lavorate (Totali vs Extra)")
+    
+    df_lav = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].copy()
+    if not df_lav.empty:
+        df_lav['data_dt'] = pd.to_datetime(df_lav['data'], errors='coerce')
+        mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
+        
+        riepilogo = {}
+        for _, row in df_lav.iterrows():
+            if pd.notna(row['data_dt']):
+                chiave = f"{mesi_nomi[row['data_dt'].month]} {row['data_dt'].year}"
+                gg = estrai_giornate(str(row['descrizione']), "Iannone Felice")
+                
+                if chiave not in riepilogo:
+                    riepilogo[chiave] = {'Giornate TOTALI': 0.0, 'Giornate EXTRA': 0.0, 'Giornate UFFICIALI': 0.0}
+                    
+                riepilogo[chiave]['Giornate TOTALI'] += gg
+                if row['categoria'] == 'Manodopera Extra':
+                    riepilogo[chiave]['Giornate EXTRA'] += gg
+                elif row['categoria'] == 'Manodopera':
+                    riepilogo[chiave]['Giornate UFFICIALI'] += gg
+
+        if riepilogo:
+            df_riep = pd.DataFrame.from_dict(riepilogo, orient='index')
+            st.dataframe(df_riep, use_container_width=True)
+        else:
+            st.info("Nessuna giornata registrata finora.")
+
 
 # ==========================================
 # --- TAB 3: CASSA E CONTROLLO MESI ARRETRATI ---
@@ -427,9 +459,9 @@ with tab3:
         
         dati_mensili = {}
         mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
+        mesi_nomi_inv = {v: k for k, v in mesi_nomi.items()} # Per la ricerca inversa
         
         # 2. Calcolo Maturato (SOLO LAVORO EXTRA)
-        # Le giornate ufficiali non vengono più moltiplicate per 55€, il loro debito sarà pari alla Busta Paga
         lavoro_df = df[df['categoria'] == 'Manodopera Extra']
         
         for index, row in lavoro_df.iterrows():
@@ -457,13 +489,9 @@ with tab3:
             mese_trovato = False
             for chiave in dati_mensili.keys():
                 if chiave in descrizione:
-                    # Se è un pagamento non ufficiale (Extra), scala solo il debito
                     dati_mensili[chiave]['Pagato'] += importo_pagato
-                    
-                    # AUTO-BILANCIAMENTO: Se è Busta Paga, il costo del lavoratore diventa esattamente pari a quanto l'hai pagato
                     if cat_pag == 'Busta Paga':
                         dati_mensili[chiave]['Maturato'] += importo_pagato
-                        
                     mese_trovato = True
                     break
             
@@ -475,79 +503,28 @@ with tab3:
                 if cat_pag == 'Busta Paga':
                     dati_mensili["Pagamenti Pregressi/Non Allocati"]['Maturato'] += importo_pagato
 
-        # 4. Visualizzazione e GENERAZIONE PDF
+        # 4. Visualizzazione e Tabella
         st.markdown("### 📊 Situazione Arretrati e Saldi per Mese")
         saldo_globale = 0.0
         
         if dati_mensili:
-            # --- MOTORE DI ORDINAMENTO CRONOLOGICO ---
-            mesi_ordine = {'Gennaio': 1, 'Febbraio': 2, 'Marzo': 3, 'Aprile': 4, 'Maggio': 5, 'Giugno': 6, 'Luglio': 7, 'Agosto': 8, 'Settembre': 9, 'Ottobre': 10, 'Novembre': 11, 'Dicembre': 12}
-            
             def chiave_ordinamento(item):
                 chiave = item[0]
-                if chiave == "Pagamenti Pregressi/Non Allocati":
-                    return (0, 0)
+                if chiave == "Pagamenti Pregressi/Non Allocati": return (0, 0)
                 try:
                     mese_testo, anno_testo = chiave.split()
-                    return (int(anno_testo), mesi_ordine.get(mese_testo, 0))
+                    return (int(anno_testo), mesi_nomi_inv.get(mese_testo, 0))
                 except:
                     return (9999, 99) 
                     
             dati_mensili = dict(sorted(dati_mensili.items(), key=chiave_ordinamento))
-        
             df_riepilogo = pd.DataFrame.from_dict(dati_mensili, orient='index')
             df_riepilogo['Stato Mensile'] = df_riepilogo['Pagato'] - df_riepilogo['Maturato']
             
-            # Calcolo dei totali
             totale_maturato = df_riepilogo['Maturato'].sum()
             totale_pagato = df_riepilogo['Pagato'].sum()
             saldo_globale = totale_pagato - totale_maturato
             
-            # --- MOTORE DI DISEGNO DEL PDF ---
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", 'B', 16)
-            pdf.cell(190, 10, txt="Estratto Conto Arretrati - Iannone Felice", ln=True, align='C')
-            pdf.set_font("Arial", size=10)
-            from datetime import datetime
-            pdf.cell(190, 10, txt=f"Generato il: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='C')
-            pdf.ln(5)
-            
-            pdf.set_font("Arial", 'B', 11)
-            pdf.cell(55, 10, "Mese Riferimento", 1, 0, 'C')
-            pdf.cell(45, 10, "Maturato", 1, 0, 'C')
-            pdf.cell(45, 10, "Pagato", 1, 0, 'C')
-            pdf.cell(45, 10, "Saldo Mese", 1, 1, 'C')
-            
-            pdf.set_font("Arial", size=11)
-            for mese, row in df_riepilogo.iterrows():
-                pdf.cell(55, 10, str(mese), 1, 0, 'L')
-                pdf.cell(45, 10, f"{row['Maturato']:,.2f} Euro", 1, 0, 'R')
-                pdf.cell(45, 10, f"{row['Pagato']:,.2f} Euro", 1, 0, 'R')
-                pdf.cell(45, 10, f"{row['Stato Mensile']:,.2f} Euro", 1, 1, 'R')
-                
-            pdf.ln(10)
-            pdf.set_font("Arial", 'B', 12)
-            if saldo_globale < 0:
-                pdf.set_text_color(220, 53, 69)
-                pdf.cell(190, 10, txt=f"ATTENZIONE: Arretrati da pagare per {abs(saldo_globale):,.2f} Euro", ln=True)
-            else:
-                pdf.set_text_color(40, 167, 69)
-                pdf.cell(190, 10, txt=f"Situazione Regolare. Saldo finale: {saldo_globale:,.2f} Euro", ln=True)
-                
-            pdf.set_text_color(0, 0, 0)
-            
-            # --- PULSANTE PDF ---
-            pdf_bytes = pdf.output(dest='S').encode('latin-1')
-            st.download_button(
-                label="📄 Scarica Tabella Arretrati (PDF)",
-                data=pdf_bytes,
-                file_name=f'Arretrati_Iannone_{datetime.now().strftime("%Y_%m")}.pdf',
-                mime='application/pdf',
-                type="primary"
-            )
-            
-            # Formattazione estetica a schermo
             df_display = df_riepilogo.copy()
             for col in df_display.columns:
                 df_display[col] = df_display[col].apply(lambda x: f"{x:,.2f} €")
@@ -563,7 +540,7 @@ with tab3:
             
         st.divider()
         
-        # 5. Modulo di Pagamento Cassa
+        # 5. Modulo di Pagamento Cassa CON AUTO-SALDATO
         with st.form("cassa_form", clear_on_submit=True):
             st.write("### ➕ Registra un pagamento al dipendente")
             
@@ -575,21 +552,15 @@ with tab3:
             with c3:
                 tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
                 
-                mesi_da_pagare = []
-                # Ora mostriamo anche i mesi in cui c'è lavoro ufficiale ma non ancora pagato
-                # Per farlo leggiamo le presenze direttamente dal database per costruire la tendina
                 presenze_mesi = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])]['data_dt'].dt.strftime('%B %Y').dropna().unique()
-                
-                # Traduzione mesi in italiano per la tendina
+                import datetime
                 mesi_tradotti = []
                 for m in presenze_mesi:
                     for num, nome in mesi_nomi.items():
-                        if m.startswith(datetime.strptime(str(num), "%m").strftime("%B")):
+                        if m.startswith(datetime.datetime.strptime(str(num), "%m").strftime("%B")):
                             mesi_tradotti.append(f"{nome} {m.split(' ')[1]}")
                 
-                if not mesi_tradotti:
-                    mesi_tradotti = ["Nessun mese registrato (Versamento Generico)"]
-                    
+                if not mesi_tradotti: mesi_tradotti = ["Nessun mese registrato (Versamento Generico)"]
                 mese_rif = st.selectbox("Mese di Riferimento del Pagamento", set(mesi_tradotti))
             
             if st.form_submit_button("Registra Pagamento e Copri il Mese", type="primary"):
@@ -599,17 +570,35 @@ with tab3:
                     
                     nuova_riga = {
                         'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
-                        'descrizione': descrizione_estesa, 
-                        'importo': float(imp), 'prodotto': "Azienda", 'stato': "Saldato", 
+                        'descrizione': descrizione_estesa, 'importo': float(imp), 
+                        'prodotto': "Azienda", 'stato': "Saldato", 
                         'totale_fattura': float(imp), 'importo_pagato': float(imp), 
                         'registro_pagamenti': f"{data_f}|{imp}|Erogazione Diretta"
                     }
                     df = pd.concat([df, pd.DataFrame([nuova_riga])], ignore_index=True)
                     
-                    if save_to_github(df, sha, f"Pagato: {imp}€ per {mese_rif}"):
-                        st.success(f"✅ Pagamento di {imp}€ registrato a copertura di {mese_rif}!")
+                    # --- MAGIA AUTO-SALDATO ---
+                    try:
+                        if mese_rif != "Nessun mese registrato (Versamento Generico)":
+                            nome_mese, anno_str = mese_rif.split()
+                            m_num = mesi_nomi_inv[nome_mese]
+                            y_num = int(anno_str)
+                            
+                            cat_target = "Manodopera" if tipo_op == "Busta Paga" else ("Manodopera Extra" if tipo_op == "Saldo Extra" else None)
+                            
+                            if cat_target:
+                                df['data_temp'] = pd.to_datetime(df['data'], errors='coerce')
+                                maschera = (df['categoria'] == cat_target) & (df['stato'] != 'Saldato') & (df['data_temp'].dt.month == m_num) & (df['data_temp'].dt.year == y_num)
+                                df.loc[maschera, 'stato'] = 'Saldato'
+                                df = df.drop(columns=['data_temp'])
+                    except Exception:
+                        pass # Se c'è un errore nella lettura del mese, registra comunque il pagamento
+                    # --------------------------
+                    
+                    if save_to_github(df, sha, f"Pagato: {imp}€ per {mese_rif} e aggiornato stato giornate"):
+                        st.success(f"✅ Pagamento di {imp}€ registrato! Le giornate in Tab 1 sono state chiuse in automatico.")
                         import time
-                        time.sleep(1.5)
+                        time.sleep(2)
                         st.rerun()
                 else:
                     st.warning("L'importo deve essere maggiore di zero.")
