@@ -475,6 +475,12 @@ with tab3:
                 
                 if row['categoria'] == 'Manodopera Extra':
                     gg_lavorati = estrai_giornate(str(row['descrizione']), "Iannone Felice")
+                    
+                    # --- SCUDO MATEMATICO ANTI-ERRORE ---
+                    # Se le giornate extra inserite per sbaglio sono negative, le forza a 0
+                    if gg_lavorati < 0:
+                        gg_lavorati = 0.0
+                        
                     dati_mensili[chiave_mese]['Extra Maturato (Debito)'] += gg_lavorati * 55.0
 
         # 3. Associazione Pagamenti (SEPARATA)
