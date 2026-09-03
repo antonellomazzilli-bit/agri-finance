@@ -12,10 +12,10 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-05-31,Uscita,Manodopera Extra,Iannone Felice | 10.818 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato,0.0,0.0,2026-05-31|0.0,0.0,,2026-05-31
 2026-05-18,Uscita,Oneri,ONERI MESE DI APRILE,133.34,Olive,Saldato,133.34,133.34,2026-05-18|133.34,0.0,,2026-05-18
 2026-04-30,Uscita,Manodopera,Iannone Felice | 9.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato,0.0,0.0,2026-04-30|0.0,0.0,,2026-04-30
-2026-04-30,Uscita,Manodopera Extra,Iannone Felice | 18.181 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato,0.0,0.0,2026-04-30|0.0,0.0,,2026-04-30
+2026-04-30,Uscita,Manodopera Extra,Iannone Felice | 18.181 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,1495.0,Olive,Saldato,1495.0,0.0,2026-04-30|0.0,0.0,,2026-04-30
 2026-04-16,Uscita,Oneri,ONERI MESE DI MARZO,234.47,Olive,Saldato,234.47,234.47,2026-04-16|234.47,0.0,,2026-04-16
 2026-03-31,Uscita,Manodopera,Iannone Felice | 15.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato,0.0,0.0,2026-03-31|0.0,0.0,,2026-03-31
-2026-03-31,Uscita,Manodopera Extra,Iannone Felice | 21.363 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,2000.0,Olive,Saldato,2000.0,0.0,2026-03-31|0.0,0.0,,2026-03-31
+2026-03-31,Uscita,Manodopera Extra,Iannone Felice | 21.363 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,2000.0,Olive,Saldato,2000.0,0.0,2026-03-31|0.0,2000.0,,2026-03-31
 2026-02-28,Uscita,Manodopera,Iannone Felice | 14.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riepilogo Febbraio 2026,0.0,Olive,Saldato,0.0,0.0,2026-02-28|0.0,0.0,,2026-02-28
 2026-02-28,Uscita,Manodopera Extra,Iannone Felice | 9.454 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riepilogo Febbraio 2026,1290.0,Olive,Saldato,1290.0,0.0,2026-02-28|0.0,1290.0,,2026-02-28
 2026-01-31,Uscita,Manodopera,Iannone Felice | 13.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Totale Gennaio 2026,0.0,Olive,Saldato,0.0,0.0,2026-01-31|0.0,0.0,,2026-01-31
