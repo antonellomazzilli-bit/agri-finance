@@ -17,9 +17,9 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-03-31,Uscita,Manodopera,Iannone Felice | 15.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: ,0.0,Olive,Saldato,0.0,0.0,2026-03-31|0.0,0.0,,2026-03-31
 2026-03-31,Uscita,Manodopera Extra,Iannone Felice | 21.363 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,0.0,Olive,Saldato,0.0,0.0,2026-03-31|0.0,0.0,,2026-03-31
 2026-02-28,Uscita,Manodopera,Iannone Felice | 14.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Riepilogo Febbraio 2026,0.0,Olive,Saldato,0.0,0.0,2026-02-28|0.0,0.0,,2026-02-28
-2026-02-28,Uscita,Manodopera Extra,Iannone Felice | 9.454 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riepilogo Febbraio 2026,0.0,Olive,Saldato,0.0,0.0,2026-02-28|0.0,0.0,,2026-02-28
+2026-02-28,Uscita,Manodopera Extra,Iannone Felice | 9.454 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riepilogo Febbraio 2026,1290.0,Olive,Saldato,1290.0,0.0,2026-02-28|0.0,0.0,,2026-02-28
 2026-01-31,Uscita,Manodopera,Iannone Felice | 13.000 gg | Nessuno (Attesa Busta Paga) | UFFICIALE: Totale Gennaio 2026,0.0,Olive,Saldato,0.0,0.0,2026-01-31|0.0,0.0,,2026-01-31
-2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.364 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Totale Gennaio 2026,475.0,Olive,Saldato,475.0,0.0,2026-01-31|0.0,0.0,,2026-01-31
+2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.364 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Totale Gennaio 2026,475.0,Olive,Saldato,475.0,0.0,2026-01-31|0.0,475.0,,2026-01-31
 2026-01-01,Entrata,Vendita Olive,Mazzilli Nunzio | Vendite Olive 2025,9000.0,Olive,Saldato,9000.0,9000.0,2026-01-01|9000.0,0.0,,2026-01-01
 2026-06-29,Uscita,Materiale Agricolo (Concimi/Piante),L'Agraria di raimondo G. & C. s.n.c. | fattura Proforma n. 39,1315.55,Azienda Generale,Saldato,1315.55,1315.55,2026-06-29|1315.55,0.0,,2026-06-29
 2026-07-11,Uscita,Materiale Agricolo (Concimi/Piante),Racanati | Doc. di consegna 6913/c del 11/07/2026,2522.0,Azienda Generale,Da Saldare,2522.0,0.0,,2522.0,,2026-07-11
