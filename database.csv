@@ -34,10 +34,11 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-04-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Marzo 2026,1058.67,,Saldato,1058.67,1058.67,2026-04-02|1058.67|Erogazione Diretta,0.0,Azienda,2026-04-02
 2026-05-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Aprile 2026,641.63,,Saldato,641.63,641.63,2026-05-02|641.63|Erogazione Diretta,0.0,Azienda,2026-05-02
 2026-07-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Giugno 2026,734.0,,Saldato,734.0,734.0,2026-07-02|734.0|Erogazione Diretta,0.0,Azienda,2026-07-02
-2026-08-05,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Luglio 2026,1092.0,,Saldato,1092.0,1092.0,2026-08-05|1092.0|Erogazione Diretta,0.0,Azienda,
-2026-08-05,Uscita,Oneri,Iannone Felice | Oneri Luglio 2026,244.15,,Saldato,244.15,244.15,2026-08-05|244.15|Registrazione iniziale,0.0,,
-2026-08-25,Uscita,Irrigazione,Associazione Irrigua | Ricarica scheda per irrigazione,500.0,,Saldato,500.0,500.0,2026-08-25|500.0|Registrazione iniziale,0.0,,
-2026-09-02,Uscita,Oneri,Iannone Felice | Oneri mese di Agosto,238.8,,Impegnato,238.8,0.0,,238.8,,
-2026-09-02,Uscita,Oneri,Iannone Felice | Oneri Inps 1° Trimestre 2026,834.01,,Impegnato,834.01,0.0,,834.01,,
-2026-08-31,Uscita,Manodopera,Iannone Felice | 15.000 gg | UFFICIALE: Giornate mese di Agosto 2026,0.0,,Impegnato,0.0,0.0,,,Olive,
-2026-08-31,Uscita,Manodopera Extra,Iannone Felice | -15.000 gg | EXTRA: Giornate mese di Agosto 2026,0.0,,Impegnato,0.0,0.0,,,Olive,
+2026-08-05,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Luglio 2026,1092.0,,Saldato,1092.0,1092.0,2026-08-05|1092.0|Erogazione Diretta,0.0,Azienda,2026-08-05
+2026-08-05,Uscita,Oneri,Iannone Felice | Oneri Luglio 2026,244.15,,Saldato,244.15,244.15,2026-08-05|244.15|Registrazione iniziale,0.0,,2026-08-05
+2026-08-25,Uscita,Irrigazione,Associazione Irrigua | Ricarica scheda per irrigazione,500.0,,Saldato,500.0,500.0,2026-08-25|500.0|Registrazione iniziale,0.0,,2026-08-25
+2026-09-02,Uscita,Oneri,Iannone Felice | Oneri mese di Agosto,238.8,,Impegnato,238.8,0.0,,238.8,,2026-09-02
+2026-09-02,Uscita,Oneri,Iannone Felice | Oneri Inps 1° Trimestre 2026,834.01,,Impegnato,834.01,0.0,,834.01,,2026-09-02
+2026-08-31,Uscita,Manodopera,Iannone Felice | 15.000 gg | UFFICIALE: Giornate mese di Agosto 2026,0.0,,Saldato,0.0,0.0,,,Olive,2026-08-31
+2026-08-31,Uscita,Manodopera Extra,Iannone Felice | -15.000 gg | EXTRA: Giornate mese di Agosto 2026,0.0,,Impegnato,0.0,0.0,,,Olive,2026-08-31
+2026-09-03,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Agosto 2026,1095.94,,Saldato,1095.94,1095.94,2026-09-03|1095.94|Erogazione Diretta,,Azienda,
