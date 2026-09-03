@@ -202,9 +202,12 @@ with tab1:
     import json
     import time
     
-    # --- 1. MODULO NOTIFICHE (AREA QUARANTENA) ---
+    # --- COORDINATE GITHUB AGGIUNTE PER RISOLVERE IL NAMEERROR ---
+    GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+    REPO = "antonellomazzilli-bit/agri-finance"
     FILE_RICHIESTE = "richieste_sospese.csv"
     
+    # --- 1. MODULO NOTIFICHE (AREA QUARANTENA) ---
     def get_richieste():
         url = f"https://api.github.com/repos/{REPO}/contents/{FILE_RICHIESTE}"
         headers = {"Authorization": f"token {GITHUB_TOKEN}"}
