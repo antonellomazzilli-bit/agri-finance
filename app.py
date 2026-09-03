@@ -457,6 +457,7 @@ with tab3:
     df, sha = get_github_file()
     
     if not df.empty:
+        # 1. Preparazione Dati
         df['importo'] = pd.to_numeric(df['importo'], errors='coerce').fillna(0.0)
         df['data_dt'] = pd.to_datetime(df['data'], errors='coerce')
         
@@ -464,6 +465,7 @@ with tab3:
         mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
         mesi_nomi_inv = {v: k for k, v in mesi_nomi.items()}
         
+        # 2. Inizializzazione Mesi e Calcolo Extra (SEPARATO)
         tutto_lavoro = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
         
         for index, row in tutto_lavoro.iterrows():
@@ -478,7 +480,7 @@ with tab3:
                 if row['categoria'] == 'Manodopera Extra':
                     gg_lavorati = estrai_giornate(str(row['descrizione']), "Iannone Felice")
                     
-                    # SALVAVITA: Se hai scritto l'importo esatto in Tab 1, il sistema lo prenderà alla lettera.
+                    # SALVAVITA: Forza l'importo esatto se digitato in Tab 1
                     importo_forzato = abs(float(row['importo']))
                     if importo_forzato > 0:
                         valore_maturato = importo_forzato
@@ -487,6 +489,7 @@ with tab3:
                         
                     dati_mensili[chiave_mese]['Extra Maturato (Debito)'] += valore_maturato
 
+        # 3. Associazione Pagamenti (SEPARATA)
         pagamenti_df = df[df['categoria'].isin(['Busta Paga', 'Saldo Extra', 'Rimborsi'])]
         
         for index, row in pagamenti_df.iterrows():
@@ -514,6 +517,7 @@ with tab3:
                 elif cat == 'Busta Paga':
                     dati_mensili[chiave_na]['Busta Paga Versata'] += importo_pagato
 
+        # 4. Visualizzazione e Tabella Trasparente
         st.markdown("### 📊 Situazione Arretrati e Compensazione Lavoro")
         saldo_globale = 0.0
         
@@ -530,13 +534,12 @@ with tab3:
             dati_mensili = dict(sorted(dati_mensili.items(), key=chiave_ordinamento))
             df_riepilogo = pd.DataFrame.from_dict(dati_mensili, orient='index')
             
-            # --- LA MATEMATICA PERFETTA CHE HAI RICHIESTO ---
+            # Formule di calcolo delle colonne
             df_riepilogo['Saldo Arretrati (Extra)'] = df_riepilogo['Extra Pagato'] - df_riepilogo['Extra Maturato (Debito)']
             df_riepilogo['Differenza (Busta - Extra)'] = df_riepilogo['Busta Paga Versata'] - df_riepilogo['Extra Maturato (Debito)']
             
-            totale_maturato_ex = df_riepilogo['Extra Maturato (Debito)'].sum()
-            totale_pagato_ex = df_riepilogo['Extra Pagato'].sum()
-            saldo_globale = totale_pagato_ex - totale_maturato_ex
+            # --- MODIFICA RICHIESTA: Il Saldo Globale è la somma della colonna Differenza ---
+            saldo_globale = df_riepilogo['Differenza (Busta - Extra)'].sum()
             
             df_display = df_riepilogo.copy()
             for col in df_display.columns:
@@ -544,6 +547,7 @@ with tab3:
                 
             st.dataframe(df_display, use_container_width=True)
             
+            # --- MOTORE DI DISEGNO DEL PDF ---
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", 'B', 16)
@@ -579,10 +583,10 @@ with tab3:
             pdf.set_font("Arial", 'B', 12)
             if saldo_globale < 0:
                 pdf.set_text_color(220, 53, 69)
-                pdf.cell(190, 10, txt=f"ATTENZIONE: Arretrati (Extra) da pagare per {abs(saldo_globale):,.2f} Euro", ln=True)
+                pdf.cell(190, 10, txt=f"ATTENZIONE: Differenza totale (Busta - Extra) negativa per {abs(saldo_globale):,.2f} Euro", ln=True)
             else:
                 pdf.set_text_color(40, 167, 69)
-                pdf.cell(190, 10, txt=f"Situazione Extra regolare. Saldo finale: {saldo_globale:,.2f} Euro", ln=True)
+                pdf.cell(190, 10, txt=f"Situazione Regolare. Differenza totale (Busta - Extra): {saldo_globale:,.2f} Euro", ln=True)
                 
             pdf.set_text_color(0, 0, 0)
             
@@ -595,15 +599,17 @@ with tab3:
                 type="primary"
             )
             
+            # --- MESSAGGIO A SCHERMO (Rosso o Verde) ---
             if saldo_globale < 0:
-                st.error(f"⚠️ ATTENZIONE: Il dipendente risulta in credito (arretrati Extra) per: **{abs(saldo_globale):,.2f} €**")
+                st.error(f"⚠️ ATTENZIONE: La differenza totale (Busta Paga - Extra) è negativa per: **{abs(saldo_globale):,.2f} €**")
             else:
-                st.success(f"✅ Situazione Extra regolare. Saldo arretrati globale: **{saldo_globale:,.2f} €**")
+                st.success(f"✅ Situazione regolare. La differenza totale (Busta Paga - Extra) è: **{saldo_globale:,.2f} €**")
         else:
             st.info("Nessun dato lavorativo o di pagamento registrato.")
             
         st.divider()
         
+        # 5. Modulo di Pagamento Cassa CON AUTO-SALDATO
         with st.form("cassa_form", clear_on_submit=True):
             st.write("### ➕ Registra un pagamento al dipendente")
             
@@ -611,7 +617,8 @@ with tab3:
             with c1:
                 data_pag = st.date_input("Data del Bonifico/Contanti", format="DD/MM/YYYY")
             with c2:
-                imp = st.number_input("Importo Erogato (€)", min_value=0.0, step=10.0, format="%.2f", value=float(abs(saldo_globale) if saldo_globale < 0 else 0.0))
+                # Modificato in 0.0 fisso per evitare confusioni sull'auto-inserimento
+                imp = st.number_input("Importo Erogato (€)", min_value=0.0, step=10.0, format="%.2f", value=0.0)
             with c3:
                 tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
                 
