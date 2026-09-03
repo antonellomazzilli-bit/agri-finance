@@ -459,9 +459,9 @@ with tab3:
         
         dati_mensili = {}
         mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
-        mesi_nomi_inv = {v: k for k, v in mesi_nomi.items()} # Per la ricerca inversa
+        mesi_nomi_inv = {v: k for k, v in mesi_nomi.items()}
         
-        # 2. Inizializzazione Mesi (CORREZIONE BUG: Prende TUTTO il lavoro, non solo l'extra)
+        # 2. Inizializzazione Mesi e Calcolo Extra (SEPARATO)
         tutto_lavoro = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
         
         for index, row in tutto_lavoro.iterrows():
@@ -470,47 +470,43 @@ with tab3:
                 anno_num = row['data_dt'].year
                 chiave_mese = f"{mesi_nomi[mese_num]} {anno_num}"
                 
-                # Creiamo la riga del mese a prescindere dal tipo di giornata
                 if chiave_mese not in dati_mensili:
-                    dati_mensili[chiave_mese] = {'Maturato': 0.0, 'Pagato': 0.0}
+                    dati_mensili[chiave_mese] = {'Extra Maturato (Debito)': 0.0, 'Extra Pagato': 0.0, 'Busta Paga Versata': 0.0}
                 
-                # Il debito matematico (55€/giorno) si innesca SOLO per le giornate Extra
                 if row['categoria'] == 'Manodopera Extra':
                     gg_lavorati = estrai_giornate(str(row['descrizione']), "Iannone Felice")
-                    valore_maturato = gg_lavorati * 55.0
-                    dati_mensili[chiave_mese]['Maturato'] += valore_maturato
+                    dati_mensili[chiave_mese]['Extra Maturato (Debito)'] += gg_lavorati * 55.0
 
-        # 3. Associazione Pagamenti al Mese
-        cat_pagamenti = ['Busta Paga', 'Saldo Extra', 'Rimborsi']
-        pagamenti_df = df[df['categoria'].isin(cat_pagamenti)]
+        # 3. Associazione Pagamenti (SEPARATA)
+        pagamenti_df = df[df['categoria'].isin(['Busta Paga', 'Saldo Extra', 'Rimborsi'])]
         
         for index, row in pagamenti_df.iterrows():
             importo_pagato = row['importo']
-            descrizione = str(row['descrizione'])
-            cat_pag = row['categoria']
+            desc_str = str(row['descrizione'])
+            cat = row['categoria']
             
             mese_trovato = False
             for chiave in dati_mensili.keys():
-                if chiave in descrizione:
-                    dati_mensili[chiave]['Pagato'] += importo_pagato
-                    
-                    # Se il pagamento è una Busta Paga, il costo Ufficiale diventa esattamente pari a quanto l'hai pagata
-                    if cat_pag == 'Busta Paga':
-                        dati_mensili[chiave]['Maturato'] += importo_pagato
-                        
+                if chiave in desc_str:
+                    if cat == 'Saldo Extra' or cat == 'Rimborsi':
+                        dati_mensili[chiave]['Extra Pagato'] += importo_pagato
+                    elif cat == 'Busta Paga':
+                        dati_mensili[chiave]['Busta Paga Versata'] += importo_pagato
                     mese_trovato = True
                     break
             
             if not mese_trovato:
-                if "Pagamenti Pregressi/Non Allocati" not in dati_mensili:
-                    dati_mensili["Pagamenti Pregressi/Non Allocati"] = {'Maturato': 0.0, 'Pagato': 0.0}
+                chiave_na = "Pagamenti Pregressi/Non Allocati"
+                if chiave_na not in dati_mensili:
+                    dati_mensili[chiave_na] = {'Extra Maturato (Debito)': 0.0, 'Extra Pagato': 0.0, 'Busta Paga Versata': 0.0}
                 
-                dati_mensili["Pagamenti Pregressi/Non Allocati"]['Pagato'] += importo_pagato
-                if cat_pag == 'Busta Paga':
-                    dati_mensili["Pagamenti Pregressi/Non Allocati"]['Maturato'] += importo_pagato
+                if cat == 'Saldo Extra' or cat == 'Rimborsi':
+                    dati_mensili[chiave_na]['Extra Pagato'] += importo_pagato
+                elif cat == 'Busta Paga':
+                    dati_mensili[chiave_na]['Busta Paga Versata'] += importo_pagato
 
-        # 4. Visualizzazione e Tabella
-        st.markdown("### 📊 Situazione Arretrati e Saldi per Mese")
+        # 4. Visualizzazione e Tabella Trasparente
+        st.markdown("### 📊 Situazione Arretrati e Compensazione Lavoro")
         saldo_globale = 0.0
         
         if dati_mensili:
@@ -525,11 +521,14 @@ with tab3:
                     
             dati_mensili = dict(sorted(dati_mensili.items(), key=chiave_ordinamento))
             df_riepilogo = pd.DataFrame.from_dict(dati_mensili, orient='index')
-            df_riepilogo['Stato Mensile'] = df_riepilogo['Pagato'] - df_riepilogo['Maturato']
             
-            totale_maturato = df_riepilogo['Maturato'].sum()
-            totale_pagato = df_riepilogo['Pagato'].sum()
-            saldo_globale = totale_pagato - totale_maturato
+            # --- LA MATEMATICA E' STATA INVERTITA IN SOTTRAZIONE COME RICHIESTO ---
+            df_riepilogo['Saldo Arretrati (Extra)'] = df_riepilogo['Extra Pagato'] - df_riepilogo['Extra Maturato (Debito)']
+            df_riepilogo['Differenza (Busta - Extra)'] = df_riepilogo['Busta Paga Versata'] - df_riepilogo['Extra Maturato (Debito)']
+            
+            totale_maturato_ex = df_riepilogo['Extra Maturato (Debito)'].sum()
+            totale_pagato_ex = df_riepilogo['Extra Pagato'].sum()
+            saldo_globale = totale_pagato_ex - totale_maturato_ex
             
             df_display = df_riepilogo.copy()
             for col in df_display.columns:
@@ -537,12 +536,68 @@ with tab3:
                 
             st.dataframe(df_display, use_container_width=True)
             
+            # --- MOTORE DI DISEGNO DEL PDF AGGIORNATO ---
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", 'B', 16)
+            pdf.cell(190, 10, txt="Estratto Conto Lavoro - Iannone Felice", ln=True, align='C')
+            pdf.set_font("Arial", size=10)
+            from datetime import datetime
+            pdf.cell(190, 10, txt=f"Generato il: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='C')
+            pdf.ln(5)
+            
+            # Intestazioni PDF ridimensionate per far spazio alla parola "Differenza"
+            pdf.set_font("Arial", 'B', 9)
+            pdf.cell(32, 10, "Mese", 1, 0, 'C')
+            pdf.cell(28, 10, "Debito Ext", 1, 0, 'C')
+            pdf.cell(28, 10, "Pagato Ext", 1, 0, 'C')
+            pdf.cell(32, 10, "Busta Paga", 1, 0, 'C')
+            pdf.cell(30, 10, "Arretrati", 1, 0, 'C')
+            pdf.cell(40, 10, "Diff (Busta-Ext)", 1, 1, 'C')
+            
+            pdf.set_font("Arial", size=9)
+            for mese, row in df_riepilogo.iterrows():
+                m_str = str(mese)[:12]
+                pdf.cell(32, 10, m_str, 1, 0, 'L')
+                pdf.cell(28, 10, f"{row['Extra Maturato (Debito)']:,.2f} E", 1, 0, 'R')
+                pdf.cell(28, 10, f"{row['Extra Pagato']:,.2f} E", 1, 0, 'R')
+                pdf.cell(32, 10, f"{row['Busta Paga Versata']:,.2f} E", 1, 0, 'R')
+                
+                # Colore Arretrati (Rosso o Verde)
+                pdf.set_text_color(220, 53, 69) if row['Saldo Arretrati (Extra)'] < 0 else pdf.set_text_color(40, 167, 69)
+                pdf.cell(30, 10, f"{row['Saldo Arretrati (Extra)']:,.2f} E", 1, 0, 'R')
+                pdf.set_text_color(0, 0, 0)
+                
+                # Inserimento della Differenza calcolata
+                pdf.cell(40, 10, f"{row['Differenza (Busta - Extra)']:,.2f} E", 1, 1, 'R')
+                
+            pdf.ln(10)
+            pdf.set_font("Arial", 'B', 12)
             if saldo_globale < 0:
-                st.error(f"⚠️ ATTENZIONE: Il dipendente risulta in credito totale (arretrati Extra) per: **{abs(saldo_globale):,.2f} €**")
+                pdf.set_text_color(220, 53, 69)
+                pdf.cell(190, 10, txt=f"ATTENZIONE: Arretrati (Extra) da pagare per {abs(saldo_globale):,.2f} Euro", ln=True)
             else:
-                st.success(f"✅ Situazione Extra regolare. Saldo globale: **{saldo_globale:,.2f} €**")
+                pdf.set_text_color(40, 167, 69)
+                pdf.cell(190, 10, txt=f"Situazione Extra regolare. Saldo finale: {saldo_globale:,.2f} Euro", ln=True)
+                
+            pdf.set_text_color(0, 0, 0)
+            
+            # --- PULSANTE PDF ---
+            pdf_bytes = pdf.output(dest='S').encode('latin-1')
+            st.download_button(
+                label="📄 Scarica Tabella Aggiornata (PDF)",
+                data=pdf_bytes,
+                file_name=f'Conto_Lavoro_Iannone_{datetime.now().strftime("%Y_%m")}.pdf',
+                mime='application/pdf',
+                type="primary"
+            )
+            
+            if saldo_globale < 0:
+                st.error(f"⚠️ ATTENZIONE: Il dipendente risulta in credito (arretrati Extra) per: **{abs(saldo_globale):,.2f} €**")
+            else:
+                st.success(f"✅ Situazione Extra regolare. Saldo arretrati globale: **{saldo_globale:,.2f} €**")
         else:
-            st.info("Nessun dato lavorativo Extra o di pagamento registrato.")
+            st.info("Nessun dato lavorativo o di pagamento registrato.")
             
         st.divider()
         
