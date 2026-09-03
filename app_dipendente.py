@@ -4,6 +4,7 @@ import requests
 import base64
 import json
 from datetime import datetime
+import time
 
 # Configurazione ottimizzata per Smartphone
 st.set_page_config(page_title="Portale Lavoratore", page_icon="🚜", layout="centered")
@@ -23,7 +24,6 @@ def get_richieste():
         from io import StringIO
         return pd.read_csv(StringIO(content)), data['sha']
     else:
-        # Se il file non esiste ancora, crea un DataFrame vuoto con le colonne corrette
         colonne = ['timestamp', 'lavoratore', 'tipo', 'valore', 'note', 'stato']
         return pd.DataFrame(columns=colonne), None
 
@@ -39,54 +39,71 @@ def salva_richiesta(df, sha):
     r = requests.put(url, headers=headers, data=json.dumps(payload))
     return r.status_code in [200, 201]
 
-# --- INTERFACCIA MOBILE ---
+# --- INTERFACCIA MOBILE SEMPLIFICATA ---
 st.title("🚜 Area Personale")
-st.markdown("Usa questo modulo per comunicare a fine giornata i lavori svolti o le spese sostenute.")
+st.markdown("Compila i campi qui sotto. Puoi inserire solo le ore, solo le spese, o **entrambi insieme!**")
 
-# Recupera il database delle richieste in background
 df_richieste, sha_attuale = get_richieste()
 
-# Modulo di inserimento semplice e a prova di errore
 with st.container(border=True):
     nome_dipendente = st.selectbox("👤 Chi sei?", ["Seleziona il tuo nome...", "Iannone Felice"])
     
-    tipo_inserimento = st.radio("🛠️ Cosa devi comunicare?", ["Tempo di Lavoro", "Spese Vive / Rimborsi"], horizontal=False)
+    st.divider()
+    
+    # Campo 1: Ore (Preimpostato a 0)
+    st.markdown("### ⏱️ Tempo di Lavoro")
+    ore_input = st.number_input("Ore Lavorate (Oggi)", min_value=0.0, max_value=16.0, step=0.5, value=0.0)
+    
+    # Campo 2: Spese (Preimpostato a 0)
+    st.markdown("### 💶 Spese Vive / Anticipi")
+    spesa_input = st.number_input("Importo Speso (€)", min_value=0.0, max_value=500.0, step=1.0, value=0.0)
     
     st.divider()
     
-    if tipo_inserimento == "Tempo di Lavoro":
-        valore_input = st.number_input("⏱️ Ore Lavorate (Oggi)", min_value=0.0, max_value=16.0, step=0.5)
-        etichetta_valore = "Ore"
-    else:
-        valore_input = st.number_input("💶 Importo Anticipato (€)", min_value=0.0, max_value=500.0, step=5.0)
-        etichetta_valore = "Euro"
-        
-    note_input = st.text_area("📝 Descrizione (Cosa hai fatto o cosa hai comprato?)", placeholder="Es. Potatura ulivi, oppure acquisto fascette...", height=100)
+    note_input = st.text_area("📝 Descrizione (Obbligatoria)", placeholder="Es. Potatura ulivi (8 ore). Comprato benzina decespugliatore (20€).", height=100)
     
     invia_btn = st.button("Invia all'Azienda 🚀", type="primary", use_container_width=True)
 
-# --- LOGICA DI SALVATAGGIO ---
+# --- LOGICA DI INVIO MULTIPLO ---
 if invia_btn:
     if nome_dipendente == "Seleziona il tuo nome...":
         st.error("⚠️ Seleziona prima il tuo nome!")
-    elif valore_input <= 0:
-        st.error("⚠️ Inserisci un valore maggiore di zero.")
+    elif ore_input == 0 and spesa_input == 0:
+        st.error("⚠️ Inserisci almeno le ore di lavoro o una spesa.")
     elif len(note_input) < 3:
-        st.error("⚠️ Scrivi una breve descrizione del lavoro o della spesa.")
+        st.error("⚠️ Scrivi una breve descrizione nel campo note.")
     else:
-        nuova_riga = {
-            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'lavoratore': nome_dipendente,
-            'tipo': tipo_inserimento,
-            'valore': f"{valore_input} {etichetta_valore}",
-            'note': note_input,
-            'stato': "In Attesa"
-        }
+        nuove_righe = []
+        timestamp_ora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        df_richieste = pd.concat([df_richieste, pd.DataFrame([nuova_riga])], ignore_index=True)
+        # Se ha inserito le ore, crea la prima notifica
+        if ore_input > 0:
+            nuove_righe.append({
+                'timestamp': timestamp_ora,
+                'lavoratore': nome_dipendente,
+                'tipo': "Tempo di Lavoro",
+                'valore': f"{ore_input} Ore",
+                'note': note_input,
+                'stato': "In Attesa"
+            })
+            
+        # Se ha inserito anche le spese, crea la seconda notifica
+        if spesa_input > 0:
+            nuove_righe.append({
+                'timestamp': timestamp_ora,
+                'lavoratore': nome_dipendente,
+                'tipo': "Spese Vive / Rimborsi",
+                'valore': f"{spesa_input} Euro",
+                'note': note_input,
+                'stato': "In Attesa"
+            })
+            
+        df_richieste = pd.concat([df_richieste, pd.DataFrame(nuove_righe)], ignore_index=True)
         
         with st.spinner("Invio in corso..."):
             if salva_richiesta(df_richieste, sha_attuale):
                 st.success("✅ Dati inviati con successo all'amministrazione!")
+                time.sleep(2)
+                st.rerun()
             else:
                 st.error("❌ Errore di rete. Riprova.")
