@@ -186,7 +186,7 @@ def estrai_giornate(descrizione, dipendente):
 
 
 # --- INTERFACCIA PRINCIPALE (LE 6 TAB) ---
-st.title("AgriFinance Cloud")
+st.title("AgriFinance")
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Home", "Manodopera", "Cassa", "Rese", "Bilancio", "Fatture"])
 
 
