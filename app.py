@@ -461,21 +461,24 @@ with tab3:
         mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
         mesi_nomi_inv = {v: k for k, v in mesi_nomi.items()} # Per la ricerca inversa
         
-        # 2. Calcolo Maturato (SOLO LAVORO EXTRA)
-        lavoro_df = df[df['categoria'] == 'Manodopera Extra']
+        # 2. Inizializzazione Mesi (CORREZIONE BUG: Prende TUTTO il lavoro, non solo l'extra)
+        tutto_lavoro = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
         
-        for index, row in lavoro_df.iterrows():
+        for index, row in tutto_lavoro.iterrows():
             if pd.notna(row['data_dt']):
                 mese_num = row['data_dt'].month
                 anno_num = row['data_dt'].year
                 chiave_mese = f"{mesi_nomi[mese_num]} {anno_num}"
                 
-                gg_lavorati = estrai_giornate(str(row['descrizione']), "Iannone Felice")
-                valore_maturato = gg_lavorati * 55.0
-                
+                # Creiamo la riga del mese a prescindere dal tipo di giornata
                 if chiave_mese not in dati_mensili:
                     dati_mensili[chiave_mese] = {'Maturato': 0.0, 'Pagato': 0.0}
-                dati_mensili[chiave_mese]['Maturato'] += valore_maturato
+                
+                # Il debito matematico (55€/giorno) si innesca SOLO per le giornate Extra
+                if row['categoria'] == 'Manodopera Extra':
+                    gg_lavorati = estrai_giornate(str(row['descrizione']), "Iannone Felice")
+                    valore_maturato = gg_lavorati * 55.0
+                    dati_mensili[chiave_mese]['Maturato'] += valore_maturato
 
         # 3. Associazione Pagamenti al Mese
         cat_pagamenti = ['Busta Paga', 'Saldo Extra', 'Rimborsi']
@@ -490,8 +493,11 @@ with tab3:
             for chiave in dati_mensili.keys():
                 if chiave in descrizione:
                     dati_mensili[chiave]['Pagato'] += importo_pagato
+                    
+                    # Se il pagamento è una Busta Paga, il costo Ufficiale diventa esattamente pari a quanto l'hai pagata
                     if cat_pag == 'Busta Paga':
                         dati_mensili[chiave]['Maturato'] += importo_pagato
+                        
                     mese_trovato = True
                     break
             
@@ -592,8 +598,7 @@ with tab3:
                                 df.loc[maschera, 'stato'] = 'Saldato'
                                 df = df.drop(columns=['data_temp'])
                     except Exception:
-                        pass # Se c'è un errore nella lettura del mese, registra comunque il pagamento
-                    # --------------------------
+                        pass
                     
                     if save_to_github(df, sha, f"Pagato: {imp}€ per {mese_rif} e aggiornato stato giornate"):
                         st.success(f"✅ Pagamento di {imp}€ registrato! Le giornate in Tab 1 sono state chiuse in automatico.")
