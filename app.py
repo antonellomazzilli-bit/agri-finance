@@ -191,175 +191,146 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Home", "Manodopera", "Cassa", "Re
 
 
 # ==========================================
-# --- TAB 1: HOME (CON TRACCIAMENTO TRANCHE DI PAGAMENTO) ---
+# --- TAB 1: HOME, NOTIFICHE E DATABASE ---
 # ==========================================
 with tab1:
-    st.header("🏠 Database Unificato")
+    st.header("🏠 Cruscotto Generale e Notifiche")
     
+    # Importazioni di sicurezza per far funzionare le chiamate esterne
+    import requests
+    import base64
+    import json
+    import time
+    
+    # --- 1. MODULO NOTIFICHE (AREA QUARANTENA) ---
+    FILE_RICHIESTE = "richieste_sospese.csv"
+    
+    def get_richieste():
+        url = f"https://api.github.com/repos/{REPO}/contents/{FILE_RICHIESTE}"
+        headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+        r = requests.get(url, headers=headers)
+        if r.status_code == 200:
+            data = r.json()
+            content = base64.b64decode(data['content']).decode('utf-8')
+            from io import StringIO
+            return pd.read_csv(StringIO(content)), data['sha']
+        return pd.DataFrame(), None
+
+    def update_richieste(df, sha):
+        url = f"https://api.github.com/repos/{REPO}/contents/{FILE_RICHIESTE}"
+        headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+        csv_data = df.to_csv(index=False)
+        payload = {
+            "message": "Archiviata richiesta dipendente", 
+            "content": base64.b64encode(csv_data.encode('utf-8')).decode('utf-8'),
+            "sha": sha
+        }
+        r = requests.put(url, headers=headers, data=json.dumps(payload))
+        return r.status_code in [200, 201]
+        
+    df_richieste, sha_richieste = get_richieste()
+    
+    if not df_richieste.empty:
+        # Filtriamo solo le richieste non ancora lette/gestite
+        richieste_attive = df_richieste[df_richieste['stato'] == 'In Attesa']
+        
+        if not richieste_attive.empty:
+            st.error(f"🔔 **ATTENZIONE: Hai {len(richieste_attive)} nuova/e comunicazione/i dal personale!**")
+            
+            for idx, row in richieste_attive.iterrows():
+                with st.expander(f"📩 {row['tipo']} da {row['lavoratore']} - {row['timestamp']}", expanded=True):
+                    st.markdown(f"**Valore dichiarato:** {row['valore']}")
+                    st.markdown(f"**Note/Giustificativo:** {row['note']}")
+                    
+                    if st.button("✅ Segna come Gestita e Archivia", key=f"archivia_{idx}"):
+                        # Cambiamo lo stato nel database di quarantena
+                        df_richieste.at[idx, 'stato'] = 'Archiviata'
+                        with st.spinner("Archiviazione in corso..."):
+                            if update_richieste(df_richieste, sha_richieste):
+                                st.success("Richiesta archiviata! Ora puoi registrarla ufficialmente nel gestionale.")
+                                time.sleep(1.5)
+                                st.rerun()
+        else:
+            st.info("📭 Nessuna nuova comunicazione dal personale.")
+    else:
+        st.info("📭 Sistema di comunicazione col personale in attesa del primo messaggio.")
+        
+    st.divider()
+    
+    # --- 2. VISUALIZZAZIONE DATABASE GENERALE ---
+    st.subheader("🗄️ Database Generale Aziendale")
     df, sha = get_github_file()
     
     if not df.empty:
-        # 1. AUTO-AGGIORNAMENTO STRUTTURALE DEL DATABASE (MIGRAZIONE SILENZIOSA)
-        colonne_modificate = False
+        st.dataframe(df, use_container_width=True)
         
-        if 'totale_fattura' not in df.columns:
-            df['totale_fattura'] = df['importo']
-            colonne_modificate = True
+        st.divider()
         
-        if 'importo_pagato' not in df.columns:
-            df['importo_pagato'] = df.apply(lambda row: row['importo'] if row['stato'] == 'Saldato' else 0.0, axis=1)
-            colonne_modificate = True
+        # --- 3. MODULO DI MODIFICA E CORREZIONE MANUALE ---
+        st.subheader("✏️ Modifica o Elimina Registrazione")
+        st.info("💡 Usa questo pannello per forzare un importo (es. 475€ di Gennaio), mettere 'Saldato' o correggere errori.")
+        
+        # Invertiamo il database per avere gli ultimi inserimenti comodamente in cima alla tendina
+        df_reversed = df.iloc[::-1].copy()
+        
+        opzioni_riga = []
+        for i, r in df_reversed.iterrows():
+            opzioni_riga.append(f"Riga {i} | {r['data']} | {r['categoria']} | {r['descrizione']} | {r['stato']}")
             
-        if 'registro_pagamenti' not in df.columns:
-            def crea_storico(row):
-                if row['stato'] == 'Saldato':
-                    return f"{row['data']}|{row['importo']}"
-                return ""
-            df['registro_pagamenti'] = df.apply(crea_storico, axis=1)
-            colonne_modificate = True
-            
-        if colonne_modificate:
-            save_to_github(df, sha, "Auto-Aggiornamento Struttura Database ERP")
-            st.rerun()
-
-        # 2. CALCOLO DINAMICO DEL RESIDUO
-        df['Residuo (€)'] = df['totale_fattura'] - df['importo_pagato']
+        riga_selezionata = st.selectbox("Seleziona la registrazione da gestire:", opzioni_riga)
         
-        df_display = df.copy()
-        colonne_da_mostrare = ['data', 'categoria', 'descrizione', 'totale_fattura', 'importo_pagato', 'Residuo (€)', 'stato']
-        df_display = df_display[[c for c in colonne_da_mostrare if c in df_display.columns]]
-
-        st.subheader("📋 Storico Movimenti e Situazione Fatture")
-        st.markdown("Seleziona una riga per registrare un nuovo pagamento o modificare la fattura.")
-
-        evento = st.dataframe(
-            df_display.reset_index(drop=True),
-            use_container_width=True,
-            selection_mode="single-row",
-            on_select="rerun",
-            hide_index=False
-        )
-
-        righe_selezionate = evento.selection.rows
-        
-        if len(righe_selezionate) > 0:
-            indice_visualizzato = righe_selezionate[0]
-            indice_reale = df.index[indice_visualizzato]
-            riga_sel = df.loc[indice_reale]
-
-            st.divider()
+        if riga_selezionata:
+            # Estraiamo il numero della riga (l'indice) reale
+            indice_reale = int(riga_selezionata.split(" | ")[0].replace("Riga ", ""))
+            riga_dati = df.loc[indice_reale]
             
-            with st.container(border=True):
-                st.subheader(f"💼 Gestione Fattura/Documento: {riga_sel['categoria']}")
+            with st.form("form_modifica_riga"):
+                st.write("**Dati Documento Selezionato**")
                 
-                # Layout a due colonne: A sinistra la fattura base, a destra i pagamenti
-                col_dati, col_rate = st.columns([1.2, 1])
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    nuova_data = st.text_input("Data (YYYY-MM-DD)", value=str(riga_dati['data']))
+                with c2:
+                    stati_possibili = ["Impegnato", "Saldato", "Annullato"]
+                    indice_stato = stati_possibili.index(riga_dati['stato']) if riga_dati['stato'] in stati_possibili else 0
+                    nuovo_stato = st.selectbox("Stato Generale", stati_possibili, index=indice_stato)
+                with c3:
+                    importo_attuale = float(riga_dati['importo']) if pd.notna(riga_dati['importo']) and str(riga_dati['importo']).replace('.','',1).isdigit() else 0.0
+                    nuovo_importo = st.number_input("Totale Fattura / Importo (€)", value=importo_attuale, format="%.2f")
                 
-                with col_dati:
-                    st.write("### 📝 Dati Documento")
-                    with st.form("form_modifica_fattura"):
-                        mod_cat = st.text_input("Categoria", value=str(riga_sel['categoria']))
-                        mod_desc = st.text_input("Descrizione Documento", value=str(riga_sel['descrizione']))
+                nuova_desc = st.text_input("Descrizione Documento", value=str(riga_dati['descrizione']))
+                
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    salva_modifiche = st.form_submit_button("💾 Salva Modifiche", type="primary", use_container_width=True)
+                with col_btn2:
+                    elimina_riga = st.form_submit_button("🗑️ Elimina Registrazione", use_container_width=True)
+            
+            # Logica Salvataggio
+            if salva_modifiche:
+                df.at[indice_reale, 'data'] = nuova_data
+                df.at[indice_reale, 'stato'] = nuovo_stato
+                df.at[indice_reale, 'importo'] = float(nuovo_importo)
+                df.at[indice_reale, 'totale_fattura'] = float(nuovo_importo)
+                df.at[indice_reale, 'importo_pagato'] = float(nuovo_importo)
+                df.at[indice_reale, 'descrizione'] = nuova_desc
+                
+                with st.spinner("Salvataggio modifiche in corso..."):
+                    if save_to_github(df, sha, f"Modifica manuale riga {indice_reale}"):
+                        st.success("✅ Modifiche salvate con successo!")
+                        time.sleep(1.5)
+                        st.rerun()
                         
-                        c_imp1, c_imp2 = st.columns(2)
-                        # Qui modifichi il costo della fattura (se c'era stato un errore)
-                        tot_fat_attuale = float(riga_sel['totale_fattura'])
-                        mod_totale = c_imp1.number_input("Totale Fattura (€)", value=tot_fat_attuale, step=10.0)
-                        
-                        mod_stato = c_imp2.selectbox(
-                            "Stato Generale", 
-                            ["Saldato", "Pagamento Parziale", "Da Saldare", "Da Incassare"], 
-                            index=["Saldato", "Pagamento Parziale", "Da Saldare", "Da Incassare"].index(riga_sel['stato']) if riga_sel['stato'] in ["Saldato", "Pagamento Parziale", "Da Saldare", "Da Incassare"] else 0
-                        )
-
-                        # Impaginazione dei due bottoni (Salva e Elimina)
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        c_btn1, c_btn2 = st.columns(2)
-                        salva_fattura = c_btn1.form_submit_button("💾 Salva Modifiche", type="primary")
-                        elimina_fattura = c_btn2.form_submit_button("🗑️ Elimina Registrazione", type="secondary")
-                        
-                        if salva_fattura:
-                            df.at[indice_reale, 'categoria'] = mod_cat
-                            df.at[indice_reale, 'descrizione'] = mod_desc
-                            df.at[indice_reale, 'totale_fattura'] = mod_totale
-                            df.at[indice_reale, 'importo'] = mod_totale # per retrocompatibilità
-                            df.at[indice_reale, 'stato'] = mod_stato
-                            
-                            if save_to_github(df, sha, f"Modificati dati riga {indice_reale}"):
-                                st.success("✅ Dati aggiornati!")
-                                time.sleep(1)
-                                st.rerun()
-                                
-                        if elimina_fattura:
-                            # Logica di eliminazione della riga dal database
-                            df = df.drop(index=indice_reale).reset_index(drop=True)
-                            
-                            if save_to_github(df, sha, f"Eliminata registrazione: {riga_sel['descrizione']}"):
-                                st.error("🗑️ Registrazione eliminata con successo dal database!")
-                                time.sleep(1.5)
-                                st.rerun()
-
-                with col_rate:
-                    totale = float(riga_sel['totale_fattura'])
-                    pagato = float(riga_sel['importo_pagato'])
-                    residuo = totale - pagato
-                    
-                    st.write("### 💶 Stato Pagamenti")
-                    c_fin1, c_fin2 = st.columns(2)
-                    c_fin1.metric("Totale Pagato", format_euro(pagato))
-                    c_fin2.metric("Debito Residuo", format_euro(residuo), delta=f"{residuo:.2f} €", delta_color="inverse")
-                    
-                    storico_txt = str(riga_sel.get('registro_pagamenti', ''))
-                    if storico_txt and storico_txt != 'nan':
-                        st.write("**Storico Rate Versate:**")
-                        rate = storico_txt.split(';')
-                        for rata in rate:
-                            parti = rata.split('|')
-                            if len(parti) >= 2:
-                                r_data = parti[0]
-                                r_imp = format_euro(float(parti[1]))
-                                r_nota = f" *(Note: {parti[2]})*" if len(parti) == 3 and parti[2].strip() else ""
-                                st.markdown(f"- 📅 {r_data}: **{r_imp}**{r_nota}")
-                    else:
-                        st.info("Nessun pagamento registrato finora.")
-
-                    st.divider()
-                    
-                    with st.form("form_aggiungi_rata"):
-                        st.write("**➕ Registra Nuovo Versamento (Tranche)**")
-                        r_col1, r_col2 = st.columns(2)
-                        
-                        import datetime
-                        nuova_data = r_col1.date_input("Data Versamento", value=datetime.date.today())
-                        importo_rata = r_col2.number_input("Importo Rata (€)", value=residuo if residuo > 0 else 0.0, step=10.0, min_value=0.0)
-                        
-                        nota_rata = st.text_input("Metodo / Note (es. Bonifico n.456, Contanti)", placeholder="Facoltativo...")
-                        
-                        aggiungi_rata = st.form_submit_button("Aggiungi Rata 💸", type="secondary")
-                        
-                        if aggiungi_rata and importo_rata > 0:
-                            nota_pulita = nota_rata.replace("|", "-").replace(";", ",")
-                            nuova_stringa_rata = f"{nuova_data.strftime('%Y-%m-%d')}|{importo_rata}|{nota_pulita}"
-                            
-                            storico_attuale = str(df.at[indice_reale, 'registro_pagamenti'])
-                            if storico_attuale and storico_attuale != 'nan' and storico_attuale != '':
-                                df.at[indice_reale, 'registro_pagamenti'] = f"{storico_attuale};{nuova_stringa_rata}"
-                            else:
-                                df.at[indice_reale, 'registro_pagamenti'] = nuova_stringa_rata
-                            
-                            nuovo_totale_pagato = pagato + importo_rata
-                            df.at[indice_reale, 'importo_pagato'] = nuovo_totale_pagato
-                            
-                            if nuovo_totale_pagato >= totale:
-                                df.at[indice_reale, 'stato'] = "Saldato"
-                            elif nuovo_totale_pagato > 0:
-                                df.at[indice_reale, 'stato'] = "Pagamento Parziale"
-                                
-                            if save_to_github(df, sha, f"Aggiunta tranche di {importo_rata} su riga {indice_reale}"):
-                                st.success("✅ Rata registrata correttamente!")
-                                time.sleep(1)
-                                st.rerun()
-
+            # Logica Eliminazione
+            if elimina_riga:
+                df = df.drop(index=indice_reale).reset_index(drop=True)
+                with st.spinner("Eliminazione in corso..."):
+                    if save_to_github(df, sha, f"Eliminata riga {indice_reale}"):
+                        st.success("🗑️ Registrazione eliminata definitivamente!")
+                        time.sleep(1.5)
+                        st.rerun()
+    else:
+        st.warning("Il database principale è attualmente vuoto o non raggiungibile.")
 
 # ==========================================
 # --- TAB 2: MANODOPERA (SEMPLIFICATA E CORRETTA) ---
