@@ -362,7 +362,7 @@ with tab1:
 
 
 # ==========================================
-# --- TAB 2: MANODOPERA (CON RIEPILOGO MATEMATICO) ---
+# --- TAB 2: MANODOPERA (SEMPLIFICATA E CORRETTA) ---
 # ==========================================
 with tab2:
     st.header("🚜 Gestione Manodopera")
@@ -370,21 +370,25 @@ with tab2:
     
     with st.form("form_registrazione_manodopera", clear_on_submit=True):
         st.subheader("📝 Registra Nuova Giornata")
+        st.info("💡 Inserisci direttamente i giorni extra senza dover fare il calcolo del totale.")
         
         c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
             op_nome = st.selectbox("Operatore", ["Iannone Felice"])
             op_data = st.date_input("Data Lavoro", format="DD/MM/YYYY")
         with c2:
-            op_ufficiali = st.number_input("Giornate Ufficiali", min_value=0.0, step=0.5, format="%.2f")
+            op_ufficiali = st.number_input("Giornate Ufficiali (In Busta)", min_value=0.0, step=0.5, format="%.2f")
         with c3:
-            op_reali = st.number_input("Giornate Reali Effettuate", min_value=0.0, step=0.5, format="%.2f")
+            # Niente più "Giornate Reali", si inserisce direttamente l'Extra!
+            op_extra = st.number_input("Giornate EXTRA (Fuori Busta)", min_value=0.0, step=0.5, format="%.2f")
             
         op_note = st.text_input("Note (Lavoro svolto)")
         inviato = st.form_submit_button("Registra Giornate", type="primary")
         
     if inviato:
         righe_nuove = []
+        
+        # 1. Crea la riga Ufficiale
         if op_ufficiali > 0:
             desc_uff = f"{op_nome} | {op_ufficiali:.3f} gg | UFFICIALE: {op_note}"
             righe_nuove.append({
@@ -393,9 +397,9 @@ with tab2:
                 'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
             })
         
-        gg_extra = op_reali - op_ufficiali
-        if abs(gg_extra) > 0.001:
-            desc_extra = f"{op_nome} | {gg_extra:.3f} gg | EXTRA: {op_note}"
+        # 2. Crea la riga Extra diretta (Zero calcoli, zero errori)
+        if op_extra > 0:
+            desc_extra = f"{op_nome} | {op_extra:.3f} gg | EXTRA: {op_note}"
             righe_nuove.append({
                 'data': op_data.strftime('%Y-%m-%d'), 'tipo': "Uscita", 'categoria': "Manodopera Extra", 
                 'descrizione': desc_extra, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
@@ -406,7 +410,7 @@ with tab2:
             df_nuove = pd.DataFrame(righe_nuove)
             df = pd.concat([df, df_nuove], ignore_index=True)
             
-            if save_to_github(df, sha, "Aggiornamento Manodopera"):
+            if save_to_github(df, sha, "Aggiornamento Manodopera Semplificata"):
                 st.success("✅ Giornate lavorative registrate con successo!")
                 import time
                 time.sleep(1)
@@ -414,9 +418,9 @@ with tab2:
         else:
             st.warning("Nessun dato valido inserito (Giornate a zero).")
 
-    # --- NUOVO SCHERMO: RIEPILOGO TAB 2 ---
+    # --- RIEPILOGO TAB 2 ---
     st.divider()
-    st.subheader("📊 Riepilogo Giornate Lavorate (Totali vs Extra)")
+    st.subheader("📊 Riepilogo Giornate Lavorate")
     
     df_lav = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].copy()
     if not df_lav.empty:
@@ -430,20 +434,20 @@ with tab2:
                 gg = estrai_giornate(str(row['descrizione']), "Iannone Felice")
                 
                 if chiave not in riepilogo:
-                    riepilogo[chiave] = {'Giornate TOTALI': 0.0, 'Giornate EXTRA': 0.0, 'Giornate UFFICIALI': 0.0}
+                    riepilogo[chiave] = {'Giornate EXTRA': 0.0, 'Giornate UFFICIALI': 0.0, 'TOTALE Giornate': 0.0}
                     
-                riepilogo[chiave]['Giornate TOTALI'] += gg
                 if row['categoria'] == 'Manodopera Extra':
-                    riepilogo[chiave]['Giornate EXTRA'] += gg
+                    riepilogo[chiave]['Giornate EXTRA'] += abs(gg)
                 elif row['categoria'] == 'Manodopera':
-                    riepilogo[chiave]['Giornate UFFICIALI'] += gg
+                    riepilogo[chiave]['Giornate UFFICIALI'] += abs(gg)
+                    
+                riepilogo[chiave]['TOTALE Giornate'] = riepilogo[chiave]['Giornate UFFICIALI'] + riepilogo[chiave]['Giornate EXTRA']
 
         if riepilogo:
             df_riep = pd.DataFrame.from_dict(riepilogo, orient='index')
             st.dataframe(df_riep, use_container_width=True)
         else:
             st.info("Nessuna giornata registrata finora.")
-
 
 # ==========================================
 # --- TAB 3: CASSA E CONTROLLO MESI ARRETRATI ---
@@ -453,7 +457,6 @@ with tab3:
     df, sha = get_github_file()
     
     if not df.empty:
-        # 1. Preparazione Dati
         df['importo'] = pd.to_numeric(df['importo'], errors='coerce').fillna(0.0)
         df['data_dt'] = pd.to_datetime(df['data'], errors='coerce')
         
@@ -461,7 +464,6 @@ with tab3:
         mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
         mesi_nomi_inv = {v: k for k, v in mesi_nomi.items()}
         
-        # 2. Inizializzazione Mesi e Calcolo Extra (SEPARATO)
         tutto_lavoro = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
         
         for index, row in tutto_lavoro.iterrows():
@@ -476,14 +478,15 @@ with tab3:
                 if row['categoria'] == 'Manodopera Extra':
                     gg_lavorati = estrai_giornate(str(row['descrizione']), "Iannone Felice")
                     
-                    # --- SCUDO MATEMATICO ANTI-ERRORE ---
-                    # Se le giornate extra inserite per sbaglio sono negative, le forza a 0
-                    if gg_lavorati < 0:
-                        gg_lavorati = 0.0
+                    # SALVAVITA: Se hai scritto l'importo esatto in Tab 1, il sistema lo prenderà alla lettera.
+                    importo_forzato = abs(float(row['importo']))
+                    if importo_forzato > 0:
+                        valore_maturato = importo_forzato
+                    else:
+                        valore_maturato = abs(gg_lavorati) * 55.0
                         
-                    dati_mensili[chiave_mese]['Extra Maturato (Debito)'] += gg_lavorati * 55.0
+                    dati_mensili[chiave_mese]['Extra Maturato (Debito)'] += valore_maturato
 
-        # 3. Associazione Pagamenti (SEPARATA)
         pagamenti_df = df[df['categoria'].isin(['Busta Paga', 'Saldo Extra', 'Rimborsi'])]
         
         for index, row in pagamenti_df.iterrows():
@@ -511,7 +514,6 @@ with tab3:
                 elif cat == 'Busta Paga':
                     dati_mensili[chiave_na]['Busta Paga Versata'] += importo_pagato
 
-        # 4. Visualizzazione e Tabella Trasparente
         st.markdown("### 📊 Situazione Arretrati e Compensazione Lavoro")
         saldo_globale = 0.0
         
@@ -528,7 +530,7 @@ with tab3:
             dati_mensili = dict(sorted(dati_mensili.items(), key=chiave_ordinamento))
             df_riepilogo = pd.DataFrame.from_dict(dati_mensili, orient='index')
             
-            # --- LA MATEMATICA E' STATA INVERTITA IN SOTTRAZIONE COME RICHIESTO ---
+            # --- LA MATEMATICA PERFETTA CHE HAI RICHIESTO ---
             df_riepilogo['Saldo Arretrati (Extra)'] = df_riepilogo['Extra Pagato'] - df_riepilogo['Extra Maturato (Debito)']
             df_riepilogo['Differenza (Busta - Extra)'] = df_riepilogo['Busta Paga Versata'] - df_riepilogo['Extra Maturato (Debito)']
             
@@ -542,7 +544,6 @@ with tab3:
                 
             st.dataframe(df_display, use_container_width=True)
             
-            # --- MOTORE DI DISEGNO DEL PDF AGGIORNATO ---
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", 'B', 16)
@@ -552,7 +553,6 @@ with tab3:
             pdf.cell(190, 10, txt=f"Generato il: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='C')
             pdf.ln(5)
             
-            # Intestazioni PDF ridimensionate per far spazio alla parola "Differenza"
             pdf.set_font("Arial", 'B', 9)
             pdf.cell(32, 10, "Mese", 1, 0, 'C')
             pdf.cell(28, 10, "Debito Ext", 1, 0, 'C')
@@ -569,12 +569,10 @@ with tab3:
                 pdf.cell(28, 10, f"{row['Extra Pagato']:,.2f} E", 1, 0, 'R')
                 pdf.cell(32, 10, f"{row['Busta Paga Versata']:,.2f} E", 1, 0, 'R')
                 
-                # Colore Arretrati (Rosso o Verde)
                 pdf.set_text_color(220, 53, 69) if row['Saldo Arretrati (Extra)'] < 0 else pdf.set_text_color(40, 167, 69)
                 pdf.cell(30, 10, f"{row['Saldo Arretrati (Extra)']:,.2f} E", 1, 0, 'R')
                 pdf.set_text_color(0, 0, 0)
                 
-                # Inserimento della Differenza calcolata
                 pdf.cell(40, 10, f"{row['Differenza (Busta - Extra)']:,.2f} E", 1, 1, 'R')
                 
             pdf.ln(10)
@@ -588,7 +586,6 @@ with tab3:
                 
             pdf.set_text_color(0, 0, 0)
             
-            # --- PULSANTE PDF ---
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
             st.download_button(
                 label="📄 Scarica Tabella Aggiornata (PDF)",
@@ -607,7 +604,6 @@ with tab3:
             
         st.divider()
         
-        # 5. Modulo di Pagamento Cassa CON AUTO-SALDATO
         with st.form("cassa_form", clear_on_submit=True):
             st.write("### ➕ Registra un pagamento al dipendente")
             
@@ -644,7 +640,6 @@ with tab3:
                     }
                     df = pd.concat([df, pd.DataFrame([nuova_riga])], ignore_index=True)
                     
-                    # --- MAGIA AUTO-SALDATO ---
                     try:
                         if mese_rif != "Nessun mese registrato (Versamento Generico)":
                             nome_mese, anno_str = mese_rif.split()
