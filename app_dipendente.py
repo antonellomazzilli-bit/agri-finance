@@ -5,11 +5,12 @@ import base64
 import json
 from datetime import datetime
 import time
+import calendar
 
-# Configurazione ottimizzata per Smartphone
-st.set_page_config(page_title="Portale Lavoratore", page_icon="🚜", layout="centered")
+# Configurazione ottimizzata
+st.set_page_config(page_title="Foglio Mensile", page_icon="🚜", layout="centered")
 
-# --- CONNESSIONE GITHUB (File Isolato) ---
+# --- CONNESSIONE GITHUB ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 REPO = "antonellomazzilli-bit/agri-finance"
 FILE_RICHIESTE = "richieste_sospese.csv"
@@ -32,124 +33,128 @@ def salva_richiesta(df, sha):
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     csv_data = df.to_csv(index=False)
     encoded_data = base64.b64encode(csv_data.encode('utf-8')).decode('utf-8')
-    
-    payload = {"message": "Nuova richiesta dipendente", "content": encoded_data}
+    payload = {"message": "Invio foglio mensile", "content": encoded_data}
     if sha: payload["sha"] = sha
-        
     r = requests.put(url, headers=headers, data=json.dumps(payload))
     return r.status_code in [200, 201]
 
-# --- INTERFACCIA MOBILE ---
-st.title("🚜 Area Personale")
+# --- INTERFACCIA APP ---
+st.title("🚜 Foglio Presenze Mensile")
 
 df_richieste, sha_attuale = get_richieste()
-
 nome_dipendente = st.selectbox("👤 Chi sei?", ["Seleziona il tuo nome...", "Iannone Felice"])
 
 if nome_dipendente != "Seleziona il tuo nome...":
-    # Creazione delle due sezioni: Inserimento e Tabella Riepilogo
-    tab1, tab2 = st.tabs(["📝 Inserisci Dati", "📅 Tabella Mensile"])
+    tab1, tab2 = st.tabs(["📝 Compila Mese", "🗂️ Storico Inviati"])
     
     # ==========================================
-    # --- TAB 1: INSERIMENTO CON DATA SPECIFICA ---
+    # --- TAB 1: GRIGLIA MENSILE ---
     # ==========================================
     with tab1:
-        st.markdown("Compila i campi. Scegli il giorno esatto a cui si riferisce il lavoro o la spesa.")
-        with st.container(border=True):
-            # IL NUOVO CALENDARIO
-            data_lavoro = st.date_input("📅 Giorno di riferimento", value=datetime.today(), format="DD/MM/YYYY")
-            st.divider()
+        st.info("💡 **Istruzioni:** Compila questa tabella alla fine del mese con tutti i giorni lavorati e clicca su Invia.")
+        
+        # Selezione Mese e Anno
+        oggi = datetime.today()
+        mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 
+                     7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            mese_sel = st.selectbox("Mese di Riferimento", list(mesi_nomi.values()), index=oggi.month-1)
+        with c2:
+            anno_sel = st.selectbox("Anno", [oggi.year, oggi.year-1], index=0)
             
-            # Campo 1: Ore
-            st.markdown("### ⏱️ Tempo di Lavoro")
-            ore_input = st.number_input("Ore Lavorate", min_value=0.0, max_value=24.0, step=0.5, value=0.0)
+        mese_num = list(mesi_nomi.keys())[list(mesi_nomi.values()).index(mese_sel)]
+        giorni_nel_mese = calendar.monthrange(anno_sel, mese_num)[1]
+        
+        # Creazione della tabella vuota per quel mese
+        if 'dati_griglia' not in st.session_state or st.session_state.get('mese_corrente') != f"{mese_sel}_{anno_sel}":
+            df_vuoto = pd.DataFrame({
+                "Giorno": range(1, giorni_nel_mese + 1),
+                "Ore Lavoro": [0.0] * giorni_nel_mese,
+                "Spese (€)": [0.0] * giorni_nel_mese,
+                "Note (Lavori / Scontrini)": [""] * giorni_nel_mese
+            })
+            st.session_state.dati_griglia = df_vuoto
+            st.session_state.mese_corrente = f"{mese_sel}_{anno_sel}"
             
-            # Campo 2: Spese
-            st.markdown("### 💶 Spese Vive / Anticipi")
-            spesa_input = st.number_input("Importo Speso (€)", min_value=0.0, max_value=500.0, step=1.0, value=0.0)
+        st.markdown("### ✍️ Tabella Giornaliera")
+        
+        # La griglia modificabile dal dipendente
+        df_modificato = st.data_editor(
+            st.session_state.dati_griglia, 
+            disabled=["Giorno"], # Impedisce di cancellare i numeri dei giorni
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                "Ore Lavoro": st.column_config.NumberColumn("Ore Lavoro", min_value=0.0, max_value=24.0, step=0.5),
+                "Spese (€)": st.column_config.NumberColumn("Spese (€)", min_value=0.0, step=1.0),
+                "Note (Lavori / Scontrini)": st.column_config.TextColumn("Cosa hai fatto?")
+            }
+        )
+        
+        # Totali in tempo reale
+        tot_ore = df_modificato['Ore Lavoro'].sum()
+        tot_spese = df_modificato['Spese (€)'].sum()
+        
+        st.success(f"**Totale accumulato nel mese:** {tot_ore} Ore | {tot_spese} € Spese")
+        
+        # Tasto di invio
+        if st.button("🚀 Invia Foglio Mensile all'Azienda", type="primary", use_container_width=True):
+            # Filtriamo solo i giorni in cui ha scritto qualcosa
+            giorni_compilati = df_modificato[(df_modificato['Ore Lavoro'] > 0) | (df_modificato['Spese (€)'] > 0)]
             
-            st.divider()
-            
-            note_input = st.text_area("📝 Note Aggiuntive (Obbligatorie se inserisci dati)", placeholder="Es. Potatura ulivi, oppure scontrino gasolio...", height=80)
-            
-            invia_btn = st.button("Invia all'Azienda 🚀", type="primary", use_container_width=True)
-
-        if invia_btn:
-            if ore_input == 0 and spesa_input == 0:
-                st.error("⚠️ Inserisci almeno le ore di lavoro o una spesa.")
-            elif len(note_input) < 3:
-                st.error("⚠️ Scrivi una breve descrizione nel campo note.")
+            if giorni_compilati.empty:
+                st.warning("⚠️ La tabella è vuota! Inserisci le ore o le spese in almeno un giorno.")
             else:
-                nuove_righe = []
-                data_formattata = data_lavoro.strftime("%d/%m/%Y")
-                timestamp_invio = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                # Creiamo il riepilogo testuale per te
+                dettaglio_note = f"Dettaglio giorni di {mese_sel} {anno_sel}:\n"
+                for _, row in giorni_compilati.iterrows():
+                    dettaglio_note += f"• Giorno {int(row['Giorno'])}: "
+                    if row['Ore Lavoro'] > 0: dettaglio_note += f"{row['Ore Lavoro']} ore. "
+                    if row['Spese (€)'] > 0: dettaglio_note += f"Spese: {row['Spese (€)']}€. "
+                    if row['Note (Lavori / Scontrini)']: dettaglio_note += f"({row['Note (Lavori / Scontrini)']})"
+                    dettaglio_note += "\n"
+                    
+                nuova_riga = {
+                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'lavoratore': nome_dipendente,
+                    'tipo': f"Riepilogo Mensile - {mese_sel} {anno_sel}",
+                    'valore': f"TOTALE: {tot_ore} Ore | {tot_spese} €",
+                    'note': dettaglio_note,
+                    'stato': "In Attesa"
+                }
                 
-                # Iniezione sicura della data nelle note per non rompere il database principale
-                if ore_input > 0:
-                    nuove_righe.append({
-                        'timestamp': timestamp_invio,
-                        'lavoratore': nome_dipendente,
-                        'tipo': "Tempo di Lavoro",
-                        'valore': f"{ore_input} Ore",
-                        'note': f"[Lavoro del {data_formattata}] {note_input}",
-                        'stato': "In Attesa"
-                    })
-                    
-                if spesa_input > 0:
-                    nuove_righe.append({
-                        'timestamp': timestamp_invio,
-                        'lavoratore': nome_dipendente,
-                        'tipo': "Spese Vive / Rimborsi",
-                        'valore': f"{spesa_input} Euro",
-                        'note': f"[Spesa del {data_formattata}] {note_input}",
-                        'stato': "In Attesa"
-                    })
-                    
-                df_richieste = pd.concat([df_richieste, pd.DataFrame(nuove_righe)], ignore_index=True)
+                df_richieste = pd.concat([df_richieste, pd.DataFrame([nuova_riga])], ignore_index=True)
                 
                 with st.spinner("Invio in corso..."):
                     if salva_richiesta(df_richieste, sha_attuale):
-                        st.success("✅ Dati inviati con successo all'amministrazione!")
-                        time.sleep(2)
+                        st.success(f"✅ Foglio di {mese_sel} inviato con successo!")
+                        
+                        # Resetta la tabella dopo l'invio per evitare doppi invii
+                        st.session_state.dati_griglia = pd.DataFrame({
+                            "Giorno": range(1, giorni_nel_mese + 1),
+                            "Ore Lavoro": [0.0] * giorni_nel_mese,
+                            "Spese (€)": [0.0] * giorni_nel_mese,
+                            "Note (Lavori / Scontrini)": [""] * giorni_nel_mese
+                        })
+                        time.sleep(3)
                         st.rerun()
                     else:
-                        st.error("❌ Errore di rete. Riprova.")
+                        st.error("❌ Errore di rete.")
 
     # ==========================================
-    # --- TAB 2: TABELLA RIEPILOGATIVA PERSONALE ---
+    # --- TAB 2: STORICO INVII ---
     # ==========================================
     with tab2:
-        st.markdown("### 📊 Il tuo Foglio Presenze")
-        st.markdown("Qui vedi tutto ciò che hai inviato finora e lo stato di approvazione aziendale.")
-        
+        st.markdown("### 🗂️ Storico Fogli Inviati")
         if not df_richieste.empty:
-            # Filtriamo il database per mostrare solo i dati del dipendente connesso
             df_mio = df_richieste[df_richieste['lavoratore'] == nome_dipendente].copy()
-            
             if not df_mio.empty:
-                # Estraiamo la data che era stata salvata nella nota per formare una tabella pulita
-                def estrai_data_nota(testo):
-                    if "[Lavoro del" in testo or "[Spesa del" in testo:
-                        try:
-                            return testo.split("]")[0].split("del ")[1]
-                        except:
-                            return "Data non spec."
-                    return "Data non spec."
-                    
-                df_mio['Giorno'] = df_mio['note'].apply(estrai_data_nota)
-                
-                # Ripuliamo la nota per togliere la data tra parentesi
-                df_mio['Note'] = df_mio['note'].apply(lambda x: x.split("] ")[1] if "]" in x else x)
-                
-                # Selezioniamo e riordiniamo le colonne da far vedere al dipendente
-                df_display = df_mio[['Giorno', 'tipo', 'valore', 'Note', 'stato']].copy()
-                df_display.columns = ['Data', 'Categoria', 'Quantità', 'Descrizione', 'Stato Approvazione']
-                
-                # Mostriamo la tabella (hide_index toglie i numeri di riga per renderla più pulita)
+                df_display = df_mio[['tipo', 'valore', 'stato', 'timestamp']].copy()
+                df_display.columns = ['Mese', 'Totali Dichiarati', 'Stato Azienda', 'Data Invio']
                 st.dataframe(df_display, use_container_width=True, hide_index=True)
             else:
-                st.info("Nessuna registrazione o spesa inviata finora.")
-        else:
-            st.info("Nessuna registrazione o spesa inviata finora.")
+                st.info("Nessun foglio mensile inviato finora.")
 else:
-    st.info("Seleziona il tuo nome per accedere alle funzionalità.")
+    st.info("Seleziona il tuo nome in alto per sbloccare la tabella mensile.")
