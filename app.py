@@ -243,7 +243,7 @@ with tab1:
             for idx, row in richieste_attive.iterrows():
                 with st.expander(f"📩 {row['tipo']} da {row['lavoratore']} - {row['timestamp']}", expanded=True):
                     st.markdown(f"**Valore globale:** {row['valore']}")
-                    st.text(row['note']) # Usiamo st.text per mantenere l'impaginazione a punti elenco dei giorni
+                    st.text(row['note']) 
                     
                     # Layout a due colonne per i pulsanti Accetta / Rifiuta
                     col_ok, col_ko = st.columns(2)
@@ -272,8 +272,80 @@ with tab1:
         
     st.divider()
     
-    # --- 2. VISUALIZZAZIONE DATABASE GENERALE (Inizia da qui in poi il tuo vecchio codice) ---
+    # --- 2. VISUALIZZAZIONE DATABASE GENERALE ---
     st.subheader("🗄️ Database Generale Aziendale")
+    df, sha = get_github_file()
+    
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+        
+        st.divider()
+        
+        # --- 3. MODULO DI MODIFICA E CORREZIONE MANUALE ---
+        st.subheader("✏️ Modifica o Elimina Registrazione")
+        st.info("💡 Usa questo pannello per forzare un importo (es. 475€ di Gennaio), mettere 'Saldato' o correggere errori.")
+        
+        # Invertiamo il database per avere gli ultimi inserimenti comodamente in cima alla tendina
+        df_reversed = df.iloc[::-1].copy()
+        
+        opzioni_riga = []
+        for i, r in df_reversed.iterrows():
+            opzioni_riga.append(f"Riga {i} | {r['data']} | {r['categoria']} | {r['descrizione']} | {r['stato']}")
+            
+        riga_selezionata = st.selectbox("Seleziona la registrazione da gestire:", opzioni_riga)
+        
+        if riga_selezionata:
+            # Estraiamo il numero della riga (l'indice) reale
+            indice_reale = int(riga_selezionata.split(" | ")[0].replace("Riga ", ""))
+            riga_dati = df.loc[indice_reale]
+            
+            with st.form("form_modifica_riga"):
+                st.write("**Dati Documento Selezionato**")
+                
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    nuova_data = st.text_input("Data (YYYY-MM-DD)", value=str(riga_dati['data']))
+                with c2:
+                    stati_possibili = ["Impegnato", "Saldato", "Annullato"]
+                    indice_stato = stati_possibili.index(riga_dati['stato']) if riga_dati['stato'] in stati_possibili else 0
+                    nuovo_stato = st.selectbox("Stato Generale", stati_possibili, index=indice_stato)
+                with c3:
+                    importo_attuale = float(riga_dati['importo']) if pd.notna(riga_dati['importo']) and str(riga_dati['importo']).replace('.','',1).isdigit() else 0.0
+                    nuovo_importo = st.number_input("Totale Fattura / Importo (€)", value=importo_attuale, format="%.2f")
+                
+                nuova_desc = st.text_input("Descrizione Documento", value=str(riga_dati['descrizione']))
+                
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    salva_modifiche = st.form_submit_button("💾 Salva Modifiche", type="primary", use_container_width=True)
+                with col_btn2:
+                    elimina_riga = st.form_submit_button("🗑️ Elimina Registrazione", use_container_width=True)
+            
+            # Logica Salvataggio
+            if salva_modifiche:
+                df.at[indice_reale, 'data'] = nuova_data
+                df.at[indice_reale, 'stato'] = nuovo_stato
+                df.at[indice_reale, 'importo'] = float(nuovo_importo)
+                df.at[indice_reale, 'totale_fattura'] = float(nuovo_importo)
+                df.at[indice_reale, 'importo_pagato'] = float(nuovo_importo)
+                df.at[indice_reale, 'descrizione'] = nuova_desc
+                
+                with st.spinner("Salvataggio modifiche in corso..."):
+                    if save_to_github(df, sha, f"Modifica manuale riga {indice_reale}"):
+                        st.success("✅ Modifiche salvate con successo!")
+                        time.sleep(1.5)
+                        st.rerun()
+                        
+            # Logica Eliminazione
+            if elimina_riga:
+                df = df.drop(index=indice_reale).reset_index(drop=True)
+                with st.spinner("Eliminazione in corso..."):
+                    if save_to_github(df, sha, f"Eliminata riga {indice_reale}"):
+                        st.success("🗑️ Registrazione eliminata definitivamente!")
+                        time.sleep(1.5)
+                        st.rerun()
+    else:
+        st.warning("Il database principale è attualmente vuoto o non raggiungibile.")
 
 # ==========================================
 # --- TAB 2: MANODOPERA (SEMPLIFICATA E CORRETTA) ---
