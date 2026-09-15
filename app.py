@@ -876,66 +876,81 @@ with tab5:
                     .header-doc {{ border-bottom: 2px solid black; padding-bottom: 15px; margin-bottom: 25px; }}
                     table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; page-break-inside: avoid; }}
                     th, td {{ border: 1px solid #000; padding: 8px; text-align: left; }}
-                    th {{ background-color: #e9e9e9; font-weight: bold; text-align: center; }}
-                    .right {{ text-align: right; }}
-                    .bold {{ font-weight: bold; }}
-                    .totale-riga td {{ background-color: #e9e9e9; font-weight: bold; }}
-                    .totale-box {{ margin-top: 30px; border: 2px solid black; padding: 15px; page-break-inside: avoid; }}
-                    .box-row {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }}
-                    @media print {{
-                        body {{ background-color: white; padding: 0; }}
-                        .foglio-a4 {{ box-shadow: none; max-width: 100%; padding: 0; margin: 0; }}
-                        button {{ display: none; }}
-                    }}
-                </style>
-                </head>
-                <body>
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background-color: #1565c0; color: white; border: none; border-radius: 5px; font-weight: bold;">🖨️ Stampa Bilancio Comparato PDF</button>
-                    </div>
-                    <div class="foglio-a4">
-                        <div class="header-doc">
-                            <h2>AZIENDA AGRICOLA ANTONELLO MAZZILLI</h2>
-                            <h4>Produzione Olio ed Esercizio Agricolo</h4>
-                            <h3>CONTO ECONOMICO COMPARATO: ESERCIZIO {anno_sel} vs {anno_prec}</h3>
-                            <p style="text-align:center; font-size: 12px;">Redatto in conformità all'Art. 2425 c.c. (Schema IV Direttiva CEE)</p>
-                        </div>
-                        
-                        <h4 style="text-align: left;">A) VALORE DELLA PRODUZIONE</h4>
-                        <table>
-                            <tr><th>Voce Bilancio</th><th style="width: 20%;">Anno {anno_sel}</th><th style="width: 20%;">Anno {anno_prec}</th></tr>
-                            {html_righe_a if html_righe_a else "<tr><td colspan='3'>Nessun dato presente</td></tr>"}
-                            <tr class="totale-riga"><td>TOTALE A</td><td class="right">{format_euro(tot_a_n)}</td><td class="right">{format_euro(tot_a_n1)}</td></tr>
-                        </table>
 
-                        <br>
-                        <h4 style="text-align: left;">B) COSTI DELLA PRODUZIONE</h4>
-                        <table>
-                            <tr><th>Voce Bilancio</th><th style="width: 20%;">Anno {anno_sel}</th><th style="width: 20%;">Anno {anno_prec}</th></tr>
-                            {html_righe_b if html_righe_b else "<tr><td colspan='3'>Nessun dato presente</td></tr>"}
-                            <tr class="totale-riga"><td>TOTALE B</td><td class="right">{format_euro(tot_b_n)}</td><td class="right">{format_euro(tot_b_n1)}</td></tr>
-                        </table>
 
-                        <div class="totale-box">
-                            <h3 style="text-align: center; border-bottom: 1px solid #ccc; padding-bottom: 10px;">DIFFERENZA TRA VALORE E COSTI DELLA PRODUZIONE (A - B)</h3>
-                            <div class="box-row">
-                                <span style="font-size: 18px;">Risultato d'Esercizio {anno_prec}:</span>
-                                <span style="font-size: 18px; color: #555;">{format_euro(ris_operativo_n1)}</span>
-                            </div>
-                            <div class="box-row">
-                                <span style="font-size: 22px; font-weight: bold;">Risultato d'Esercizio {anno_sel}:</span>
-                                <span style="font-size: 24px; font-weight: bold; color: {colore_ris};">{format_euro(ris_operativo_n)}</span>
-                            </div>
-                        </div>
-                    </div>
-                </body>
-                </html>
-                """
-                import streamlit.components.v1 as components
-                components.html(html_bilancio_comparato, height=900, scrolling=True)
+# ==================================================
+# --- TAB BILANCIO: ANALISI E SPENDING REVIEW ---
+# ==================================================
+with tab3: # (Assicurati che il numero del tab corrisponda al tuo)
+    st.header("📉 Radiografia dei Costi e Spending Review")
+    st.markdown("Usa questo pannello per identificare esattamente dove stai perdendo marginalità.")
+    
+    df, sha = get_github_file()
+    
+    if not df.empty:
+        # Assicuriamoci che i numeri siano leggibili dal sistema
+        df['importo'] = pd.to_numeric(df['importo'], errors='coerce').fillna(0)
+        
+        # Filtriamo SOLO le spese certe (Saldato o Impegnato)
+        df_spese = df[df['stato'].isin(['Saldato', 'Impegnato'])].copy()
+        
+        # Trasformiamo tutto in numeri positivi per fare le classifiche
+        df_spese['importo_assoluto'] = df_spese['importo'].abs()
+        
+        # Creiamo la Classifica delle peggiori spese
+        spese_per_categoria = df_spese.groupby('categoria')['importo_assoluto'].sum().reset_index()
+        spese_per_categoria = spese_per_categoria.sort_values(by='importo_assoluto', ascending=False)
+        
+        totale_uscite = spese_per_categoria['importo_assoluto'].sum()
+        
+        # --- METRICHE DI EMERGENZA ---
+        st.subheader("🚨 Sintesi Critica")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("💸 Totale Uscite (Euro)", f"{totale_uscite:.2f} €")
+        
+        if not spese_per_categoria.empty:
+            peggiore_categoria = spese_per_categoria.iloc[0]['categoria']
+            peggiore_importo = spese_per_categoria.iloc[0]['importo_assoluto']
+            incidenza = (peggiore_importo / totale_uscite) * 100 if totale_uscite > 0 else 0
+            
+            c2.metric("⚠️ Buco Nero (Voce peggiore)", peggiore_categoria)
+            c3.metric("📊 Peso sul totale", f"{incidenza:.1f} %")
+            
+            st.divider()
+            
+            # --- GRAFICO VISIVO ---
+            st.markdown("### 📊 Distribuzione del Budget")
+            # Un grafico a barre per mostrare a colpo d'occhio il dislivello tra le categorie
+            st.bar_chart(spese_per_categoria.set_index('categoria')['importo_assoluto'])
+            
+            st.divider()
+            
+            # --- STRUMENTO DI TAGLIO (DRILL-DOWN) ---
+            st.markdown("### ✂️ Ispezione Singola Categoria (Per decidere i tagli)")
+            st.info("Seleziona la categoria che costa troppo. Il sistema ti mostrerà le singole operazioni, dalla più costosa alla più economica, per farti decidere cosa eliminare il prossimo anno.")
+            
+            categoria_selezionata = st.selectbox(
+                "Scegli la categoria da ispezionare:", 
+                spese_per_categoria['categoria'].tolist()
+            )
+            
+            if categoria_selezionata:
+                # Estraiamo solo le spese di quella specifica categoria
+                df_dettaglio = df_spese[df_spese['categoria'] == categoria_selezionata][['data', 'descrizione', 'importo_assoluto', 'stato']]
                 
+                # Rinominiamo la colonna per pulizia visiva
+                df_dettaglio.rename(columns={'importo_assoluto': 'Costo (€)'}, inplace=True)
+                
+                # Ordiniamo per costo decrescente: il colpevole sarà in cima!
+                df_dettaglio = df_dettaglio.sort_values(by='Costo (€)', ascending=False)
+                
+                # Mostriamo la tabella pulita
+                st.dataframe(df_dettaglio, use_container_width=True, hide_index=True)
+                
+                # Calcolo del risparmio potenziale
+                st.caption(f"💡 *Suggerimento:* Se riuscissi a tagliare anche solo il 20% delle spese in questa tabella, risparmieresti **{(df_dettaglio['Costo (€)'].sum() * 0.20):.2f} €** immediati.")
     else:
-        st.info("Nessun dato registrato nel database per generare il bilancio.")
+        st.warning("Il database è vuoto. Nessun dato da analizzare.")
 
 
 # ==========================================
