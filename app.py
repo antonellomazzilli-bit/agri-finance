@@ -757,14 +757,15 @@ with tab5:
             df_valido = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
             
             # 2. BLACKLIST DELLE ENTRATE: Qui escludiamo a monte tutte le voci che rappresentano incassi.
-            # Se nel gestionale usi un nome diverso per indicare un'entrata (es. "Vendita al dettaglio"), 
-            # aggiungilo a questa lista!
+            # Se nel gestionale usi un nome diverso per indicare un'entrata, aggiungilo a questa lista!
+            # Ho aggiunto "buste paga del lavoratore" come da tua indicazione.
             categorie_da_escludere = [
                 'Vendita Olive', 
                 'Vendita Olio', 
                 'Contributi PAC', 
                 'Rimborso Spese', 
-                'Entrate Diverse'
+                'Entrate Diverse',
+                'buste paga del lavoratore'
             ]
             
             # 3. Creiamo il vero database delle sole Uscite
