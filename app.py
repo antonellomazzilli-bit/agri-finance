@@ -753,12 +753,26 @@ with tab5:
         if not df_spesa.empty:
             df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
             
-            # FILTRO MATEMATICO CORRETTO: Prende solo le voci con segno negativo (le spese reali)
-            df_uscite_reali = df_spesa[(df_spesa['stato'].isin(['Saldato', 'Impegnato'])) & (df_spesa['importo'] < 0)].copy()
+            # 1. Filtriamo solo i pagamenti reali
+            df_valido = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
             
-            if not df_uscite_reali.empty:
-                # Trasformiamo in positivo SOLO dopo aver filtrato le spese
-                classifica = df_uscite_reali.groupby('categoria')['importo'].apply(lambda x: x.abs().sum()).reset_index()
+            # 2. BLACKLIST DELLE ENTRATE: Qui escludiamo a monte tutte le voci che rappresentano incassi.
+            # Se nel gestionale usi un nome diverso per indicare un'entrata (es. "Vendita al dettaglio"), 
+            # aggiungilo a questa lista!
+            categorie_da_escludere = [
+                'Vendita Olive', 
+                'Vendita Olio', 
+                'Contributi PAC', 
+                'Rimborso Spese', 
+                'Entrate Diverse'
+            ]
+            
+            # 3. Creiamo il vero database delle sole Uscite
+            df_uscite = df_valido[~df_valido['categoria'].isin(categorie_da_escludere)].copy()
+            
+            if not df_uscite.empty:
+                # Classifica basata solo sulle vere uscite
+                classifica = df_uscite.groupby('categoria')['importo'].sum().reset_index()
                 classifica = classifica.sort_values(by='importo', ascending=False)
                 
                 if not classifica.empty:
@@ -769,13 +783,10 @@ with tab5:
                     c2.metric("💸 Costo Totale", f"{peggiore_imp:.2f} €")
                     
                     st.markdown(f"**Dettaglio operazioni: {peggiore_cat}**")
-                    dettaglio = df_uscite_reali[df_uscite_reali['categoria'] == peggiore_cat][['data', 'descrizione', 'importo']]
-                    
-                    # Riportiamo in positivo per la lettura visiva nella tabella finale
-                    dettaglio['importo'] = dettaglio['importo'].abs()
+                    dettaglio = df_uscite[df_uscite['categoria'] == peggiore_cat][['data', 'descrizione', 'importo']]
                     st.dataframe(dettaglio, hide_index=True)
             else:
-                st.info("Nessuna uscita di cassa registrata.")
+                st.info("Nessuna uscita di cassa registrata (o tutte le voci appartengono alle categorie escluse).")
     st.markdown("Riclassificazione civilistica (Art. 2425 c.c.) con affiancamento automatico dell'anno precedente.")
 
     df_bilancio, _ = get_github_file()
