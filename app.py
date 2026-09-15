@@ -941,7 +941,40 @@ with tab3: # (Assicurati che il numero del tab corrisponda al tuo)
     else:
         st.warning("Il database è vuoto. Nessun dato da analizzare.")
 
-
+    st.divider()
+    with st.expander("🚨 APRI CRUSCOTTO SPENDING REVIEW (Trova il Buco Nero)", expanded=True):
+        st.markdown("### Radiografia dei Costi Operativi")
+        
+        # Recupera il database tramite la tua funzione
+        df_spesa, _ = get_github_file()
+        
+        if not df_spesa.empty:
+            df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
+            df_valido = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
+            df_valido['Costo Assoluto'] = df_valido['importo'].abs()
+            
+            # Classifica aggregata
+            classifica = df_valido.groupby('categoria')['Costo Assoluto'].sum().reset_index()
+            classifica = classifica.sort_values(by='Costo Assoluto', ascending=False)
+            
+            if not classifica.empty:
+                peggiore_cat = classifica.iloc[0]['categoria']
+                peggiore_imp = classifica.iloc[0]['Costo Assoluto']
+                tot = classifica['Costo Assoluto'].sum()
+                incidenza = (peggiore_imp / tot) * 100 if tot > 0 else 0
+                
+                c1, c2 = st.columns(2)
+                c1.metric("⚠️ Buco Nero (Peggiore Categoria)", peggiore_cat)
+                c2.metric("💸 Costo e Incidenza", f"{peggiore_imp:.2f} € ({incidenza:.1f}%)")
+                
+                st.bar_chart(classifica.set_index('categoria')['Costo Assoluto'])
+                
+                st.markdown(f"**Dettaglio operazioni per: {peggiore_cat}**")
+                dettaglio = df_valido[df_valido['categoria'] == peggiore_cat][['data', 'descrizione', 'Costo Assoluto']]
+                st.dataframe(dettaglio.sort_values(by='Costo Assoluto', ascending=False), hide_index=True)
+            else:
+                st.info("Nessuna spesa registrata.")
+                
 # ==========================================
 # --- TAB 6: FATTURE E COMMERCIALIZZAZIONE ---
 # ==========================================
