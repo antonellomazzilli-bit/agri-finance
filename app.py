@@ -866,18 +866,7 @@ with tab5:
 
                 colore_ris = "#1b5e20" if ris_operativo_n >= 0 else "#b71c1c"
 
-                html_bilancio_comparato = f"""
-                <html>
-                <head>
-                <style>
-                    body {{ font-family: 'Arial', sans-serif; background-color: #f4f4f9; padding: 20px; }}
-                    .foglio-a4 {{ background-color: white; color: black; padding: 40px; max-width: 800px; margin: auto; box-shadow: 0 0 15px rgba(0,0,0,0.2); }}
-                    h2, h3, h4 {{ text-align: center; margin: 5px 0; }}
-                    .header-doc {{ border-bottom: 2px solid black; padding-bottom: 15px; margin-bottom: 25px; }}
-                    table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; page-break-inside: avoid; }}
-                    th, td {{ border: 1px solid #000; padding: 8px; text-align: left; }}
-
-
+                
 # ==================================================
 # --- TAB BILANCIO: ANALISI E SPENDING REVIEW ---
 # ==================================================
