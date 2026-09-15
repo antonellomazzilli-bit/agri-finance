@@ -748,6 +748,22 @@ with tab4:
 # ==========================================
 with tab5:
     st.header("⚖️ Conto Economico CEE Comparato")
+    with st.expander("🚨 APRI CRUSCOTTO SPENDING REVIEW", expanded=True):
+        df_spesa, _ = get_github_file()
+        if not df_spesa.empty:
+            df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
+            df_valido = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
+            classifica = df_valido.groupby('categoria')['importo'].apply(lambda x: x.abs().sum()).reset_index()
+            classifica = classifica.sort_values(by='importo', ascending=False)
+            if not classifica.empty:
+                peggiore_cat = classifica.iloc[0]['categoria']
+                peggiore_imp = classifica.iloc[0]['importo']
+                c1, c2 = st.columns(2)
+                c1.metric("⚠️ Buco Nero (Peggiore Categoria)", peggiore_cat)
+                c2.metric("💸 Costo Totale", f"{peggiore_imp:.2f} €")
+                st.markdown(f"**Operazioni per: {peggiore_cat}**")
+                dettaglio = df_valido[df_valido['categoria'] == peggiore_cat][['data', 'descrizione', 'importo']]
+                st.dataframe(dettaglio, hide_index=True)
     st.markdown("Riclassificazione civilistica (Art. 2425 c.c.) con affiancamento automatico dell'anno precedente.")
 
     df_bilancio, _ = get_github_file()
