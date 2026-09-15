@@ -753,26 +753,21 @@ with tab5:
         if not df_spesa.empty:
             df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
             
-            # 1. Filtriamo solo i pagamenti reali
             df_valido = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
             
-            # 2. BLACKLIST DELLE ENTRATE: Qui escludiamo a monte tutte le voci che rappresentano incassi.
-            # Se nel gestionale usi un nome diverso per indicare un'entrata, aggiungilo a questa lista!
-            # Ho aggiunto "buste paga del lavoratore" come da tua indicazione.
+            # BLACKLIST AGGIORNATA CON I NOMI CORRETTI AL 100%
             categorie_da_escludere = [
                 'Vendita Olive', 
                 'Vendita Olio', 
                 'Contributi PAC', 
                 'Rimborso Spese', 
                 'Entrate Diverse',
-                'buste paga del lavoratore'
+                'Busta Paga' # <--- ECCO LA CORREZIONE!
             ]
             
-            # 3. Creiamo il vero database delle sole Uscite
             df_uscite = df_valido[~df_valido['categoria'].isin(categorie_da_escludere)].copy()
             
             if not df_uscite.empty:
-                # Classifica basata solo sulle vere uscite
                 classifica = df_uscite.groupby('categoria')['importo'].sum().reset_index()
                 classifica = classifica.sort_values(by='importo', ascending=False)
                 
@@ -787,7 +782,7 @@ with tab5:
                     dettaglio = df_uscite[df_uscite['categoria'] == peggiore_cat][['data', 'descrizione', 'importo']]
                     st.dataframe(dettaglio, hide_index=True)
             else:
-                st.info("Nessuna uscita di cassa registrata (o tutte le voci appartengono alle categorie escluse).")
+                st.info("Nessuna spesa nascosta rilevata oltre alle buste paga.")
     st.markdown("Riclassificazione civilistica (Art. 2425 c.c.) con affiancamento automatico dell'anno precedente.")
 
     df_bilancio, _ = get_github_file()
