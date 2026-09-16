@@ -1069,3 +1069,19 @@ with tab6:
                     st.rerun()
             else:
                 st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
+
+# ==================================================
+# --- MODULO ALERT IRRIGAZIONE BASATO SU TEMPERATURA ---
+# ==================================================
+st.subheader("🌡️ Controllo Irriguo Intelligente (Alert Meteo)")
+st.markdown("Verifica se la temperatura giustifica l'attivazione del servizio di irrigazione da 20 €/ora.")
+
+temp_max = st.number_input("Inserisci la temperatura massima prevista oggi (°C):", min_value=10.0, max_value=50.0, value=31.0, step=0.5)
+
+# Logica di soglia per la Coratina
+if temp_max >= 35.0:
+    st.error("🔥 **ALLARME CALDO ESTREMO (>35°C):** Rischio stress idrico severo. L'irrigazione è fortemente consigliata per proteggere le olive (valuta un ciclo breve).")
+elif temp_max >= 32.0:
+    st.warning("⚠️ **Attenzione (32°C - 34.9°C):** Condizione di caldo intenso. Procedi solo se l'ultimo turno risale a più di 7-10 giorni fa.")
+else:
+    st.success("✅ **Temperatura nella norma (<32°C):** La pianta non richiede acqua urgente. **Blocca l'irrigazione e risparmia i 20 €/h!**")
