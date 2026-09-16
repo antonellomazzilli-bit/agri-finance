@@ -748,41 +748,36 @@ with tab4:
 # ==========================================
 with tab5:
     st.header("⚖️ Conto Economico CEE Comparato")
-    with st.expander("🚨 APRI CRUSCOTTO SPENDING REVIEW", expanded=True):
+    with st.expander("🔍 ANALITICO SPESE: Tutte le voci riga per riga", expanded=True):
+        st.markdown("### Elenco Analitico dei Costi Vivi (dal più alto al più basso)")
+        st.info("Qui trovi ogni singola spesa registrata, ripulita dalle entrate e dalle buste paga, così puoi individuare subito le voci superflue.")
+        
         df_spesa, _ = get_github_file()
         if not df_spesa.empty:
             df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
             
+            # 1. Filtriamo solo i pagamenti reali (Saldato o Impegnato)
             df_valido = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
             
-            # BLACKLIST AGGIORNATA CON I NOMI CORRETTI AL 100%
-            categorie_da_escludere = [
-                'Vendita Olive', 
-                'Vendita Olio', 
-                'Contributi PAC', 
-                'Rimborso Spese', 
-                'Entrate Diverse',
-                'Busta Paga' # <--- ECCO LA CORREZIONE!
-            ]
+            # 2. Escludiamo le entrate e le buste paga per concentrarci sui costi di gestione
+            escluse = ['Vendita Olive', 'Vendita Olio', 'Contributi PAC', 'Rimborso Spese', 'Entrate Diverse', 'Busta Paga']
+            df_costi_vivi = df_valido[~df_valido['categoria'].isin(escluse)].copy()
             
-            df_uscite = df_valido[~df_valido['categoria'].isin(categorie_da_escludere)].copy()
-            
-            if not df_uscite.empty:
-                classifica = df_uscite.groupby('categoria')['importo'].sum().reset_index()
-                classifica = classifica.sort_values(by='importo', ascending=False)
+            if not df_costi_vivi.empty:
+                # Prepariamo la colonna dei costi in positivo per l'analisi
+                df_costi_vivi['Costo (€)'] = df_costi_vivi['importo'].abs()
                 
-                if not classifica.empty:
-                    peggiore_cat = classifica.iloc[0]['categoria']
-                    peggiore_imp = classifica.iloc[0]['importo']
-                    c1, c2 = st.columns(2)
-                    c1.metric("⚠️ Buco Nero (Voce di Spesa Maggiore)", peggiore_cat)
-                    c2.metric("💸 Costo Totale", f"{peggiore_imp:.2f} €")
-                    
-                    st.markdown(f"**Dettaglio operazioni: {peggiore_cat}**")
-                    dettaglio = df_uscite[df_uscite['categoria'] == peggiore_cat][['data', 'descrizione', 'importo']]
-                    st.dataframe(dettaglio, hide_index=True)
+                # Ordiniamo dal più costoso al meno costoso (il cuore della spending review)
+                df_analitico = df_costi_vivi[['data', 'categoria', 'descrizione', 'Costo (€)', 'stato']].sort_values(by='Costo (€)', ascending=False)
+                
+                # Mostriamo la tabella completa
+                st.dataframe(df_analitico, use_container_width=True, hide_index=True)
+                
+                # Metrica riassuntiva dei costi di gestione
+                tot_costi_vivi = df_analitico['Costo (€)'].sum()
+                st.metric("📉 Totale Uscite di Gestione (Escluse Buste Paga)", f"{tot_costi_vivi:.2f} €")
             else:
-                st.info("Nessuna spesa nascosta rilevata oltre alle buste paga.")
+                st.info("Nessun costo di gestione registrato oltre alle buste paga.")
     st.markdown("Riclassificazione civilistica (Art. 2425 c.c.) con affiancamento automatico dell'anno precedente.")
 
     df_bilancio, _ = get_github_file()
