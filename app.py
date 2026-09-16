@@ -799,159 +799,53 @@ with tab4:
     else:
         st.info("Nessun dato finanziario registrato nel database per attivare il simulatore.")
 
-# ==========================================
-# --- TAB 5: BILANCIO (SCHEMA CEE COMPARATO N vs N-1) ---
-# ==========================================
-with tab5:
-    st.header("⚖️ Conto Economico CEE Comparato")
-    with st.expander("🔍 ANALITICO SPESE: Tutte le voci riga per riga", expanded=True):
-        st.markdown("### Elenco Analitico dei Costi Vivi (dal più alto al più basso)")
-        st.info("Qui trovi ogni singola spesa registrata, ripulita dalle entrate e dalle buste paga, così puoi individuare subito le voci superflue.")
-        
-        df_spesa, _ = get_github_file()
-        if not df_spesa.empty:
-            df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
-            
-            # 1. Filtriamo solo i pagamenti reali (Saldato o Impegnato)
-            df_valido = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
-            
-            # 2. Escludiamo le entrate e le buste paga per concentrarci sui costi di gestione
-            escluse = ['Vendita Olive', 'Vendita Olio', 'Contributi PAC', 'Rimborso Spese', 'Entrate Diverse', 'Busta Paga']
-            df_costi_vivi = df_valido[~df_valido['categoria'].isin(escluse)].copy()
-            
-            if not df_costi_vivi.empty:
-                # Prepariamo la colonna dei costi in positivo per l'analisi
-                df_costi_vivi['Costo (€)'] = df_costi_vivi['importo'].abs()
-                
-                # Ordiniamo dal più costoso al meno costoso (il cuore della spending review)
-                df_analitico = df_costi_vivi[['data', 'categoria', 'descrizione', 'Costo (€)', 'stato']].sort_values(by='Costo (€)', ascending=False)
-                
-                # Mostriamo la tabella completa
-                st.dataframe(df_analitico, use_container_width=True, hide_index=True)
-                
-                # Metrica riassuntiva dei costi di gestione
-                tot_costi_vivi = df_analitico['Costo (€)'].sum()
-                st.metric("📉 Totale Uscite di Gestione (Escluse Buste Paga)", f"{tot_costi_vivi:.2f} €")
-            else:
-                st.info("Nessun costo di gestione registrato oltre alle buste paga.")
-    st.markdown("Riclassificazione civilistica (Art. 2425 c.c.) con affiancamento automatico dell'anno precedente.")
+# ==================================================
+# --- CONTO ECONOMICO CEE INTERATTIVO (TUTTE CLICCABILI) ---
+# ==================================================
+st.subheader("📊 Conto Economico CEE Analitico e Interattivo")
+st.markdown("Clicca sulla freccia di qualsiasi voce per esplorare l'elenco esatto delle spese che la compongono.")
 
-    df_bilancio, _ = get_github_file()
+df_spesa, _ = get_github_file()
+
+if not df_spesa.empty:
+    df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
+    df_validi = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
     
-    if not df_bilancio.empty:
-        # ---> AGGIUNTA SALVAVITA: Forziamo la colonna importo in numeri puri anche nel Bilancio
-        df_bilancio['importo'] = pd.to_numeric(df_bilancio['importo'], errors='coerce').fillna(0.0)
+    # Esempio di lista delle principali macro-voci CEE presenti nel tuo bilancio
+    # Puoi mappare qui tutte le voci che vuoi monitorare
+    voci_cee = [
+        "B.6 - Costi per Materie Prime, Sussidiarie, Consumo e Merci",
+        "B.7 - Costi per Servizi (es. Acqua, Consulenze)",
+        "B.8 - Godimento Beni di Terzi",
+        "B.9 - Costi per il Personale (Buste Paga)",
+        "A.1 - Ricavi delle Vendite e Prestazioni"
+    ]
+    
+    for voce in voci_cee:
+        # Estraiamo la categoria corrispondente nel tuo database (puoi personalizzare il filtro)
+        # Qui ipotizziamo di filtrare in base al nome della voce o a una colonna di mappatura CEE
+        nome_categoria_db = voce.split(" - ")[1].split(" (")[0].strip() # Estrae es. "Costi per Servizi" o "Busta Paga"
         
-        df_bilancio['data_dt'] = pd.to_datetime(df_bilancio['data'], errors='coerce')
-        df_bilancio = df_bilancio.dropna(subset=['data_dt'])
-        anni_disponibili = sorted(df_bilancio['data_dt'].dt.year.unique(), reverse=True)
+        # Filtriamo i movimenti per questa specifica voce
+        df_dettaglio = df_validi[df_validi['categoria'].str.contains(nome_categoria_db, case=False, na=False)].copy()
         
-        if len(anni_disponibili) > 0:
-            anno_sel = st.selectbox("Seleziona Esercizio Fiscale (N):", anni_disponibili, key="bilancio_anno")
-            anno_prec = anno_sel - 1
-            
-            def classifica_cee(row):
-                cat = str(row['categoria']).upper()
-                tipo = row['tipo']
-                if tipo == 'Entrata':
-                    if 'CONTRIBUT' in cat or 'AGEA' in cat or 'PAC' in cat: return "A.5 - Altri ricavi e proventi (Contributi)"
-                    else: return "A.1 - Ricavi delle vendite e prestazioni"
-                elif tipo == 'Uscita':
-                    if 'MANODOPERA' in cat or 'BUSTA' in cat or 'SALDO' in cat: return "B.9 - Costi per il personale"
-                    elif 'ATTREZZATUR' in cat or 'AMMORTAMENT' in cat or 'MACCHINARI' in cat: return "B.10 - Ammortamenti e svalutazioni"
-                    elif 'SERVIZ' in cat or 'FRANTOIO' in cat or 'MOLITURA' in cat or 'TERZI' in cat or 'CONSULENZ' in cat: return "B.7 - Costi per servizi"
-                    elif 'CONCIM' in cat or 'MATERI' in cat or 'PIANTIN' in cat or 'CARBURANT' in cat or 'GASOLIO' in cat: return "B.6 - Per materie prime, sussidiarie, di consumo"
-                    elif 'AFFITT' in cat or 'LEASING' in cat: return "B.8 - Per godimento di beni di terzi"
-                    else: return "B.14 - Oneri diversi di gestione"
-                return "Non Classificato"
-
-            df_bilancio['voce_cee'] = df_bilancio.apply(classifica_cee, axis=1)
-
-            df_n = df_bilancio[df_bilancio['data_dt'].dt.year == anno_sel]
-            entrate_n = df_n[df_n['tipo'] == 'Entrata'].groupby('voce_cee')['importo'].sum()
-            uscite_n = df_n[df_n['tipo'] == 'Uscita'].groupby('voce_cee')['importo'].sum()
-            
-            df_n1 = df_bilancio[df_bilancio['data_dt'].dt.year == anno_prec]
-            entrate_n1 = df_n1[df_n1['tipo'] == 'Entrata'].groupby('voce_cee')['importo'].sum()
-            uscite_n1 = df_n1[df_n1['tipo'] == 'Uscita'].groupby('voce_cee')['importo'].sum()
-
-            voci_a = sorted(list(set(entrate_n.index).union(set(entrate_n1.index))))
-            voci_b = sorted(list(set(uscite_n.index).union(set(uscite_n1.index))))
-
-            tot_a_n, tot_a_n1 = entrate_n.sum(), entrate_n1.sum()
-            tot_b_n, tot_b_n1 = uscite_n.sum(), uscite_n1.sum()
-            ris_operativo_n = tot_a_n - tot_b_n
-            ris_operativo_n1 = tot_a_n1 - tot_b_n1
-
-            mappatura_categorie = {
-                "A.1 - Ricavi delle vendite e prestazioni": "Vendita Olio, Vendita Olive, ecc.",
-                "A.5 - Altri ricavi e proventi (Contributi)": "Contributi AGEA, PAC, ecc.",
-                "B.6 - Per materie prime, sussidiarie, di consumo": "Gasolio, Concimi, Piantine, Materie varie",
-                "B.7 - Costi per servizi": "Frantoio, Molitura, Consulenze, Lavori conto terzi",
-                "B.8 - Per godimento di beni di terzi": "Affitti terreni, Leasing",
-                "B.9 - Costi per il personale": "Manodopera, Buste Paga",
-                "B.10 - Ammortamenti e svalutazioni": "Attrezzature, Macchinari",
-                "B.14 - Oneri diversi di gestione": "Tutte le altre uscite non classificate"
-            }
-
-            sub_bil1, sub_bil2 = st.tabs(["💻 Visualizzazione Interattiva (N vs N-1)", "🖨️ Documento Stampabile (PDF Comparato)"])
-
-            with sub_bil1:
-                col_a, col_b = st.columns(2)
-                
-                with col_a:
-                    st.subheader(f"🟢 A) VALORE PRODUZIONE")
-                    for v in voci_a:
-                        val_n = entrate_n.get(v, 0.0)
-                        val_n1 = entrate_n1.get(v, 0.0)
-                        spiegazione = mappatura_categorie.get(v, "")
-                        
-                        st.markdown(f"**{v}**")
-                        if spiegazione:
-                            st.markdown(f"<p style='color: gray; font-size: 12px; margin-top: -15px; margin-bottom: 5px;'>Da DB: {spiegazione}</p>", unsafe_allow_html=True)
-                        
-                        c1, c2 = st.columns(2)
-                        c1.metric(f"Anno {anno_sel}", format_euro(val_n))
-                        c2.metric(f"Anno {anno_prec}", format_euro(val_n1), delta=f"{val_n - val_n1:.2f} €", delta_color="normal")
-                    st.divider()
-                    st.markdown(f"<h4 style='color: #1b5e20;'>TOTALE A ({anno_sel}): {format_euro(tot_a_n)}</h4>", unsafe_allow_html=True)
-                    st.markdown(f"<p style='color: gray;'>TOTALE A ({anno_prec}): {format_euro(tot_a_n1)}</p>", unsafe_allow_html=True)
-
-                with col_b:
-                    st.subheader(f"🔴 B) COSTI PRODUZIONE")
-                    for v in voci_b:
-                        val_n = uscite_n.get(v, 0.0)
-                        val_n1 = uscite_n1.get(v, 0.0)
-                        spiegazione = mappatura_categorie.get(v, "")
-                        
-                        st.markdown(f"**{v}**")
-                        if spiegazione:
-                            st.markdown(f"<p style='color: gray; font-size: 12px; margin-top: -15px; margin-bottom: 5px;'>Da DB: {spiegazione}</p>", unsafe_allow_html=True)
-                            
-                        c1, c2 = st.columns(2)
-                        c1.metric(f"Anno {anno_sel}", format_euro(val_n))
-                        c2.metric(f"Anno {anno_prec}", format_euro(val_n1), delta=f"{val_n - val_n1:.2f} €", delta_color="inverse")
-                    st.divider()
-                    st.markdown(f"<h4 style='color: #b71c1c;'>TOTALE B ({anno_sel}): {format_euro(tot_b_n)}</h4>", unsafe_allow_html=True)
-                    st.markdown(f"<p style='color: gray;'>TOTALE B ({anno_prec}): {format_euro(tot_b_n1)}</p>", unsafe_allow_html=True)
-
-                st.divider()
-                st.subheader("⚖️ RISULTATO D'ESERCIZIO")
-                c_ris1, c_ris2, c_ris3 = st.columns(3)
-                c_ris1.metric(f"Utile/Perdita {anno_prec}", format_euro(ris_operativo_n1))
-                c_ris2.metric(f"Utile/Perdita {anno_sel}", format_euro(ris_operativo_n), delta=f"{ris_operativo_n - ris_operativo_n1:.2f} €")
-
-            with sub_bil2:
-                html_righe_a = ""
-                for v in voci_a:
-                    html_righe_a += f"<tr><td>{v}</td><td class='right bold'>{format_euro(entrate_n.get(v, 0.0))}</td><td class='right' style='color: #555;'>{format_euro(entrate_n1.get(v, 0.0))}</td></tr>"
-                
-                html_righe_b = ""
-                for v in voci_b:
-                    html_righe_b += f"<tr><td>{v}</td><td class='right bold'>{format_euro(uscite_n.get(v, 0.0))}</td><td class='right' style='color: #555;'>{format_euro(uscite_n1.get(v, 0.0))}</td></tr>"
-
-                colore_ris = "#1b5e20" if ris_operativo_n >= 0 else "#b71c1c"
-
+        # Calcoliamo il totale della voce
+        totale_voce = df_dettaglio['importo'].sum() if not df_dettaglio.empty else 0.0
+        
+        # Creiamo l'expander interattivo per la riga
+        with st.expander(f"📁 **{voce}** — Totale: **{totale_voce:,.2f} €**"):
+            if not df_dettaglio.empty:
+                # Mostriamo la tabella analitica delle singole spese di quella voce
+                st.dataframe(
+                    df_dettaglio[['data', 'categoria', 'descrizione', 'importo', 'stato']], 
+                    use_container_width=True, 
+                    hide_index=True
+                )
+                st.caption(f"Numero movimenti registrati: {len(df_dettaglio)}")
+            else:
+                st.info("Nessun movimento registrato per questa voce nel periodo selezionato.")
+else:
+    st.warning("Nessun dato disponibile nel database.")
                 
 # ==================================================
 # --- TAB BILANCIO: ANALISI E SPENDING REVIEW ---
