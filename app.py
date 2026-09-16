@@ -669,6 +669,86 @@ with tab5:
             st.markdown("### 📊 Distribuzione dei Costi")
             st.bar_chart(spese_per_categoria.set_index('categoria')['importo_assoluto'])
 
+st.divider()
+    st.subheader("📄 Esportazione e Stampa Bilancio")
+    st.markdown("Genera un documento PDF ufficiale con il riepilogo di tutte le categorie e i totali del periodo.")
+
+    if not df_spesa.empty:
+        # Calcoliamo i totali per categoria per il PDF
+        df_pdf_data = df_validi.groupby(['tipo', 'categoria'])['importo'].sum().reset_index()
+        
+        if not df_pdf_data.empty:
+            pdf = FPDF()
+            pdf.add_page()
+            
+            # Intestazione del documento
+            pdf.set_font("Arial", 'B', 16)
+            pdf.cell(190, 10, txt="AgriFinance Cloud - Bilancio Aziendale", ln=True, align='C')
+            pdf.set_font("Arial", size=10)
+            pdf.cell(190, 10, txt=f"Data generazione: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='C')
+            pdf.ln(5)
+            
+            # Tabella PDF: Intestazioni
+            pdf.set_font("Arial", 'B', 10)
+            pdf.cell(40, 10, "Tipo", 1, 0, 'C')
+            pdf.cell(100, 10, "Categoria", 1, 0, 'C')
+            pdf.cell(50, 10, "Totale (€)", 1, 1, 'C')
+            
+            # Righe della tabella
+            pdf.set_font("Arial", size=9)
+            totale_entrate = 0.0
+            totale_uscite = 0.0
+            
+            for _, row in df_pdf_data.iterrows():
+                tipo_op = str(row['tipo'])
+                cat_op = str(row['categoria'])[:30]
+                imp_op = float(row['importo'])
+                
+                if tipo_op == "Entrata":
+                    totale_entrate += imp_op
+                else:
+                    totale_uscite += imp_op
+                
+                pdf.cell(40, 8, tipo_op, 1, 0, 'L')
+                pdf.cell(100, 8, cat_op, 1, 0, 'L')
+                pdf.cell(50, 8, f"{imp_op:,.2f} E", 1, 1, 'R')
+            
+            pdf.ln(5)
+            
+            # Riepilogo finale Utile / Perdita
+            pdf.set_font("Arial", 'B', 11)
+            utile_esercizio = totale_entrate - totale_uscite
+            pdf.cell(140, 10, "Totale Ricavi / Entrate:", 1, 0, 'L')
+            pdf.cell(50, 10, f"{totale_entrate:,.2f} E", 1, 1, 'R')
+            
+            pdf.cell(140, 10, "Totale Costi / Uscite:", 1, 0, 'L')
+            pdf.cell(50, 10, f"{totale_uscite:,.2f} E", 1, 1, 'R')
+            
+            if utile_esercizio >= 0:
+                pdf.set_text_color(40, 167, 69)
+            else:
+                pdf.set_text_color(220, 53, 69)
+                
+            pdf.cell(140, 10, "Risultato d'Esercizio (Utile / Perdita):", 1, 0, 'L')
+            pdf.cell(50, 10, f"{utile_esercizio:,.2f} E", 1, 1, 'R')
+            pdf.set_text_color(0, 0, 0)
+            
+            # Output dei byte per il download button di Streamlit
+            pdf_bytes = pdf.output(dest='S').encode('latin-1')
+            
+            st.download_button(
+                label="📄 Scarica Report Bilancio in PDF",
+                data=pdf_bytes,
+                file_name=f'Bilancio_AgriFinance_{datetime.now().strftime("%Y_%m_%d")}.pdf',
+                mime='application/pdf',
+                type="primary",
+                use_container_width=True
+            )
+        else:
+            st.info("Nessun dato sufficiente per generare il PDF.")
+    else:
+        st.warning("Database vuoto.")
+
 # ==========================================
 # --- TAB 6: FATTURE E COMMERCIALIZZAZIONE ---
 # ==========================================
