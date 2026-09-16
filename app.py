@@ -620,7 +620,6 @@ with tab5:
                 df_dettaglio = df_validi[df_validi['categoria'] == cat].copy()
                 totale_cat = df_dettaglio['importo'].sum()
                 
-                # Verifichiamo se è un'entrata o un'uscita per mettere l'icona corretta
                 tipo_op = df_dettaglio['tipo'].iloc[0] if 'tipo' in df_dettaglio.columns and not df_dettaglio.empty else "Uscita"
                 icona = "🟢" if tipo_op == "Entrata" else "🔴"
                 
@@ -645,7 +644,6 @@ with tab5:
         df_spese = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
         df_spese['importo_assoluto'] = df_spese['importo'].abs()
         
-        # Escludiamo le entrate per evidenziare i veri costi operativi evitabili
         escluse = ['Vendita Olio', 'Vendita Olive', 'Contributi/Aiuti', 'Rimborso Spese']
         df_costi_vivi = df_spese[~df_spese['categoria'].isin(escluse)].copy()
         
@@ -669,32 +667,28 @@ with tab5:
             st.markdown("### 📊 Distribuzione dei Costi")
             st.bar_chart(spese_per_categoria.set_index('categoria')['importo_assoluto'])
 
-st.divider()
+    st.divider()
     st.subheader("📄 Esportazione e Stampa Bilancio")
     st.markdown("Genera un documento PDF ufficiale con il riepilogo di tutte le categorie e i totali del periodo.")
 
     if not df_spesa.empty:
-        # Calcoliamo i totali per categoria per il PDF
         df_pdf_data = df_validi.groupby(['tipo', 'categoria'])['importo'].sum().reset_index()
         
         if not df_pdf_data.empty:
             pdf = FPDF()
             pdf.add_page()
             
-            # Intestazione del documento
             pdf.set_font("Arial", 'B', 16)
             pdf.cell(190, 10, txt="AgriFinance Cloud - Bilancio Aziendale", ln=True, align='C')
             pdf.set_font("Arial", size=10)
             pdf.cell(190, 10, txt=f"Data generazione: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='C')
             pdf.ln(5)
             
-            # Tabella PDF: Intestazioni
             pdf.set_font("Arial", 'B', 10)
             pdf.cell(40, 10, "Tipo", 1, 0, 'C')
             pdf.cell(100, 10, "Categoria", 1, 0, 'C')
             pdf.cell(50, 10, "Totale (€)", 1, 1, 'C')
             
-            # Righe della tabella
             pdf.set_font("Arial", size=9)
             totale_entrate = 0.0
             totale_uscite = 0.0
@@ -715,7 +709,6 @@ st.divider()
             
             pdf.ln(5)
             
-            # Riepilogo finale Utile / Perdita
             pdf.set_font("Arial", 'B', 11)
             utile_esercizio = totale_entrate - totale_uscite
             pdf.cell(140, 10, "Totale Ricavi / Entrate:", 1, 0, 'L')
@@ -733,7 +726,6 @@ st.divider()
             pdf.cell(50, 10, f"{utile_esercizio:,.2f} E", 1, 1, 'R')
             pdf.set_text_color(0, 0, 0)
             
-            # Output dei byte per il download button di Streamlit
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
             
             st.download_button(
