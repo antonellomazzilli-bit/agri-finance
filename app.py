@@ -1071,17 +1071,56 @@ with tab6:
                 st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
 
 # ==================================================
-# --- MODULO ALERT IRRIGAZIONE BASATO SU TEMPERATURA ---
+# --- MODULO METEO AUTOMATICO & ALERT IRRIGUO (CORATO) ---
 # ==================================================
-st.subheader("🌡️ Controllo Irriguo Intelligente (Alert Meteo)")
-st.markdown("Verifica se la temperatura giustifica l'attivazione del servizio di irrigazione da 20 €/ora.")
+import requests
+import pandas as pd
 
-temp_max = st.number_input("Inserisci la temperatura massima prevista oggi (°C):", min_value=10.0, max_value=50.0, value=31.0, step=0.5)
+st.subheader("🌦️ Previsioni Meteo & Semaforo Irriguo (Corato)")
+st.markdown("Dati climatici aggiornati in automatico via satellite per l'area di Corato / Agro di Andria.")
 
-# Logica di soglia per la Coratina
-if temp_max >= 35.0:
-    st.error("🔥 **ALLARME CALDO ESTREMO (>35°C):** Rischio stress idrico severo. L'irrigazione è fortemente consigliata per proteggere le olive (valuta un ciclo breve).")
-elif temp_max >= 32.0:
-    st.warning("⚠️ **Attenzione (32°C - 34.9°C):** Condizione di caldo intenso. Procedi solo se l'ultimo turno risale a più di 7-10 giorni fa.")
-else:
-    st.success("✅ **Temperatura nella norma (<32°C):** La pianta non richiede acqua urgente. **Blocca l'irrigazione e risparmia i 20 €/h!**")
+# Coordinate esatte di Corato (Open-Meteo API gratuita)
+url = "https://api.open-meteo.com/v1/forecast?latitude=41.1535&longitude=16.4132&daily=temperature_2m_max,precipitation_sum&timezone=Europe/Rome"
+
+try:
+    response = requests.get(url, timeout=5)
+    if response.status_code == 200:
+        data = response.json()
+        daily = data.get("daily", {})
+        dates = daily.get("time", [])
+        max_temps = daily.get("temperature_2m_max", [])
+        rain_sums = daily.get("precipitation_sum", [])
+        
+        if dates and max_temps:
+            # Prepariamo la tabella a 3 giorni
+            forecast_list = []
+            for i in range(min(3, len(dates))):
+                forecast_list.append({
+                    "Giorno": dates[i],
+                    "Temp Massima (°C)": max_temps[i],
+                    "Pioggia Prevista (mm)": rain_sums[i] if i < len(rain_sums) else 0.0
+                })
+            
+            df_meteo = pd.DataFrame(forecast_list)
+            st.dataframe(df_meteo, use_container_width=True, hide_index=True)
+            
+            # Analisi intelligente basata sul giorno odierno (indice 0)
+            temp_oggi = max_temps[0]
+            pioggia_oggi = rain_sums[0] if rain_sums else 0.0
+            
+            st.markdown("### 🚦 Semaforo Irriguo Automatico (Oggi)")
+            
+            if pioggia_oggi > 1.5:
+                st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Ottime notizie! **Non attivare l'irrigazione**, la natura sta bagnando i tuoi 800 alberi a costo zero.")
+            elif temp_oggi >= 35.0:
+                st.error(f"🔥 **Caldo Estremo ({temp_oggi}°C):** Rischio stress idrico severo per la Coratina. L'irrigazione a 20 €/h è giustificata solo se il terreno è asciutto.")
+            elif temp_oggi >= 32.0:
+                st.warning(f"⚠️ **Caldo Intenso ({temp_oggi}°C):** Condizione limite. Valuta se rimandare o procedere con un turno ridotto.")
+            else:
+                st.success(f"✅ **Temperatura mite ({temp_oggi}°C):** La pianta non è in sofferenza termica. **Blocca l'acqua e risparmia i 20 €!**")
+        else:
+            st.warning("Impossibile leggere i dati meteo giornalieri.")
+    else:
+        st.error("Servizio meteo temporaneamente non disponibile.")
+except Exception as e:
+    st.info("Connessione al meteo non disponibile in questo momento.")
