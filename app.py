@@ -603,34 +603,40 @@ with tab4:
 # --- TAB 5: BILANCIO E SPENDING REVIEW ---
 # ==========================================
 with tab5:
-    st.header("📊 Conto Economico CEE Analitico e Interattivo")
-    st.markdown("Clicca sulla freccia di qualsiasi voce per esplorare l'elenco esatto delle spese che la compongono.")
+    st.header("📊 Conto Economico & Analitico per Categoria")
+    st.markdown("Clicca sulla freccia di qualsiasi categoria per esplorare l'elenco esatto delle spese o dei ricavi registrati.")
 
     df_spesa, _ = get_github_file()
+    
     if not df_spesa.empty:
         df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
         df_validi = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
         
-        voci_cee = [
-            "B.6 - Costi per Materie Prime, Sussidiarie, Consumo e Merci",
-            "B.7 - Costi per Servizi (es. Acqua, Consulenze)",
-            "B.8 - Godimento Beni di Terzi",
-            "B.9 - Costi per il Personale (Buste Paga)",
-            "A.1 - Ricavi delle Vendite e Prestazioni"
-        ]
+        # Estraiamo dinamicamente tutte le categorie reali presenti nel database
+        categorie_uniche = df_validi['categoria'].dropna().unique()
         
-        for voce in voci_cee:
-            nome_categoria_db = voce.split(" - ")[1].split(" (")[0].strip()
-            df_dettaglio = df_validi[df_validi['categoria'].str.contains(nome_categoria_db, case=False, na=False)].copy()
-            totale_voce = df_dettaglio['importo'].sum() if not df_dettaglio.empty else 0.0
+        if len(categorie_uniche) > 0:
+            for cat in sorted(categorie_uniche):
+                df_dettaglio = df_validi[df_validi['categoria'] == cat].copy()
+                totale_cat = df_dettaglio['importo'].sum()
+                
+                # Verifichiamo se è un'entrata o un'uscita per mettere l'icona corretta
+                tipo_op = df_dettaglio['tipo'].iloc[0] if 'tipo' in df_dettaglio.columns and not df_dettaglio.empty else "Uscita"
+                icona = "🟢" if tipo_op == "Entrata" else "🔴"
+                
+                with st.expander(f"{icona} **{cat}** — Totale: **{totale_cat:,.2f} €**"):
+                    if not df_dettaglio.empty:
+                        st.dataframe(
+                            df_dettaglio[['data', 'tipo', 'descrizione', 'importo', 'stato']], 
+                            use_container_width=True, 
+                            hide_index=True
+                        )
+                        st.caption(f"Numero movimenti registrati: {len(df_dettaglio)}")
+                    else:
+                        st.info("Nessun movimento registrato per questa categoria.")
+        else:
+            st.info("Nessuna categoria trovata nel database.")
             
-            with st.expander(f"📁 **{voce}** — Totale: **{totale_voce:,.2f} €**"):
-                if not df_dettaglio.empty:
-                    st.dataframe(df_dettaglio[['data', 'categoria', 'descrizione', 'importo', 'stato']], use_container_width=True, hide_index=True)
-                    st.caption(f"Numero movimenti registrati: {len(df_dettaglio)}")
-                else:
-                    st.info("Nessun movimento registrato per questa voce nel periodo selezionato.")
-    
     st.divider()
     st.header("📉 Radiografia dei Costi e Spending Review")
     st.markdown("Usa questo pannello per identificare esattamente dove stai perdendo marginalità.")
@@ -639,8 +645,8 @@ with tab5:
         df_spese = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
         df_spese['importo_assoluto'] = df_spese['importo'].abs()
         
-        # Escludiamo le buste paga e ricavi per evidenziare i veri costi operativi evitabili
-        escluse = ['Vendita Olive', 'Vendita Olio', 'Contributi/Aiuti', 'Rimborso Spese', 'Busta Paga', 'Manodopera']
+        # Escludiamo le entrate per evidenziare i veri costi operativi evitabili
+        escluse = ['Vendita Olio', 'Vendita Olive', 'Contributi/Aiuti', 'Rimborso Spese']
         df_costi_vivi = df_spese[~df_spese['categoria'].isin(escluse)].copy()
         
         spese_per_categoria = df_costi_vivi.groupby('categoria')['importo_assoluto'].sum().reset_index()
