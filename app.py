@@ -600,6 +600,7 @@ with tab4:
                         rc3.metric("📊 Fatturato Target", format_euro(fabbisogno_totale), "Copertura Raggiunta")
 
 
+
 # ==========================================
 # --- TAB 5: BILANCIO E SPENDING REVIEW ---
 # ==========================================
@@ -683,7 +684,9 @@ with tab5:
         if not df_pdf_data.empty:
             pdf = FPDF()
             
+            # ==========================================
             # PAGINA 1: RIEPILOGO GENERALE
+            # ==========================================
             pdf.add_page()
             pdf.set_font("Arial", 'B', 16)
             pdf.cell(190, 10, txt="AgriFinance Cloud - Bilancio Aziendale", ln=True, align='C')
@@ -734,7 +737,9 @@ with tab5:
             pdf.cell(50, 10, f"{utile_esercizio:,.2f} EUR", 1, 1, 'R')
             pdf.set_text_color(0, 0, 0)
             
-            # PAGINA 2: DETTAGLIO ANALITICO
+            # ==========================================
+            # PAGINA 2: DETTAGLIO ANALITICO CON TOTALI
+            # ==========================================
             pdf.add_page()
             pdf.set_font("Arial", 'B', 14)
             pdf.cell(190, 10, txt="Dettaglio Analitico delle Operazioni", ln=True, align='C')
@@ -744,6 +749,7 @@ with tab5:
             
             for cat in sorted(categorie_uniche):
                 df_cat = df_validi_pdf[df_validi_pdf['categoria'] == cat]
+                totale_categoria = df_cat['importo'].sum() # <-- Calcolo automatico del totale di questa categoria
                 
                 pdf.set_font("Arial", 'B', 11)
                 pdf.set_fill_color(220, 220, 220)
@@ -767,7 +773,13 @@ with tab5:
                     pdf.cell(30, 6, stato_op, 1, 0, 'C')
                     pdf.cell(30, 6, f"{imp_op:,.2f} EUR", 1, 1, 'R')
                 
-                pdf.ln(4)
+                # --- RIGA AGGIUNTIVA: TOTALE DELLA CATEGORIA ---
+                pdf.set_font("Arial", 'B', 9)
+                pdf.set_fill_color(240, 240, 240) # Sfondo leggermente grigio per far risaltare il totale
+                pdf.cell(160, 6, f"TOTALE {cat.upper()}", 1, 0, 'R', fill=True)
+                pdf.cell(30, 6, f"{totale_categoria:,.2f} EUR", 1, 1, 'R', fill=True)
+                
+                pdf.ln(6) # Spazio maggiorato per separare bene i blocchi
 
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
             
