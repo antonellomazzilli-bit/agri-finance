@@ -669,8 +669,9 @@ with tab5:
 
     st.divider()
     st.divider()
+   st.divider()
     st.subheader("📄 Esportazione e Stampa Bilancio")
-    st.markdown("Genera un documento PDF ufficiale con il riepilogo di tutte le categorie e i totali del periodo.")
+    st.markdown("Genera un documento PDF ufficiale con il riepilogo e il dettaglio analitico di tutte le operazioni.")
 
     df_spesa_pdf, _ = get_github_file()
 
@@ -678,23 +679,32 @@ with tab5:
         df_spesa_pdf['importo'] = pd.to_numeric(df_spesa_pdf['importo'], errors='coerce').fillna(0)
         df_validi_pdf = df_spesa_pdf[df_spesa_pdf['stato'].isin(['Saldato', 'Impegnato'])].copy()
         
+        # Ordiniamo i dati per averli in ordine nel dettaglio
+        df_validi_pdf = df_validi_pdf.sort_values(by=['tipo', 'categoria', 'data'])
+        
         df_pdf_data = df_validi_pdf.groupby(['tipo', 'categoria'])['importo'].sum().reset_index()
         
         if not df_pdf_data.empty:
             pdf = FPDF()
-            pdf.add_page()
             
+            # ==========================================
+            # PAGINA 1: RIEPILOGO GENERALE
+            # ==========================================
+            pdf.add_page()
             pdf.set_font("Arial", 'B', 16)
             pdf.cell(190, 10, txt="AgriFinance Cloud - Bilancio Aziendale", ln=True, align='C')
             pdf.set_font("Arial", size=10)
             pdf.cell(190, 10, txt=f"Data generazione: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='C')
             pdf.ln(5)
             
+            # Tabella Riepilogo: Intestazioni
             pdf.set_font("Arial", 'B', 10)
-            pdf.cell(40, 10, "Tipo", 1, 0, 'C')
-            pdf.cell(100, 10, "Categoria", 1, 0, 'C')
-            pdf.cell(50, 10, "Totale (EUR)", 1, 1, 'C')
+            pdf.set_fill_color(240, 240, 240)
+            pdf.cell(40, 10, "Tipo", 1, 0, 'C', fill=True)
+            pdf.cell(100, 10, "Categoria", 1, 0, 'C', fill=True)
+            pdf.cell(50, 10, "Totale (EUR)", 1, 1, 'C', fill=True)
             
+            # Righe Riepilogo
             pdf.set_font("Arial", size=9)
             totale_entrate = 0.0
             totale_uscite = 0.0
@@ -715,6 +725,7 @@ with tab5:
             
             pdf.ln(5)
             
+            # Totali Riepilogo
             pdf.set_font("Arial", 'B', 11)
             utile_esercizio = totale_entrate - totale_uscite
             pdf.cell(140, 10, "Totale Ricavi / Entrate:", 1, 0, 'L')
@@ -732,14 +743,55 @@ with tab5:
             pdf.cell(50, 10, f"{utile_esercizio:,.2f} EUR", 1, 1, 'R')
             pdf.set_text_color(0, 0, 0)
             
-            # --- IL PULSANTE ORA E' BLINDATO E VISIBILE ---
+            # ==========================================
+            # PAGINA 2: DETTAGLIO ANALITICO
+            # ==========================================
+            pdf.add_page()
+            pdf.set_font("Arial", 'B', 14)
+            pdf.cell(190, 10, txt="Dettaglio Analitico delle Operazioni", ln=True, align='C')
+            pdf.ln(5)
+            
+            categorie_uniche = df_validi_pdf['categoria'].unique()
+            
+            for cat in sorted(categorie_uniche):
+                df_cat = df_validi_pdf[df_validi_pdf['categoria'] == cat]
+                
+                # Titolo Categoria
+                pdf.set_font("Arial", 'B', 11)
+                pdf.set_fill_color(220, 220, 220)
+                pdf.cell(190, 8, f"Categoria: {cat}", 1, 1, 'L', fill=True)
+                
+                # Intestazioni Tabella Dettaglio
+                pdf.set_font("Arial", 'B', 9)
+                pdf.cell(30, 8, "Data", 1, 0, 'C')
+                pdf.cell(100, 8, "Descrizione", 1, 0, 'C')
+                pdf.cell(30, 8, "Stato", 1, 0, 'C')
+                pdf.cell(30, 8, "Importo", 1, 1, 'C')
+                
+                # Righe Dettaglio
+                pdf.set_font("Arial", size=8)
+                for _, riga in df_cat.iterrows():
+                    data_op = str(riga['data'])
+                    # Tagliamo la descrizione se è troppo lunga per evitare sbavature
+                    desc_op = str(riga['descrizione'])[:50] 
+                    stato_op = str(riga['stato'])
+                    imp_op = float(riga['importo'])
+                    
+                    pdf.cell(30, 6, data_op, 1, 0, 'C')
+                    pdf.cell(100, 6, desc_op, 1, 0, 'L')
+                    pdf.cell(30, 6, stato_op, 1, 0, 'C')
+                    pdf.cell(30, 6, f"{imp_op:,.2f} EUR", 1, 1, 'R')
+                
+                pdf.ln(4) # Spazio tra una categoria e l'altra
+
+            # --- GENERAZIONE DEL FILE ---
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
             
-            st.success("✅ Documento PDF generato con successo!")
+            st.success("✅ Documento PDF completo di dettagli generato con successo!")
             st.download_button(
-                label="📄 Clicca qui per Scaricare il Bilancio in PDF",
+                label="📄 Clicca qui per Scaricare il Bilancio Dettagliato in PDF",
                 data=pdf_bytes,
-                file_name=f'Bilancio_AgriFinance_{datetime.now().strftime("%Y_%m_%d")}.pdf',
+                file_name=f'Bilancio_Analitico_{datetime.now().strftime("%Y_%m_%d")}.pdf',
                 mime='application/pdf',
                 type="primary",
                 use_container_width=True
