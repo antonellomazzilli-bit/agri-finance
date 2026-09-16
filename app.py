@@ -802,50 +802,42 @@ with tab4:
 # ==================================================
 # --- CONTO ECONOMICO CEE INTERATTIVO (TUTTE CLICCABILI) ---
 # ==================================================
-st.subheader("📊 Conto Economico CEE Analitico e Interattivo")
-st.markdown("Clicca sulla freccia di qualsiasi voce per esplorare l'elenco esatto delle spese che la compongono.")
 
-df_spesa, _ = get_github_file()
+with tab_5:
+    st.subheader("📊 Conto Economico CEE Analitico e Interattivo")
+    st.markdown("Clicca sulla freccia di qualsiasi voce per esplorare l'elenco esatto delle spese che la compongono.")
 
-if not df_spesa.empty:
-    df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
-    df_validi = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
-    
-    # Esempio di lista delle principali macro-voci CEE presenti nel tuo bilancio
-    # Puoi mappare qui tutte le voci che vuoi monitorare
-    voci_cee = [
-        "B.6 - Costi per Materie Prime, Sussidiarie, Consumo e Merci",
-        "B.7 - Costi per Servizi (es. Acqua, Consulenze)",
-        "B.8 - Godimento Beni di Terzi",
-        "B.9 - Costi per il Personale (Buste Paga)",
-        "A.1 - Ricavi delle Vendite e Prestazioni"
-    ]
-    
-    for voce in voci_cee:
-        # Estraiamo la categoria corrispondente nel tuo database (puoi personalizzare il filtro)
-        # Qui ipotizziamo di filtrare in base al nome della voce o a una colonna di mappatura CEE
-        nome_categoria_db = voce.split(" - ")[1].split(" (")[0].strip() # Estrae es. "Costi per Servizi" o "Busta Paga"
+    df_spesa, _ = get_github_file()
+
+    if not df_spesa.empty:
+        df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
+        df_validi = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
         
-        # Filtriamo i movimenti per questa specifica voce
-        df_dettaglio = df_validi[df_validi['categoria'].str.contains(nome_categoria_db, case=False, na=False)].copy()
+        voci_cee = [
+            "B.6 - Costi per Materie Prime, Sussidiarie, Consumo e Merci",
+            "B.7 - Costi per Servizi (es. Acqua, Consulenze)",
+            "B.8 - Godimento Beni di Terzi",
+            "B.9 - Costi per il Personale (Buste Paga)",
+            "A.1 - Ricavi delle Vendite e Prestazioni"
+        ]
         
-        # Calcoliamo il totale della voce
-        totale_voce = df_dettaglio['importo'].sum() if not df_dettaglio.empty else 0.0
-        
-        # Creiamo l'expander interattivo per la riga
-        with st.expander(f"📁 **{voce}** — Totale: **{totale_voce:,.2f} €**"):
-            if not df_dettaglio.empty:
-                # Mostriamo la tabella analitica delle singole spese di quella voce
-                st.dataframe(
-                    df_dettaglio[['data', 'categoria', 'descrizione', 'importo', 'stato']], 
-                    use_container_width=True, 
-                    hide_index=True
-                )
-                st.caption(f"Numero movimenti registrati: {len(df_dettaglio)}")
-            else:
-                st.info("Nessun movimento registrato per questa voce nel periodo selezionato.")
-else:
-    st.warning("Nessun dato disponibile nel database.")
+        for voce in voci_cee:
+            nome_categoria_db = voce.split(" - ")[1].split(" (")[0].strip()
+            df_dettaglio = df_validi[df_validi['categoria'].str.contains(nome_categoria_db, case=False, na=False)].copy()
+            totale_voce = df_dettaglio['importo'].sum() if not df_dettaglio.empty else 0.0
+            
+            with st.expander(f"📁 **{voce}** — Totale: **{totale_voce:,.2f} €**"):
+                if not df_dettaglio.empty:
+                    st.dataframe(
+                        df_dettaglio[['data', 'categoria', 'descrizione', 'importo', 'stato']], 
+                        use_container_width=True, 
+                        hide_index=True
+                    )
+                    st.caption(f"Numero movimenti registrati: {len(df_dettaglio)}")
+                else:
+                    st.info("Nessun movimento registrato per questa voce nel periodo selezionato.")
+    else:
+        st.warning("Nessun dato disponibile nel database.")
                 
 # ==================================================
 # --- TAB BILANCIO: ANALISI E SPENDING REVIEW ---
