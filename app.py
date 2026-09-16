@@ -19,75 +19,10 @@ with st.sidebar:
     
     testo_manuale = """
     MANUALE OPERATIVO: AGRIFINANCE CLOUD
-    ... (Versione: 2.0 (Architettura a Doppio Binario e Database Cloud)
+    (Versione: Architettura a Doppio Binario e Database Cloud)
 
-🎯 Obiettivo del Sistema
-Il software centralizza la gestione amministrativa, finanziaria e operativa dell'impresa agricola. Il cuore logico è la separazione netta tra i movimenti fisici (il lavoro sui campi in giornate da 6 ore) e i movimenti finanziari (cassa, fatture e bonifici).
-
-Moduli Operativi (Le 6 Aree del Gestionale)
-1. Tab 1: Home (Registro Generale / Editor Diviso)
-Questo è il pannello di controllo diretto sul database. L'interfaccia è divisa in due colonne: 🟢 Entrate e 🔴 Uscite.
-
-Come Analizzare: Clicca sull'intestazione di qualsiasi colonna (es. "Importo" o "Data") per ordinare i dati.
-
-Come Modificare: Fai doppio clic su una cella qualsiasi per correggere un refuso (es. una categoria assegnata per sbaglio). Premi Invio per confermare la digitazione.
-
-Come Eliminare: Seleziona la riga cliccando sul quadratino alla sua estrema sinistra e premi il tasto Canc (o clicca sull'icona a cestino in alto a destra).
-
-⚠️ PASSAGGIO OBBLIGATORIO: Nessuna modifica è definitiva finché non clicchi il pulsante blu in basso "💾 SALVA MODIFICHE NEL DATABASE".
-
-2. Tab 2: Manodopera (Gestione Ore e Forza Lavoro)
-Modulo dedicato esclusivamente al tracciamento del tempo fisico speso sugli uliveti. Non movimenta Euro in questa fase.
-
-Logica di Base: La giornata lavorativa standard è impostata rigidamente su 6 ore (1.000 = 6 ore).
-
-Come Registrare:
-
-Seleziona il lavoratore (es. Iannone Felice).
-
-Inserisci il totale delle giornate REALI lavorate (es. 2.000 per 12 ore totali).
-
-Inserisci la quota da dichiarare come UFFICIALE (es. 1.000).
-
-Il sistema calcola automaticamente la differenza (1.000 gg Extra) e crea due registrazioni separate per mantenere in perfetto equilibrio il doppio binario (Busta Paga vs. Fuori Busta).
-
-Nota Strategica: Usa il campo note per specificare l'attività (es. "Potatura uliveto", "Raccolta").
-
-3. Tab 3: Cassa (Estratto Conto Dipendenti)
-Questo modulo traduce il tempo lavorato (Tab 2) in valuta, incrociandolo con i pagamenti reali effettuati.
-
-Indicatore Dare/Avere: Il sistema moltiplica le giornate totali estratte dalla Tab 2 per la tariffa fissa (55 €) e sottrae tutti i versamenti registrati.
-
-Verde: L'azienda ha erogato più di quanto strettamente dovuto (Credito).
-
-Rosso: Ci sono giornate lavorate ancora da saldare (Debito).
-
-Registrazione: Usa il form in basso per inserire i bonifici o gli anticipi. Scegli se si tratta di "Busta Paga" o "Saldo Extra" per mantenere l'allineamento con la contabilità della manodopera.
-
-4. Tab 4: Rese
-Modulo attualmente in fase di predisposizione per incrociare i quintali raccolti con la resa in olio.
-
-5. Tab 5: Bilancio e Controllo di Gestione
-È il cruscotto direzionale. Filtra i dati per anno e restituisce 4 livelli di analisi finanziaria:
-
-Sintesi Finanziaria: L'utile o la perdita reale calcolando tutte le Entrate contro tutte le Uscite (incluse fatture e stipendi).
-
-Analisi dei Costi (Dove vanno i soldi): Divide le uscite in due categorie. Da una parte la Cassa Personale (quanto è costato il lavoratore), dall'altra i Costi Operativi puri (acquisto attrezzature, gasolio, ecc.).
-
-Forza Lavoro: Un contatore che riassume l'impegno fisico (giornate totali) e mostra il debito potenziale generato dal lavoro ancor prima che venga pagato.
-
-Grafico Andamento: Permette di visualizzare picchi di spesa in determinati mesi (es. picco di acquisti carburante durante la raccolta).
-
-6. Tab 6: Fatture e Commercializzazione
-Il modulo per la contabilità generale e le operazioni commerciali dell'azienda.
-
-Flusso di lavoro:
-
-Seleziona in alto se è un'Uscita o un'Entrata. Questa scelta è reattiva e modificherà le categorie disponibili nel passo successivo.
-
-Compila Data, Fornitore (es. Consorzio Agrario) e Descrizione (es. "Acquisto Concime").
-
-Assegna la categoria, inserisci l'importo e clicca su Registra. Questi dati andranno ad alimentare istantaneamente i grafici della Tab 5.
+    🎯 Obiettivo del Sistema
+    Il software centralizza la gestione amministrativa, finanziaria e operativa dell'impresa agricola. Il cuore logico è la separazione netta tra i movimenti fisici (il lavoro sui campi in giornate da 6 ore) e i movimenti finanziari (cassa, fatture e bonifici).
     """
     
     st.download_button(
@@ -99,7 +34,6 @@ Assegna la categoria, inserisci l'importo e clicca su Registra. Questi dati andr
     )
     st.divider()
     st.info("Utilizza il manuale per orientarti nel flusso di cassa e nella gestione delle fatture.")
-
 
 # --- FUNZIONI DI CONNESSIONE GITHUB ---
 @st.cache_data(ttl=0) 
@@ -154,22 +88,16 @@ def save_to_github(df, sha, message):
         st.error(f"❌ Errore di Sistema durante il salvataggio: {e}")
         return False
 
-
 # --- FUNZIONI DI UTILITA' ---
 def format_euro(valore):
     """Formatta i numeri in stile italiano: 1.000,50 €"""
-    # BLINDATURA: Se il valore non è un numero, forzalo a zero.
     try:
         valore = float(valore)
     except (ValueError, TypeError):
         valore = 0.0
         
-    # 1. Formatta il numero in stile anglosassone (1,234.56)
     importo_str = f"{valore:,.2f}"
-    
-    # 2. Inverte punto e virgola tramite un carattere temporaneo (X)
     importo_str = importo_str.replace(",", "X").replace(".", ",").replace("X", ".")
-    
     return f"€ {importo_str}"
 
 def estrai_giornate(descrizione, dipendente):
@@ -184,30 +112,20 @@ def estrai_giornate(descrizione, dipendente):
     except: 
         return 0.0
 
-
 # --- INTERFACCIA PRINCIPALE (LE 6 TAB) ---
 st.title("AgriFinance")
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Home", "Manodopera", "Cassa", "Rese", "Bilancio", "Fatture"])
 
-
 # ==========================================
-# --- TAB 1: HOME, NOTIFICHE E DATABASE ---
+# --- TAB 1: HOME, NOTIFICHE E METEO ---
 # ==========================================
 with tab1:
     st.header("🏠 Cruscotto Generale e Notifiche")
     
-    # Importazioni di sicurezza per far funzionare le chiamate esterne
-    import requests
-    import base64
-    import json
-    import time
-    
-    # --- COORDINATE GITHUB ---
     GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
     REPO = "antonellomazzilli-bit/agri-finance"
     FILE_RICHIESTE = "richieste_sospese.csv"
     
-    # --- 1. MODULO NOTIFICHE (AREA QUARANTENA) ---
     def get_richieste():
         url = f"https://api.github.com/repos/{REPO}/contents/{FILE_RICHIESTE}"
         headers = {"Authorization": f"token {GITHUB_TOKEN}"}
@@ -215,7 +133,6 @@ with tab1:
         if r.status_code == 200:
             data = r.json()
             content = base64.b64decode(data['content']).decode('utf-8')
-            from io import StringIO
             return pd.read_csv(StringIO(content)), data['sha']
         return pd.DataFrame(), None
 
@@ -234,37 +151,28 @@ with tab1:
     df_richieste, sha_richieste = get_richieste()
     
     if not df_richieste.empty:
-        # Filtriamo solo le richieste non ancora lette/gestite
         richieste_attive = df_richieste[df_richieste['stato'] == 'In Attesa']
-        
         if not richieste_attive.empty:
             st.error(f"🔔 **ATTENZIONE: Hai {len(richieste_attive)} nuova/e comunicazione/i dal personale!**")
-            
             for idx, row in richieste_attive.iterrows():
                 with st.expander(f"📩 {row['tipo']} da {row['lavoratore']} - {row['timestamp']}", expanded=True):
                     st.markdown(f"**Valore globale:** {row['valore']}")
                     st.text(row['note']) 
-                    
-                    # Layout a due colonne per i pulsanti Accetta / Rifiuta
                     col_ok, col_ko = st.columns(2)
-                    
                     with col_ok:
                         if st.button("✅ Approva e Archivia", key=f"archivia_{idx}", use_container_width=True):
                             df_richieste.at[idx, 'stato'] = 'Approvata'
-                            with st.spinner("Archiviazione in corso..."):
-                                if update_richieste(df_richieste, sha_richieste, "Approvata richiesta dipendente"):
-                                    st.success("Richiesta archiviata! Ricorda di inserirla nel gestionale.")
-                                    time.sleep(1.5)
-                                    st.rerun()
-                                    
+                            if update_richieste(df_richieste, sha_richieste, "Approvata richiesta dipendente"):
+                                st.success("Richiesta archiviata!")
+                                time.sleep(1.5)
+                                st.rerun()
                     with col_ko:
                         if st.button("🗑️ Rifiuta ed Elimina", key=f"cestina_{idx}", type="primary", use_container_width=True):
                             df_richieste.at[idx, 'stato'] = 'Rifiutata (Cancellata)'
-                            with st.spinner("Eliminazione in corso..."):
-                                if update_richieste(df_richieste, sha_richieste, "Rifiutata/Eliminata richiesta dipendente"):
-                                    st.warning("Notifica rifiutata e rimossa.")
-                                    time.sleep(1.5)
-                                    st.rerun()
+                            if update_richieste(df_richieste, sha_richieste, "Rifiutata/Eliminata richiesta"):
+                                st.warning("Notifica rifiutata e rimossa.")
+                                time.sleep(1.5)
+                                st.rerun()
         else:
             st.info("📭 Nessuna nuova comunicazione dal personale.")
     else:
@@ -272,36 +180,67 @@ with tab1:
         
     st.divider()
     
-    # --- 2. VISUALIZZAZIONE DATABASE GENERALE ---
+    # Modulo Meteo Integrato
+    st.subheader("🌦️ Previsioni Meteo & Semaforo Irriguo (Corato)")
+    st.markdown("Dati climatici aggiornati in automatico via satellite per l'area di Corato / Agro di Andria.")
+    url_meteo = "https://api.open-meteo.com/v1/forecast?latitude=41.1535&longitude=16.4132&daily=temperature_2m_max,precipitation_sum&timezone=Europe/Rome"
+
+    try:
+        resp_meteo = requests.get(url_meteo, timeout=5)
+        if resp_meteo.status_code == 200:
+            m_data = resp_meteo.json()
+            daily = m_data.get("daily", {})
+            dates = daily.get("time", [])
+            max_temps = daily.get("temperature_2m_max", [])
+            rain_sums = daily.get("precipitation_sum", [])
+            
+            if dates and max_temps:
+                forecast_list = []
+                for i in range(min(5, len(dates))):
+                    forecast_list.append({
+                        "Giorno": dates[i],
+                        "Temp Massima (°C)": max_temps[i],
+                        "Pioggia Prevista (mm)": rain_sums[i] if i < len(rain_sums) else 0.0
+                    })
+                st.dataframe(pd.DataFrame(forecast_list), use_container_width=True, hide_index=True)
+                
+                temp_oggi = max_temps[0]
+                pioggia_oggi = rain_sums[0] if rain_sums else 0.0
+                
+                st.markdown("### 🚦 Semaforo Irriguo Automatico (Oggi)")
+                if pioggia_oggi > 1.5:
+                    st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Ottime notizie! **Non attivare l'irrigazione**.")
+                elif temp_oggi >= 35.0:
+                    st.error(f"🔥 **Caldo Estremo ({temp_oggi}°C):** Rischio stress idrico severo per la Coratina.")
+                elif temp_oggi >= 32.0:
+                    st.warning(f"⚠️ **Caldo Intenso ({temp_oggi}°C):** Condizione limite. Valuta se rimandare.")
+                else:
+                    st.success(f"✅ **Temperatura mite ({temp_oggi}°C):** La pianta non è in sofferenza termica. **Blocca l'acqua!**")
+        else:
+            st.warning("Impossibile leggere i dati meteo giornalieri.")
+    except Exception:
+        st.info("Connessione al meteo non disponibile in questo momento.")
+
+    st.divider()
+    
+    # Database Generale
     st.subheader("🗄️ Database Generale Aziendale")
     df, sha = get_github_file()
     
     if not df.empty:
         st.dataframe(df, use_container_width=True)
-        
         st.divider()
         
-        # --- 3. MODULO DI MODIFICA E CORREZIONE MANUALE ---
         st.subheader("✏️ Modifica o Elimina Registrazione")
-        st.info("💡 Usa questo pannello per forzare un importo (es. 475€ di Gennaio), mettere 'Saldato' o correggere errori.")
-        
-        # Invertiamo il database per avere gli ultimi inserimenti comodamente in cima alla tendina
         df_reversed = df.iloc[::-1].copy()
+        opzioni_riga = [f"Riga {i} | {r['data']} | {r['categoria']} | {r['descrizione']} | {r['stato']}" for i, r in df_reversed.iterrows()]
         
-        opzioni_riga = []
-        for i, r in df_reversed.iterrows():
-            opzioni_riga.append(f"Riga {i} | {r['data']} | {r['categoria']} | {r['descrizione']} | {r['stato']}")
-            
         riga_selezionata = st.selectbox("Seleziona la registrazione da gestire:", opzioni_riga)
-        
         if riga_selezionata:
-            # Estraiamo il numero della riga (l'indice) reale
             indice_reale = int(riga_selezionata.split(" | ")[0].replace("Riga ", ""))
             riga_dati = df.loc[indice_reale]
             
             with st.form("form_modifica_riga"):
-                st.write("**Dati Documento Selezionato**")
-                
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     nuova_data = st.text_input("Data (YYYY-MM-DD)", value=str(riga_dati['data']))
@@ -321,7 +260,6 @@ with tab1:
                 with col_btn2:
                     elimina_riga = st.form_submit_button("🗑️ Elimina Registrazione", use_container_width=True)
             
-            # Logica Salvataggio
             if salva_modifiche:
                 df.at[indice_reale, 'data'] = nuova_data
                 df.at[indice_reale, 'stato'] = nuovo_stato
@@ -330,81 +268,22 @@ with tab1:
                 df.at[indice_reale, 'importo_pagato'] = float(nuovo_importo)
                 df.at[indice_reale, 'descrizione'] = nuova_desc
                 
-                with st.spinner("Salvataggio modifiche in corso..."):
-                    if save_to_github(df, sha, f"Modifica manuale riga {indice_reale}"):
-                        st.success("✅ Modifiche salvate con successo!")
-                        time.sleep(1.5)
-                        st.rerun()
-                        
-            # Logica Eliminazione
+                if save_to_github(df, sha, f"Modifica manuale riga {indice_reale}"):
+                    st.success("✅ Modifiche salvate con successo!")
+                    time.sleep(1.5)
+                    st.rerun()
+                    
             if elimina_riga:
                 df = df.drop(index=indice_reale).reset_index(drop=True)
-                with st.spinner("Eliminazione in corso..."):
-                    if save_to_github(df, sha, f"Eliminata riga {indice_reale}"):
-                        st.success("🗑️ Registrazione eliminata definitivamente!")
-                        time.sleep(1.5)
-                        st.rerun()
+                if save_to_github(df, sha, f"Eliminata riga {indice_reale}"):
+                    st.warning("🗑️ Registrazione eliminata definitivamente!")
+                    time.sleep(1.5)
+                    st.rerun()
     else:
         st.warning("Il database principale è attualmente vuoto o non raggiungibile.")
 
-# ==================================================
-# --- MODULO METEO AUTOMATICO & ALERT IRRIGUO (CORATO) ---
-# ==================================================
-import requests
-import pandas as pd
-
-st.subheader("🌦️ Previsioni Meteo & Semaforo Irriguo (Corato)")
-st.markdown("Dati climatici aggiornati in automatico via satellite per l'area di Corato / Agro di Andria.")
-
-# Coordinate esatte di Corato (Open-Meteo API gratuita)
-url = "https://api.open-meteo.com/v1/forecast?latitude=41.1535&longitude=16.4132&daily=temperature_2m_max,precipitation_sum&timezone=Europe/Rome"
-
-try:
-    response = requests.get(url, timeout=5)
-    if response.status_code == 200:
-        data = response.json()
-        daily = data.get("daily", {})
-        dates = daily.get("time", [])
-        max_temps = daily.get("temperature_2m_max", [])
-        rain_sums = daily.get("precipitation_sum", [])
-        
-        if dates and max_temps:
-            # Prepariamo la tabella a 3 giorni
-            forecast_list = []
-            for i in range(min(5, len(dates))):
-                forecast_list.append({
-                    "Giorno": dates[i],
-                    "Temp Massima (°C)": max_temps[i],
-                    "Pioggia Prevista (mm)": rain_sums[i] if i < len(rain_sums) else 0.0
-                })
-            
-            df_meteo = pd.DataFrame(forecast_list)
-            st.dataframe(df_meteo, use_container_width=True, hide_index=True)
-            
-            # Analisi intelligente basata sul giorno odierno (indice 0)
-            temp_oggi = max_temps[0]
-            pioggia_oggi = rain_sums[0] if rain_sums else 0.0
-            
-            st.markdown("### 🚦 Semaforo Irriguo Automatico (Oggi)")
-            
-            if pioggia_oggi > 1.5:
-                st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Ottime notizie! **Non attivare l'irrigazione**, la natura sta bagnando i tuoi 800 alberi a costo zero.")
-            elif temp_oggi >= 35.0:
-                st.error(f"🔥 **Caldo Estremo ({temp_oggi}°C):** Rischio stress idrico severo per la Coratina. L'irrigazione a 20 €/h è giustificata solo se il terreno è asciutto.")
-            elif temp_oggi >= 32.0:
-                st.warning(f"⚠️ **Caldo Intenso ({temp_oggi}°C):** Condizione limite. Valuta se rimandare o procedere con un turno ridotto.")
-            else:
-                st.success(f"✅ **Temperatura mite ({temp_oggi}°C):** La pianta non è in sofferenza termica. **Blocca l'acqua e risparmia i 20 €!**")
-        else:
-            st.warning("Impossibile leggere i dati meteo giornalieri.")
-    else:
-        st.error("Servizio meteo temporaneamente non disponibile.")
-except Exception as e:
-    st.info("Connessione al meteo non disponibile in questo momento.")
-
-
 # ==========================================
-# --- TAB 2: MANODOPERA (SEMPLIFICATA E CORRETTA) ---
+# --- TAB 2: MANODOPERA ---
 # ==========================================
 with tab2:
     st.header("🚜 Gestione Manodopera")
@@ -412,8 +291,6 @@ with tab2:
     
     with st.form("form_registrazione_manodopera", clear_on_submit=True):
         st.subheader("📝 Registra Nuova Giornata")
-        st.info("💡 Inserisci direttamente i giorni extra senza dover fare il calcolo del totale.")
-        
         c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
             op_nome = st.selectbox("Operatore", ["Iannone Felice"])
@@ -421,7 +298,6 @@ with tab2:
         with c2:
             op_ufficiali = st.number_input("Giornate Ufficiali (In Busta)", min_value=0.0, step=0.5, format="%.2f")
         with c3:
-            # Niente più "Giornate Reali", si inserisce direttamente l'Extra!
             op_extra = st.number_input("Giornate EXTRA (Fuori Busta)", min_value=0.0, step=0.5, format="%.2f")
             
         op_note = st.text_input("Note (Lavoro svolto)")
@@ -429,8 +305,6 @@ with tab2:
         
     if inviato:
         righe_nuove = []
-        
-        # 1. Crea la riga Ufficiale
         if op_ufficiali > 0:
             desc_uff = f"{op_nome} | {op_ufficiali:.3f} gg | UFFICIALE: {op_note}"
             righe_nuove.append({
@@ -438,8 +312,6 @@ with tab2:
                 'descrizione': desc_uff, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
                 'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
             })
-        
-        # 2. Crea la riga Extra diretta (Zero calcoli, zero errori)
         if op_extra > 0:
             desc_extra = f"{op_nome} | {op_extra:.3f} gg | EXTRA: {op_note}"
             righe_nuove.append({
@@ -447,59 +319,43 @@ with tab2:
                 'descrizione': desc_extra, 'importo': 0.0, 'prodotto': "Olive", 'stato': "Impegnato", 
                 'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ""
             })
-        
         if righe_nuove:
-            df_nuove = pd.DataFrame(righe_nuove)
-            df = pd.concat([df, df_nuove], ignore_index=True)
-            
+            df = pd.concat([df, pd.DataFrame(righe_nuove)], ignore_index=True)
             if save_to_github(df, sha, "Aggiornamento Manodopera Semplificata"):
                 st.success("✅ Giornate lavorative registrate con successo!")
-                import time
                 time.sleep(1)
                 st.rerun()
-        else:
-            st.warning("Nessun dato valido inserito (Giornate a zero).")
 
-    # --- RIEPILOGO TAB 2 ---
     st.divider()
     st.subheader("📊 Riepilogo Giornate Lavorate")
-    
     df_lav = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])].copy()
     if not df_lav.empty:
         df_lav['data_dt'] = pd.to_datetime(df_lav['data'], errors='coerce')
         mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
-        
         riepilogo = {}
         for _, row in df_lav.iterrows():
             if pd.notna(row['data_dt']):
                 chiave = f"{mesi_nomi[row['data_dt'].month]} {row['data_dt'].year}"
                 gg = estrai_giornate(str(row['descrizione']), "Iannone Felice")
-                
                 if chiave not in riepilogo:
                     riepilogo[chiave] = {'Giornate EXTRA': 0.0, 'Giornate UFFICIALI': 0.0, 'TOTALE Giornate': 0.0}
-                    
                 if row['categoria'] == 'Manodopera Extra':
                     riepilogo[chiave]['Giornate EXTRA'] += abs(gg)
                 elif row['categoria'] == 'Manodopera':
                     riepilogo[chiave]['Giornate UFFICIALI'] += abs(gg)
-                    
                 riepilogo[chiave]['TOTALE Giornate'] = riepilogo[chiave]['Giornate UFFICIALI'] + riepilogo[chiave]['Giornate EXTRA']
 
         if riepilogo:
-            df_riep = pd.DataFrame.from_dict(riepilogo, orient='index')
-            st.dataframe(df_riep, use_container_width=True)
-        else:
-            st.info("Nessuna giornata registrata finora.")
+            st.dataframe(pd.DataFrame.from_dict(riepilogo, orient='index'), use_container_width=True)
 
 # ==========================================
-# --- TAB 3: CASSA E CONTROLLO MESI ARRETRATI ---
+# --- TAB 3: CASSA E ESTRATTO CONTO ---
 # ==========================================
 with tab3:
     st.subheader("💸 Cassa e Estratto Conto Mensile")
     df, sha = get_github_file()
     
     if not df.empty:
-        # 1. Preparazione Dati
         df['importo'] = pd.to_numeric(df['importo'], errors='coerce').fillna(0.0)
         df['data_dt'] = pd.to_datetime(df['data'], errors='coerce')
         
@@ -507,9 +363,7 @@ with tab3:
         mesi_nomi = {1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile', 5: 'Maggio', 6: 'Giugno', 7: 'Luglio', 8: 'Agosto', 9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'}
         mesi_nomi_inv = {v: k for k, v in mesi_nomi.items()}
         
-        # 2. Inizializzazione Mesi e Calcolo Extra (SEPARATO)
         tutto_lavoro = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])]
-        
         for index, row in tutto_lavoro.iterrows():
             if pd.notna(row['data_dt']):
                 mese_num = row['data_dt'].month
@@ -521,19 +375,11 @@ with tab3:
                 
                 if row['categoria'] == 'Manodopera Extra':
                     gg_lavorati = estrai_giornate(str(row['descrizione']), "Iannone Felice")
-                    
-                    # SALVAVITA: Forza l'importo esatto se digitato in Tab 1
                     importo_forzato = abs(float(row['importo']))
-                    if importo_forzato > 0:
-                        valore_maturato = importo_forzato
-                    else:
-                        valore_maturato = abs(gg_lavorati) * 55.0
-                        
+                    valore_maturato = importo_forzato if importo_forzato > 0 else abs(gg_lavorati) * 55.0
                     dati_mensili[chiave_mese]['Extra Maturato (Debito)'] += valore_maturato
 
-        # 3. Associazione Pagamenti (SEPARATA)
         pagamenti_df = df[df['categoria'].isin(['Busta Paga', 'Saldo Extra', 'Rimborsi'])]
-        
         for index, row in pagamenti_df.iterrows():
             importo_pagato = row['importo']
             desc_str = str(row['descrizione'])
@@ -542,7 +388,7 @@ with tab3:
             mese_trovato = False
             for chiave in dati_mensili.keys():
                 if chiave in desc_str:
-                    if cat == 'Saldo Extra' or cat == 'Rimborsi':
+                    if cat in ['Saldo Extra', 'Rimborsi']:
                         dati_mensili[chiave]['Extra Pagato'] += importo_pagato
                     elif cat == 'Busta Paga':
                         dati_mensili[chiave]['Busta Paga Versata'] += importo_pagato
@@ -553,16 +399,11 @@ with tab3:
                 chiave_na = "Pagamenti Pregressi/Non Allocati"
                 if chiave_na not in dati_mensili:
                     dati_mensili[chiave_na] = {'Extra Maturato (Debito)': 0.0, 'Extra Pagato': 0.0, 'Busta Paga Versata': 0.0}
-                
-                if cat == 'Saldo Extra' or cat == 'Rimborsi':
+                if cat in ['Saldo Extra', 'Rimborsi']:
                     dati_mensili[chiave_na]['Extra Pagato'] += importo_pagato
                 elif cat == 'Busta Paga':
                     dati_mensili[chiave_na]['Busta Paga Versata'] += importo_pagato
 
-        # 4. Visualizzazione e Tabella Trasparente
-        st.markdown("### 📊 Situazione Arretrati e Compensazione Lavoro")
-        saldo_globale = 0.0
-        
         if dati_mensili:
             def chiave_ordinamento(item):
                 chiave = item[0]
@@ -571,16 +412,13 @@ with tab3:
                     mese_testo, anno_testo = chiave.split()
                     return (int(anno_testo), mesi_nomi_inv.get(mese_testo, 0))
                 except:
-                    return (9999, 99) 
+                    return (9999, 99)
                     
             dati_mensili = dict(sorted(dati_mensili.items(), key=chiave_ordinamento))
             df_riepilogo = pd.DataFrame.from_dict(dati_mensili, orient='index')
             
-            # Formule di calcolo delle colonne
             df_riepilogo['Saldo Arretrati (Extra)'] = df_riepilogo['Extra Pagato'] - df_riepilogo['Extra Maturato (Debito)']
             df_riepilogo['Differenza (Busta - Extra)'] = df_riepilogo['Busta Paga Versata'] - df_riepilogo['Extra Maturato (Debito)']
-            
-            # --- MODIFICA RICHIESTA: Il Saldo Globale è la somma della colonna Differenza ---
             saldo_globale = df_riepilogo['Differenza (Busta - Extra)'].sum()
             
             df_display = df_riepilogo.copy()
@@ -589,13 +427,11 @@ with tab3:
                 
             st.dataframe(df_display, use_container_width=True)
             
-            # --- MOTORE DI DISEGNO DEL PDF ---
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", 'B', 16)
             pdf.cell(190, 10, txt="Estratto Conto Lavoro - Iannone Felice", ln=True, align='C')
             pdf.set_font("Arial", size=10)
-            from datetime import datetime
             pdf.cell(190, 10, txt=f"Generato il: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='C')
             pdf.ln(5)
             
@@ -615,21 +451,22 @@ with tab3:
                 pdf.cell(28, 10, f"{row['Extra Pagato']:,.2f} E", 1, 0, 'R')
                 pdf.cell(32, 10, f"{row['Busta Paga Versata']:,.2f} E", 1, 0, 'R')
                 
-                pdf.set_text_color(220, 53, 69) if row['Saldo Arretrati (Extra)'] < 0 else pdf.set_text_color(40, 167, 69)
+                if row['Saldo Arretrati (Extra)'] < 0:
+                    pdf.set_text_color(220, 53, 69)
+                else:
+                    pdf.set_text_color(40, 167, 69)
                 pdf.cell(30, 10, f"{row['Saldo Arretrati (Extra)']:,.2f} E", 1, 0, 'R')
                 pdf.set_text_color(0, 0, 0)
-                
                 pdf.cell(40, 10, f"{row['Differenza (Busta - Extra)']:,.2f} E", 1, 1, 'R')
                 
             pdf.ln(10)
             pdf.set_font("Arial", 'B', 12)
             if saldo_globale < 0:
                 pdf.set_text_color(220, 53, 69)
-                pdf.cell(190, 10, txt=f"ATTENZIONE: Differenza totale (Busta - Extra) negativa per {abs(saldo_globale):,.2f} Euro", ln=True)
+                pdf.cell(190, 10, txt=f"ATTENZIONE: Differenza totale negativa per {abs(saldo_globale):,.2f} Euro", ln=True)
             else:
                 pdf.set_text_color(40, 167, 69)
-                pdf.cell(190, 10, txt=f"Situazione Regolare. Differenza totale (Busta - Extra): {saldo_globale:,.2f} Euro", ln=True)
-                
+                pdf.cell(190, 10, txt=f"Situazione Regolare. Differenza totale: {saldo_globale:,.2f} Euro", ln=True)
             pdf.set_text_color(0, 0, 0)
             
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
@@ -641,37 +478,27 @@ with tab3:
                 type="primary"
             )
             
-            # --- MESSAGGIO A SCHERMO (Rosso o Verde) ---
             if saldo_globale < 0:
-                st.error(f"⚠️ ATTENZIONE: La differenza totale (Busta Paga - Extra) è negativa per: **{abs(saldo_globale):,.2f} €**")
+                st.error(f"⚠️ ATTENZIONE: La differenza totale è negativa per: **{abs(saldo_globale):,.2f} €**")
             else:
-                st.success(f"✅ Situazione regolare. La differenza totale (Busta Paga - Extra) è: **{saldo_globale:,.2f} €**")
-        else:
-            st.info("Nessun dato lavorativo o di pagamento registrato.")
-            
-        st.divider()
+                st.success(f"✅ Situazione regolare. La differenza totale è: **{saldo_globale:,.2f} €**")
         
-        # 5. Modulo di Pagamento Cassa CON AUTO-SALDATO
+        st.divider()
         with st.form("cassa_form", clear_on_submit=True):
             st.write("### ➕ Registra un pagamento al dipendente")
-            
             c1, c2, c3 = st.columns([1, 1, 1.5])
             with c1:
                 data_pag = st.date_input("Data del Bonifico/Contanti", format="DD/MM/YYYY")
             with c2:
-                # Modificato in 0.0 fisso per evitare confusioni sull'auto-inserimento
                 imp = st.number_input("Importo Erogato (€)", min_value=0.0, step=10.0, format="%.2f", value=0.0)
             with c3:
                 tipo_op = st.selectbox("Natura Operazione", ["Busta Paga", "Saldo Extra", "Rimborsi"])
-                
                 presenze_mesi = df[df['categoria'].isin(['Manodopera', 'Manodopera Extra'])]['data_dt'].dt.strftime('%B %Y').dropna().unique()
-                import datetime
                 mesi_tradotti = []
                 for m in presenze_mesi:
                     for num, nome in mesi_nomi.items():
-                        if m.startswith(datetime.datetime.strptime(str(num), "%m").strftime("%B")):
+                        if m.startswith(datetime.strptime(str(num), "%m").strftime("%B")):
                             mesi_tradotti.append(f"{nome} {m.split(' ')[1]}")
-                
                 if not mesi_tradotti: mesi_tradotti = ["Nessun mese registrato (Versamento Generico)"]
                 mese_rif = st.selectbox("Mese di Riferimento del Pagamento", set(mesi_tradotti))
             
@@ -679,7 +506,6 @@ with tab3:
                 if imp > 0:
                     data_f = data_pag.strftime('%Y-%m-%d')
                     descrizione_estesa = f"Pagamento Iannone Felice | {tipo_op} | Rif: {mese_rif}"
-                    
                     nuova_riga = {
                         'data': data_f, 'tipo': "Uscita", 'categoria': tipo_op, 
                         'descrizione': descrizione_estesa, 'importo': float(imp), 
@@ -694,9 +520,7 @@ with tab3:
                             nome_mese, anno_str = mese_rif.split()
                             m_num = mesi_nomi_inv[nome_mese]
                             y_num = int(anno_str)
-                            
                             cat_target = "Manodopera" if tipo_op == "Busta Paga" else ("Manodopera Extra" if tipo_op == "Saldo Extra" else None)
-                            
                             if cat_target:
                                 df['data_temp'] = pd.to_datetime(df['data'], errors='coerce')
                                 maschera = (df['categoria'] == cat_target) & (df['stato'] != 'Saldato') & (df['data_temp'].dt.month == m_num) & (df['data_temp'].dt.year == y_num)
@@ -705,46 +529,38 @@ with tab3:
                     except Exception:
                         pass
                     
-                    if save_to_github(df, sha, f"Pagato: {imp}€ per {mese_rif} e aggiornato stato giornate"):
-                        st.success(f"✅ Pagamento di {imp}€ registrato! Le giornate in Tab 1 sono state chiuse in automatico.")
-                        import time
+                    if save_to_github(df, sha, f"Pagato: {imp}€ per {mese_rif}"):
+                        st.success(f"✅ Pagamento di {imp}€ registrato!")
                         time.sleep(2)
                         st.rerun()
                 else:
                     st.warning("L'importo deve essere maggiore di zero.")
+
 # ==========================================
-# --- TAB 4: SIMULATORE STRATEGICO E TARGET ---
+# --- TAB 4: SIMULATORE STRATEGICO & TARGET ---
 # ==========================================
 with tab4:
     st.title("🎯 Simulatore Strategico & Break-Even")
-    st.markdown("Pianifica la campagna olearia: definisci il tuo **obiettivo di reddito** e scopri i volumi fisici (olive/olio) necessari in tempo reale.")
+    st.markdown("Pianifica la campagna olearia: definisci il tuo **obiettivo di reddito** e scopri i volumi fisici necessari in tempo reale.")
     st.divider()
 
     df_pareggio, _ = get_github_file()
-    
     if not df_pareggio.empty:
-        # ---> AGGIUNTA SALVAVITA: Forziamo la colonna importo in numeri puri
         df_pareggio['importo'] = pd.to_numeric(df_pareggio['importo'], errors='coerce').fillna(0.0)
-        
         df_pareggio['data_dt'] = pd.to_datetime(df_pareggio['data'], errors='coerce')
         anni_disponibili = df_pareggio['data_dt'].dt.year.dropna().unique()
         
         if len(anni_disponibili) > 0:
             anno_sel = st.selectbox("📅 Basato sulle spese storiche dell'anno:", sorted(anni_disponibili, reverse=True), key="anno_target")
-            
-            # Ora questa somma matematica funzionerà perfettamente (Solo Uscite)
             uscite_totali = df_pareggio[(df_pareggio['data_dt'].dt.year == anno_sel) & (df_pareggio['tipo'] == 'Uscita')]['importo'].sum()
             
             col_fin, col_strat = st.columns([1, 1], gap="large")
-            
             with col_fin:
                 with st.container(border=True):
                     st.subheader("💶 1. Fabbisogno Economico")
                     st.metric("🔴 Spese Vive (dal database)", format_euro(uscite_totali))
-                    
                     utile_desiderato = st.number_input("🟢 Tuo Obiettivo di Guadagno Annuo (€)", min_value=0.0, step=1000.0, value=24000.0)
                     fabbisogno_totale = uscite_totali + utile_desiderato
-                    
                     st.markdown(f"""
                     <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; text-align: center; margin-top: 15px; border-left: 5px solid #0f52ba;">
                         <p style="margin: 0; font-size: 14px; color: #555; text-transform: uppercase;">Obiettivo Finanziario Totale</p>
@@ -756,7 +572,6 @@ with tab4:
                 with st.container(border=True):
                     st.subheader("⚖️ 2. Scelta Strategica")
                     strategia = st.radio("Cosa decidi di vendere?", ["Olio (Molitura)", "Olive (Vendita Diretta)"], horizontal=True)
-                    
                     st.markdown("---")
                     if "Olio" in strategia:
                         prezzo_attuale = st.number_input("📈 Prezzo di Vendita Olio (€ / Litro)", min_value=0.0, step=0.5, value=8.50)
@@ -767,48 +582,31 @@ with tab4:
             
             st.write("")
             st.markdown("### 🏆 Traguardo Produttivo")
-            
             if prezzo_attuale > 0:
                 with st.container(border=True):
                     if "Olio" in strategia:
                         if resa_stimata > 0:
                             litri_necessari = fabbisogno_totale / prezzo_attuale
                             quintali_necessari = litri_necessari / resa_stimata
-                            
                             rc1, rc2, rc3 = st.columns(3)
                             rc1.metric("🫒 Olive da Raccogliere", f"{quintali_necessari:,.0f} Quintali", "Materia Prima")
                             rc2.metric("🍾 Olio da Produrre", f"{litri_necessari:,.0f} Litri", "Prodotto Finito")
                             rc3.metric("📊 Fatturato Target", format_euro(fabbisogno_totale), "Copertura Raggiunta")
-                            
-                            st.info(f"💡 **Piano d'Azione:** Per garantirti uno stipendio di **{format_euro(utile_desiderato)}** pagando tutte le spese, devi raccogliere circa **{quintali_necessari:,.0f} quintali**. Con una resa di {resa_stimata} L/q, otterrai i {litri_necessari:,.0f} litri necessari per incassare il totale vendendoli a {prezzo_attuale} €/L.")
-                        else:
-                            st.error("⚠️ Inserisci una resa maggiore di zero.")
-                            
                     else:
                         quintali_necessari = fabbisogno_totale / prezzo_attuale
-                        
                         rc1, rc2, rc3 = st.columns(3)
                         rc1.metric("🫒 Olive da Vendere", f"{quintali_necessari:,.0f} Quintali")
                         rc2.metric("⚖️ Equivalente in Kg", f"{quintali_necessari * 100:,.0f} Kg")
                         rc3.metric("📊 Fatturato Target", format_euro(fabbisogno_totale), "Copertura Raggiunta")
-                        
-                        st.info(f"💡 **Piano d'Azione:** Per garantirti uno stipendio di **{format_euro(utile_desiderato)}** pagando tutte le spese, devi vendere ai commercianti almeno **{quintali_necessari:,.0f} quintali** di olive al prezzo di {prezzo_attuale} €/q.")
-            else:
-                st.warning("⚠️ Imposta un Prezzo di Mercato maggiore di zero per visualizzare i traguardi.")
-                
-    else:
-        st.info("Nessun dato finanziario registrato nel database per attivare il simulatore.")
 
-# ==================================================
-# --- CONTO ECONOMICO CEE INTERATTIVO (TUTTE CLICCABILI) ---
-# ==================================================
-
-with tab_5:
-    st.subheader("📊 Conto Economico CEE Analitico e Interattivo")
+# ==========================================
+# --- TAB 5: BILANCIO E SPENDING REVIEW ---
+# ==========================================
+with tab5:
+    st.header("📊 Conto Economico CEE Analitico e Interattivo")
     st.markdown("Clicca sulla freccia di qualsiasi voce per esplorare l'elenco esatto delle spese che la compongono.")
 
     df_spesa, _ = get_github_file()
-
     if not df_spesa.empty:
         df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
         df_validi = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
@@ -828,46 +626,30 @@ with tab_5:
             
             with st.expander(f"📁 **{voce}** — Totale: **{totale_voce:,.2f} €**"):
                 if not df_dettaglio.empty:
-                    st.dataframe(
-                        df_dettaglio[['data', 'categoria', 'descrizione', 'importo', 'stato']], 
-                        use_container_width=True, 
-                        hide_index=True
-                    )
+                    st.dataframe(df_dettaglio[['data', 'categoria', 'descrizione', 'importo', 'stato']], use_container_width=True, hide_index=True)
                     st.caption(f"Numero movimenti registrati: {len(df_dettaglio)}")
                 else:
                     st.info("Nessun movimento registrato per questa voce nel periodo selezionato.")
-    else:
-        st.warning("Nessun dato disponibile nel database.")
-                
-# ==================================================
-# --- TAB BILANCIO: ANALISI E SPENDING REVIEW ---
-# ==================================================
-with tab3: # (Assicurati che il numero del tab corrisponda al tuo)
+    
+    st.divider()
     st.header("📉 Radiografia dei Costi e Spending Review")
     st.markdown("Usa questo pannello per identificare esattamente dove stai perdendo marginalità.")
     
-    df, sha = get_github_file()
-    
-    if not df.empty:
-        # Assicuriamoci che i numeri siano leggibili dal sistema
-        df['importo'] = pd.to_numeric(df['importo'], errors='coerce').fillna(0)
-        
-        # Filtriamo SOLO le spese certe (Saldato o Impegnato)
-        df_spese = df[df['stato'].isin(['Saldato', 'Impegnato'])].copy()
-        
-        # Trasformiamo tutto in numeri positivi per fare le classifiche
+    if not df_spesa.empty:
+        df_spese = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
         df_spese['importo_assoluto'] = df_spese['importo'].abs()
         
-        # Creiamo la Classifica delle peggiori spese
-        spese_per_categoria = df_spese.groupby('categoria')['importo_assoluto'].sum().reset_index()
-        spese_per_categoria = spese_per_categoria.sort_values(by='importo_assoluto', ascending=False)
+        # Escludiamo le buste paga e ricavi per evidenziare i veri costi operativi evitabili
+        escluse = ['Vendita Olive', 'Vendita Olio', 'Contributi/Aiuti', 'Rimborso Spese', 'Busta Paga', 'Manodopera']
+        df_costi_vivi = df_spese[~df_spese['categoria'].isin(escluse)].copy()
         
+        spese_per_categoria = df_costi_vivi.groupby('categoria')['importo_assoluto'].sum().reset_index()
+        spese_per_categoria = spese_per_categoria.sort_values(by='importo_assoluto', ascending=False)
         totale_uscite = spese_per_categoria['importo_assoluto'].sum()
         
-        # --- METRICHE DI EMERGENZA ---
-        st.subheader("🚨 Sintesi Critica")
+        st.subheader("🚨 Sintesi Critica Costi Operativi")
         c1, c2, c3 = st.columns(3)
-        c1.metric("💸 Totale Uscite (Euro)", f"{totale_uscite:.2f} €")
+        c1.metric("💸 Totale Costi Vivi", f"{totale_uscite:.2f} €")
         
         if not spese_per_categoria.empty:
             peggiore_categoria = spese_per_categoria.iloc[0]['categoria']
@@ -878,92 +660,24 @@ with tab3: # (Assicurati che il numero del tab corrisponda al tuo)
             c3.metric("📊 Peso sul totale", f"{incidenza:.1f} %")
             
             st.divider()
-            
-            # --- GRAFICO VISIVO ---
-            st.markdown("### 📊 Distribuzione del Budget")
-            # Un grafico a barre per mostrare a colpo d'occhio il dislivello tra le categorie
+            st.markdown("### 📊 Distribuzione dei Costi")
             st.bar_chart(spese_per_categoria.set_index('categoria')['importo_assoluto'])
-            
-            st.divider()
-            
-            # --- STRUMENTO DI TAGLIO (DRILL-DOWN) ---
-            st.markdown("### ✂️ Ispezione Singola Categoria (Per decidere i tagli)")
-            st.info("Seleziona la categoria che costa troppo. Il sistema ti mostrerà le singole operazioni, dalla più costosa alla più economica, per farti decidere cosa eliminare il prossimo anno.")
-            
-            categoria_selezionata = st.selectbox(
-                "Scegli la categoria da ispezionare:", 
-                spese_per_categoria['categoria'].tolist()
-            )
-            
-            if categoria_selezionata:
-                # Estraiamo solo le spese di quella specifica categoria
-                df_dettaglio = df_spese[df_spese['categoria'] == categoria_selezionata][['data', 'descrizione', 'importo_assoluto', 'stato']]
-                
-                # Rinominiamo la colonna per pulizia visiva
-                df_dettaglio.rename(columns={'importo_assoluto': 'Costo (€)'}, inplace=True)
-                
-                # Ordiniamo per costo decrescente: il colpevole sarà in cima!
-                df_dettaglio = df_dettaglio.sort_values(by='Costo (€)', ascending=False)
-                
-                # Mostriamo la tabella pulita
-                st.dataframe(df_dettaglio, use_container_width=True, hide_index=True)
-                
-                # Calcolo del risparmio potenziale
-                st.caption(f"💡 *Suggerimento:* Se riuscissi a tagliare anche solo il 20% delle spese in questa tabella, risparmieresti **{(df_dettaglio['Costo (€)'].sum() * 0.20):.2f} €** immediati.")
-    else:
-        st.warning("Il database è vuoto. Nessun dato da analizzare.")
 
-    st.divider()
-    with st.expander("🚨 APRI CRUSCOTTO SPENDING REVIEW (Trova il Buco Nero)", expanded=True):
-        st.markdown("### Radiografia dei Costi Operativi")
-        
-        # Recupera il database tramite la tua funzione
-        df_spesa, _ = get_github_file()
-        
-        if not df_spesa.empty:
-            df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
-            df_valido = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
-            df_valido['Costo Assoluto'] = df_valido['importo'].abs()
-            
-            # Classifica aggregata
-            classifica = df_valido.groupby('categoria')['Costo Assoluto'].sum().reset_index()
-            classifica = classifica.sort_values(by='Costo Assoluto', ascending=False)
-            
-            if not classifica.empty:
-                peggiore_cat = classifica.iloc[0]['categoria']
-                peggiore_imp = classifica.iloc[0]['Costo Assoluto']
-                tot = classifica['Costo Assoluto'].sum()
-                incidenza = (peggiore_imp / tot) * 100 if tot > 0 else 0
-                
-                c1, c2 = st.columns(2)
-                c1.metric("⚠️ Buco Nero (Peggiore Categoria)", peggiore_cat)
-                c2.metric("💸 Costo e Incidenza", f"{peggiore_imp:.2f} € ({incidenza:.1f}%)")
-                
-                st.bar_chart(classifica.set_index('categoria')['Costo Assoluto'])
-                
-                st.markdown(f"**Dettaglio operazioni per: {peggiore_cat}**")
-                dettaglio = df_valido[df_valido['categoria'] == peggiore_cat][['data', 'descrizione', 'Costo Assoluto']]
-                st.dataframe(dettaglio.sort_values(by='Costo Assoluto', ascending=False), hide_index=True)
-            else:
-                st.info("Nessuna spesa registrata.")
-                
 # ==========================================
 # --- TAB 6: FATTURE E COMMERCIALIZZAZIONE ---
 # ==========================================
 with tab6:
     st.header("🧾 Registrazione Fatture e Operazioni Commerciali")
-    
     fat_tipo = st.radio("Seleziona la Natura dell'Operazione:", ["Uscita (Acquisto / Spesa)", "Entrata (Vendita / Ricavo)"], horizontal=True)
     
     if "Uscita" in fat_tipo:
-        categorie_disponibili = ["Carburante e Mezzi", "Attrezzature", "Materiale Agricolo (Concimi/Piante)", "Manutenzione", "Consulenze/Tasse", "Oneri",  "Irrigazione","Altro"]
+        categorie_disponibili = ["Carburante e Mezzi", "Attrezzature", "Materiale Agricolo (Concimi/Piante)", "Manutenzione", "Consulenze/Tasse", "Oneri", "Irrigazione", "Altro"]
         tipo_db = "Uscita"
     else:
         categorie_disponibili = ["Vendita Olio", "Vendita Olive", "Contributi/Aiuti", "Altro"]
         tipo_db = "Entrata"
         
     st.divider()
-    
     with st.form("form_fatture", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
@@ -978,37 +692,25 @@ with tab6:
         if st.form_submit_button("Registra Operazione"):
             if fat_importo > 0 and fat_soggetto:
                 df, sha = get_github_file()
-                
                 data_formattata = fat_data.strftime('%Y-%m-%d')
                 descrizione_completa = f"{fat_soggetto.strip()} | {fat_descrizione.strip()}"
                 stato_db = "Saldato" if "Saldato" in fat_stato else "Impegnato"
                 
-               # 1. Calcoliamo i valori per le nuove colonne ERP (Rate)
                 totale_fat = fat_importo
                 imp_pagato = fat_importo if stato_db == "Saldato" else 0.0
                 storico_iniziale = f"{data_formattata}|{fat_importo}|Registrazione iniziale" if stato_db == "Saldato" else ""
 
-                # 2. Creiamo la riga come DIZIONARIO (Metodo Infallibile)
                 nuova_riga = {
-                    'data': data_formattata,
-                    'tipo': tipo_db,
-                    'categoria': fat_categoria,
-                    'descrizione': descrizione_completa,
-                    'importo': fat_importo,
-                    'prodotto': "",
-                    'stato': stato_db,
-                    'totale_fattura': totale_fat,
-                    'importo_pagato': imp_pagato,
+                    'data': data_formattata, 'tipo': tipo_db, 'categoria': fat_categoria,
+                    'descrizione': descrizione_completa, 'importo': fat_importo, 'prodotto': "",
+                    'stato': stato_db, 'totale_fattura': totale_fat, 'importo_pagato': imp_pagato,
                     'registro_pagamenti': storico_iniziale
                 }
 
-                # 3. Salvataggio intelligente (Senza più contare le colonne!)
                 df = pd.concat([df, pd.DataFrame([nuova_riga])], ignore_index=True)
-                
                 if save_to_github(df, sha, f"Registrata Fattura: {fat_soggetto}"): 
                     st.success("✅ Operazione registrata con successo!")
                     time.sleep(2)
                     st.rerun()
             else:
                 st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
-
