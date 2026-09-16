@@ -371,7 +371,7 @@ try:
         if dates and max_temps:
             # Prepariamo la tabella a 3 giorni
             forecast_list = []
-            for i in range(min(3, len(dates))):
+            for i in range(min(5, len(dates))):
                 forecast_list.append({
                     "Giorno": dates[i],
                     "Temp Massima (°C)": max_temps[i],
