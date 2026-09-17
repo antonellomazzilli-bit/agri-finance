@@ -180,48 +180,119 @@ with tab1:
         
     st.divider()
     
-    # Modulo Meteo Integrato
-    st.subheader("🌦️ Previsioni Meteo & Semaforo Irriguo (Corato)")
-    st.markdown("Dati climatici aggiornati in automatico via satellite per l'area di Corato / Agro di Andria.")
-    url_meteo = "https://api.open-meteo.com/v1/forecast?latitude=41.1535&longitude=16.4132&daily=temperature_2m_max,precipitation_sum&timezone=Europe/Rome"
-
-    try:
-        resp_meteo = requests.get(url_meteo, timeout=5)
-        if resp_meteo.status_code == 200:
-            m_data = resp_meteo.json()
-            daily = m_data.get("daily", {})
-            dates = daily.get("time", [])
-            max_temps = daily.get("temperature_2m_max", [])
-            rain_sums = daily.get("precipitation_sum", [])
-            
-            if dates and max_temps:
-                forecast_list = []
-                for i in range(min(5, len(dates))):
-                    forecast_list.append({
-                        "Giorno": dates[i],
-                        "Temp Massima (°C)": max_temps[i],
-                        "Pioggia Prevista (mm)": rain_sums[i] if i < len(rain_sums) else 0.0
-                    })
-                st.dataframe(pd.DataFrame(forecast_list), use_container_width=True, hide_index=True)
-                
-                temp_oggi = max_temps[0]
-                pioggia_oggi = rain_sums[0] if rain_sums else 0.0
-                
-                st.markdown("### 🚦 Semaforo Irriguo Automatico (Oggi)")
-                if pioggia_oggi > 1.5:
-                    st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Ottime notizie! **Non attivare l'irrigazione**.")
-                elif temp_oggi >= 35.0:
-                    st.error(f"🔥 **Caldo Estremo ({temp_oggi}°C):** Rischio stress idrico severo per la Coratina.")
-                elif temp_oggi >= 32.0:
-                    st.warning(f"⚠️ **Caldo Intenso ({temp_oggi}°C):** Condizione limite. Valuta se rimandare.")
-                else:
-                    st.success(f"✅ **Temperatura mite ({temp_oggi}°C):** La pianta non è in sofferenza termica. **Blocca l'acqua!**")
-        else:
-            st.warning("Impossibile leggere i dati meteo giornalieri.")
-    except Exception:
-        st.info("Connessione al meteo non disponibile in questo momento.")
-
+    # ==================================================
+    # --- MODULO METEO & SEMAFORO IRRIGUO INTELLIGENTE ---
+    # ==================================================
     st.divider()
+    
+    # 1. LETTURA STORICO IRRIGAZIONE DAL DATABASE
+    df_meteo_db, sha_meteo_db = get_github_file()
+    ultima_irrigazione_str = "Mai registrata"
+    giorni_trascorsi = 999
+    ultime_ore = 0.0
+    
+    if not df_meteo_db.empty:
+        # Cerca tutte le spese registrate sotto la categoria "Irrigazione"
+        df_irrigazione = df_meteo_db[df_meteo_db['categoria'].str.contains('Irrigazione', case=False, na=False)].copy()
+        if not df_irrigazione.empty:
+            df_irrigazione['data_dt'] = pd.to_datetime(df_irrigazione['data'], errors='coerce')
+            ultima_data = df_irrigazione['data_dt'].max()
+            
+            if pd.notna(ultima_data):
+                giorni_trascorsi = (datetime.now() - ultima_data).days
+                ultima_irrigazione_str = ultima_data.strftime('%d/%m/%Y')
+                
+                # Ricava le ore basandosi sul costo orario fisso (20 €/h)
+                ultimo_importo = float(df_irrigazione[df_irrigazione['data_dt'] == ultima_data].iloc[0]['importo'])
+                ultime_ore = ultimo_importo / 20.0 if ultimo_importo > 0 else 0.0
+
+    st.subheader("🌦️ Previsioni Meteo & Gestione Idratazione (Corato)")
+    st.markdown("Gestione intelligente dell'acqua basata sul meteo reale e sullo storico del tuo impianto.")
+    
+    col_meteo, col_irrig = st.columns([2, 1], gap="large")
+    
+    # --- COLONNA DESTRA: MINI-REGISTRO ACQUA ---
+    with col_irrig:
+        with st.container(border=True):
+            st.markdown("### 💧 Registro Acqua")
+            if giorni_trascorsi < 999:
+                st.info(f"**Ultimo turno:** {ultima_irrigazione_str} ({giorni_trascorsi} giorni fa)\n\n**Durata:** {ultime_ore:.1f} ore")
+            else:
+                st.info("Nessun turno di irrigazione registrato di recente.")
+                
+            with st.form("form_irrigazione", clear_on_submit=True):
+                st.write("Registra l'avvio dell'impianto:")
+                data_irrig = st.date_input("Data di Irrigazione", format="DD/MM/YYYY")
+                ore_irrig = st.number_input("Ore erogate (Costo: 20€/h)", min_value=0.5, step=0.5, value=4.0)
+                note_irrig = st.text_input("Note (es. Concimazione aggiunta)")
+                
+                if st.form_submit_button("💾 Salva Turno", type="primary", use_container_width=True):
+                    # Calcolo automatico spesa e salvataggio nel database
+                    costo_totale = ore_irrig * 20.0
+                    nuova_riga = {
+                        'data': data_irrig.strftime('%Y-%m-%d'),
+                        'tipo': 'Uscita',
+                        'categoria': 'Irrigazione',
+                        'descrizione': f"Turno Irrigazione: {ore_irrig} ore | {note_irrig}".strip(' |'),
+                        'importo': costo_totale,
+                        'prodotto': '',
+                        'stato': 'Impegnato',
+                        'totale_fattura': costo_totale,
+                        'importo_pagato': 0.0,
+                        'registro_pagamenti': ''
+                    }
+                    df_meteo_db = pd.concat([df_meteo_db, pd.DataFrame([nuova_riga])], ignore_index=True)
+                    if save_to_github(df_meteo_db, sha_meteo_db, f"Registrato turno irrigazione di {ore_irrig} ore"):
+                        st.success(f"✅ Turno registrato! {costo_totale}€ inseriti a bilancio.")
+                        time.sleep(1.5)
+                        st.rerun()
+
+    # --- COLONNA SINISTRA: METEO E SEMAFORO ---
+    with col_meteo:
+        url_meteo = "https://api.open-meteo.com/v1/forecast?latitude=41.1535&longitude=16.4132&daily=temperature_2m_max,precipitation_sum&timezone=Europe/Rome"
+        try:
+            resp_meteo = requests.get(url_meteo, timeout=5)
+            if resp_meteo.status_code == 200:
+                m_data = resp_meteo.json()
+                daily = m_data.get("daily", {})
+                dates = daily.get("time", [])
+                max_temps = daily.get("temperature_2m_max", [])
+                rain_sums = daily.get("precipitation_sum", [])
+                
+                if dates and max_temps:
+                    forecast_list = []
+                    for i in range(min(4, len(dates))):
+                        forecast_list.append({
+                            "Giorno": dates[i],
+                            "Temp Massima (°C)": max_temps[i],
+                            "Pioggia Prevista (mm)": rain_sums[i] if i < len(rain_sums) else 0.0
+                        })
+                    st.dataframe(pd.DataFrame(forecast_list), use_container_width=True, hide_index=True)
+                    
+                    temp_oggi = max_temps[0]
+                    pioggia_oggi = rain_sums[0] if rain_sums else 0.0
+                    
+                    st.markdown("### 🚦 Semaforo Irriguo Dinamico")
+                    
+                    # LOGICA AGRONOMICA AGGIORNATA
+                    if pioggia_oggi > 1.5:
+                        st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Non irrigare. La natura bagnando il terreno al posto tuo (Risparmio 20€/h).")
+                    elif giorni_trascorsi <= 7:
+                        st.success(f"✅ **Terreno già idratato:** Hai innaffiato appena {giorni_trascorsi} giorni fa. La Coratina non ha bisogno di acqua al momento. Risparmia i soldi!")
+                    elif temp_oggi >= 35.0 and giorni_trascorsi > 7:
+                        st.error(f"🔥 **Caldo Estremo ({temp_oggi}°C):** Sono passati {giorni_trascorsi} giorni dall'ultima irrigazione. La pianta rischia lo stress idrico, si consiglia un turno oggi.")
+                    elif temp_oggi >= 31.0 and giorni_trascorsi >= 12:
+                        st.warning(f"⚠️ **Caldo Intenso ({temp_oggi}°C):** Terreno a secco da {giorni_trascorsi} giorni. Valuta un turno di irrigazione per non compromettere l'oliva.")
+                    else:
+                        st.info(f"🆗 **Situazione Stabile ({temp_oggi}°C):** Non piove da {giorni_trascorsi} giorni ma le temperature sono miti. Nessuna urgenza idrica.")
+            else:
+                st.warning("Impossibile leggere i dati meteo giornalieri.")
+        except Exception:
+            st.info("Connessione al meteo non disponibile in questo momento.")
+            
+    st.divider()
+    
+    # --- FINE BLOCCO METEO ---
     
     # Database Generale
     st.subheader("🗄️ Database Generale Aziendale")
