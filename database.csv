@@ -33,7 +33,7 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-08-25,Uscita,Irrigazione,Ricarica Pozzo | 25 ore,500.0,,Saldato,500.0,500.0,2026-08-25|500.0|Registrazione iniziale,0.0,,2026-08-25
 2026-09-02,Uscita,Oneri,Iannone Felice | Oneri mese di Agosto,238.8,,Saldato,238.8,238.8,,238.8,,2026-09-02
 2026-09-02,Uscita,Oneri,Iannone Felice | Oneri Inps 1° Trimestre 2026,834.01,,Saldato,834.01,834.01,,834.01,,2026-09-02
-2026-08-31,Uscita,Manodopera Extra,Iannone Felice | -15.000 gg | EXTRA: Giornate mese di Agosto 2026,0.01,,Saldato,0.01,0.0,,0.0,Olive,2026-08-31
+2026-08-31,Uscita,Manodopera Extra,Iannone Felice | -15.000 gg | EXTRA: Giornate mese di Agosto 2026,0.0,,Saldato,0.0,0.0,,0.0,Olive,2026-08-31
 2026-09-03,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Agosto 2026,1095.94,,Saldato,1095.94,1095.94,2026-09-03|1095.94|Erogazione Diretta,0.0,Azienda,
 2026-09-15,Entrata,Vendita Olio,Frantoio Oleario De Palma Domenico | Bonifico Istantaneo,6884.5,,Saldato,6884.5,6884.5,2026-09-15|6884.5|Registrazione iniziale,,,
 2026-06-11,Uscita,Irrigazione,Turno Irrigazione | 16.0 ore | Irrigazione,0.0,,Saldato,0.0,0.0,,,,
