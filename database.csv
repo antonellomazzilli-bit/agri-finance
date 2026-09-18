@@ -4,7 +4,7 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-06-29,Uscita,Irrigazione,Ricarica scheda per irrigazione,500.0,Olive,Saldato,500.0,500.0,2026-06-29|500.0,0.0,,2026-06-29
 2026-06-25,Uscita,Altro,gestione Contabile  | Note: Bonifico da cc ingdirect,500.02,Olive,Saldato,500.02,500.02,2026-06-25|500.02,0.0,,2026-06-25
 2026-06-23,Uscita,Altro,Olive felice 2025,9000.0,Olive,Impegnato,9000.0,9000.0,,9000.0,,2026-06-23
-2026-06-20,Uscita,Irrigazione,Bonifico per irrigazione,400.0,Olive,Saldato,400.0,400.0,2026-06-20|400.0,0.0,,2026-06-20
+2026-06-20,Uscita,Irrigazione,Ricarica Pozzo | 20 ore,400.0,Olive,Saldato,400.0,400.0,2026-06-20|400.0,0.0,,2026-06-20
 2026-06-10,Uscita,Oneri,Pagamento f24 contributi operai IV Trimestre 2025,685.11,Olive,Saldato,685.11,685.11,2026-06-10|685.11,0.0,,2026-06-10
 2026-06-07,Uscita,Irrigazione,Ricarica scheda acqua Associazione irrigua,300.0,Olive ,Saldato,300.0,300.0,2026-06-07|300.0,0.0,,2026-06-07
 2026-06-05,Uscita,Altro,"Pagamento provvigioni apertura azienda agricola e partita IVA, infoagri",90.0,Olive ,Saldato,90.0,90.0,2026-06-05|90.0,0.0,,2026-06-05
