@@ -773,10 +773,10 @@ with tab5:
     if not df_spesa.empty:
         df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
         
-        # FILTRO APPLICATO: Esclude in automatico le righe con importo a 0.00 € (es. Turni Irrigazione)
+        # NUOVO FILTRO MIRATO: Nasconde gli 0.00 € SOLO per l'Irrigazione. Salva i dipendenti!
         df_validi = df_spesa[
             (df_spesa['stato'].isin(['Saldato', 'Impegnato'])) & 
-            (df_spesa['importo'] != 0)
+            ~((df_spesa['importo'] == 0) & (df_spesa['categoria'] == 'Irrigazione'))
         ].copy()
         
         categorie_uniche = df_validi['categoria'].dropna().unique()
@@ -807,10 +807,10 @@ with tab5:
     st.markdown("Usa questo pannello per identificare esattamente dove stai perdendo marginalità.")
     
     if not df_spesa.empty:
-        # Usiamo lo stesso filtro per escludere gli importi a zero dalla Spending Review
+        # Applichiamo il filtro mirato anche alla radiografia
         df_spese = df_spesa[
             (df_spesa['stato'].isin(['Saldato', 'Impegnato'])) & 
-            (df_spesa['importo'] != 0)
+            ~((df_spesa['importo'] == 0) & (df_spesa['categoria'] == 'Irrigazione'))
         ].copy()
         df_spese['importo_assoluto'] = df_spese['importo'].abs()
         
@@ -846,10 +846,10 @@ with tab5:
     if not df_spesa_pdf.empty:
         df_spesa_pdf['importo'] = pd.to_numeric(df_spesa_pdf['importo'], errors='coerce').fillna(0)
         
-        # FILTRO APPLICATO ANCHE AL PDF: Via le righe con 0.00 €
+        # Applichiamo il filtro mirato anche alla stampa PDF
         df_validi_pdf = df_spesa_pdf[
             (df_spesa_pdf['stato'].isin(['Saldato', 'Impegnato'])) & 
-            (df_spesa_pdf['importo'] != 0)
+            ~((df_spesa_pdf['importo'] == 0) & (df_spesa_pdf['categoria'] == 'Irrigazione'))
         ].copy()
         
         df_validi_pdf = df_validi_pdf.sort_values(by=['tipo', 'categoria', 'data'])
@@ -858,9 +858,7 @@ with tab5:
         if not df_pdf_data.empty:
             pdf = FPDF()
             
-            # ==========================================
             # PAGINA 1: RIEPILOGO GENERALE
-            # ==========================================
             pdf.add_page()
             pdf.set_font("Arial", 'B', 16)
             pdf.cell(190, 10, txt="AgriFinance Cloud - Bilancio Aziendale", ln=True, align='C')
@@ -911,9 +909,7 @@ with tab5:
             pdf.cell(50, 10, f"{utile_esercizio:,.2f} EUR", 1, 1, 'R')
             pdf.set_text_color(0, 0, 0)
             
-            # ==========================================
             # PAGINA 2: DETTAGLIO ANALITICO CON TOTALI
-            # ==========================================
             pdf.add_page()
             pdf.set_font("Arial", 'B', 14)
             pdf.cell(190, 10, txt="Dettaglio Analitico delle Operazioni", ln=True, align='C')
@@ -966,9 +962,9 @@ with tab5:
                 use_container_width=True
             )
         else:
-            st.info("Nessun dato sufficiente per generare il PDF. Assicurati che ci siano spese 'Saldate' o 'Impegnate'.")
+            st.info("Nessun dato sufficiente per generare il PDF.")
     else:
-        st.warning("Il database è vuoto, impossibile creare il PDF.")
+        st.warning("Il database è vuoto.")
     
 
 # ==========================================
