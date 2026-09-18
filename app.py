@@ -314,8 +314,10 @@ with tab1:
                 st.info("Nessun dato idrico trovato.")
 
     # --- COLONNA SINISTRA: METEO E SEMAFORO ---
+    # --- COLONNA SINISTRA: METEO E SEMAFORO ---
     with col_meteo:
-        url_meteo = "https://api.open-meteo.com/v1/forecast?latitude=41.1535&longitude=16.4132&daily=temperature_2m_max,precipitation_sum&timezone=Europe/Rome"
+        # Abbiamo aggiunto past_days=30 per scaricare l'ultimo mese di clima reale
+        url_meteo = "https://api.open-meteo.com/v1/forecast?latitude=41.1535&longitude=16.4132&daily=temperature_2m_max,precipitation_sum&timezone=Europe/Rome&past_days=30&forecast_days=4"
         try:
             resp_meteo = requests.get(url_meteo, timeout=5)
             if resp_meteo.status_code == 200:
@@ -326,34 +328,60 @@ with tab1:
                 rain_sums = daily.get("precipitation_sum", [])
                 
                 if dates and max_temps:
+                    # 1. Mostriamo le previsioni per i prossimi 4 giorni
+                    oggi_str = datetime.now().strftime('%Y-%m-%d')
+                    indice_oggi = dates.index(oggi_str) if oggi_str in dates else 30
+                    
                     forecast_list = []
-                    for i in range(min(4, len(dates))):
+                    for i in range(indice_oggi, min(indice_oggi + 4, len(dates))):
                         forecast_list.append({
                             "Giorno": dates[i],
-                            "Temp Massima (°C)": max_temps[i],
-                            "Pioggia Prevista (mm)": rain_sums[i] if i < len(rain_sums) else 0.0
+                            "Temp Mass (°C)": max_temps[i],
+                            "Pioggia (mm)": rain_sums[i] if i < len(rain_sums) else 0.0
                         })
                     st.dataframe(pd.DataFrame(forecast_list), use_container_width=True, hide_index=True)
                     
-                    temp_oggi = max_temps[0]
-                    pioggia_oggi = rain_sums[0] if rain_sums else 0.0
+                    temp_oggi = max_temps[indice_oggi]
+                    pioggia_oggi = rain_sums[indice_oggi]
                     
-                    st.markdown("### 🚦 Semaforo Irriguo Dinamico")
+                    # 2. CALCOLO DELLO STRESS TERMICO ACCUMULATO DALL'ULTIMO TURNO
+                    giorni_stress_caldo = 0
+                    pioggia_accumulata = 0.0
                     
-                    if pioggia_oggi > 1.5:
-                        st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Non irrigare. La natura sta bagnando il terreno (Risparmio ore prepagate).")
-                    elif giorni_trascorsi <= 7:
-                        st.success(f"✅ **Terreno idratato:** Hai innaffiato {giorni_trascorsi} giorni fa. Le olive non hanno bisogno di acqua.")
-                    elif temp_oggi >= 35.0 and giorni_trascorsi > 7:
-                        st.error(f"🔥 **Caldo Estremo ({temp_oggi}°C):** Nessun turno da {giorni_trascorsi} giorni. Si consiglia di usare le ore di credito oggi.")
-                    elif temp_oggi >= 31.0 and giorni_trascorsi >= 12:
-                        st.warning(f"⚠️ **Caldo Intenso ({temp_oggi}°C):** Terreno a secco da {giorni_trascorsi} giorni. Valuta un turno.")
+                    if ultima_data_dt is not None:
+                        for i, d_str in enumerate(dates):
+                            d_obj = datetime.strptime(d_str, '%Y-%m-%d')
+                            # Contiamo solo i giorni passati TRA l'ultima irrigazione e IERI
+                            if ultima_data_dt.date() < d_obj.date() < datetime.now().date():
+                                if max_temps[i] >= 31.0: # Soglia di stress per l'ulivo
+                                    giorni_stress_caldo += 1
+                                pioggia_accumulata += rain_sums[i]
+                    
+                    st.markdown("### 🚦 Semaforo Irriguo Avanzato")
+                    
+                    # Se abbiamo uno storico irrigazione, mostriamo l'analisi
+                    if ultima_data_dt is not None:
+                        st.caption(f"Dall'ultimo turno: **{giorni_stress_caldo} gg** sopra i 31°C | Pioggia caduta: **{pioggia_accumulata} mm**")
+                    
+                    # 3. NUOVA LOGICA AGRONOMICA (Temperatura Cumulata + Pioggia Storica)
+                    if pioggia_oggi > 2.0:
+                        st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Impianto spento. Lascia fare alla natura.")
+                    elif pioggia_accumulata > 15.0 and giorni_trascorsi < 10:
+                        st.success(f"✅ **Terreno Bagnato:** Sono caduti {pioggia_accumulata} mm di pioggia di recente. Nessuna necessità di irrigare.")
+                    elif giorni_trascorsi <= 5:
+                        st.success(f"✅ **Radici Idratate:** Hai irrigato solo {giorni_trascorsi} giorni fa. Attendi.")
+                    elif giorni_stress_caldo >= 7:
+                        st.error(f"🔥 **Allarme Stress Idrico:** Sono passati {giorni_trascorsi} gg, ma ben **{giorni_stress_caldo} giorni** hanno superato i 31°C! L'oliva rischia di raggrinzire. Irrigazione urgente.")
+                    elif giorni_trascorsi >= 12 and giorni_stress_caldo >= 3:
+                        st.warning(f"⚠️ **Consumo Elevato:** In {giorni_trascorsi} giorni ci sono stati picchi di caldo. Il terreno si sta seccando. Valuta un turno a breve.")
+                    elif giorni_trascorsi > 15:
+                        st.warning(f"⚠️ **Ciclo Lungo:** Non piove e non irrighi da oltre due settimane. Controlla il terreno.")
                     else:
-                        st.info(f"🆗 **Situazione Stabile ({temp_oggi}°C):** Non piove da {giorni_trascorsi} giorni ma le temperature sono miti.")
+                        st.info(f"🆗 **Clima Mite:** Temperature moderate dall'ultimo turno ({giorni_stress_caldo} gg caldi). La pianta sta bene, risparmia credito.")
             else:
-                st.warning("Impossibile leggere i dati meteo giornalieri.")
+                st.warning("Impossibile leggere i dati meteo.")
         except Exception:
-            st.info("Connessione al meteo non disponibile in questo momento.")
+            st.info("Servizio meteo momentaneamente non disponibile.")
     
     # Database Generale
     st.subheader("🗄️ Database Generale Aziendale")
