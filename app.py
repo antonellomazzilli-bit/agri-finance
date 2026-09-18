@@ -181,43 +181,66 @@ with tab1:
     st.divider()
     
     # ==================================================
-    # --- MODULO METEO & SEMAFORO IRRIGUO INTELLIGENTE ---
+    # --- MODULO METEO & GESTIONE POZZO PREPAGATO ---
     # ==================================================
     st.divider()
-    
-    # 1. LETTURA STORICO IRRIGAZIONE DAL DATABASE
+
+    # 1. LETTURA STORICO IRRIGAZIONE E CALCOLO CREDITO ORE
     df_meteo_db, sha_meteo_db = get_github_file()
+    
     ultima_irrigazione_str = "Mai registrata"
     giorni_trascorsi = 999
-    ultime_ore = 0.0
     
+    ore_ricaricate = 0.0
+    ore_consumate = 0.0
+    ultima_data_dt = None
+    
+    # Inizializziamo un dataframe vuoto per evitare errori successivi
+    df_irrigazione = pd.DataFrame()
+
     if not df_meteo_db.empty:
-        # Cerca tutte le spese registrate sotto la categoria "Irrigazione"
         df_irrigazione = df_meteo_db[df_meteo_db['categoria'].str.contains('Irrigazione', case=False, na=False)].copy()
+        
         if not df_irrigazione.empty:
             df_irrigazione['data_dt'] = pd.to_datetime(df_irrigazione['data'], errors='coerce')
-            ultima_data = df_irrigazione['data_dt'].max()
             
-            if pd.notna(ultima_data):
-                giorni_trascorsi = (datetime.now() - ultima_data).days
-                ultima_irrigazione_str = ultima_data.strftime('%d/%m/%Y')
+            for _, row in df_irrigazione.iterrows():
+                desc = str(row['descrizione']).lower()
                 
-                # Ricava le ore basandosi sul costo orario fisso (20 €/h)
-                ultimo_importo = float(df_irrigazione[df_irrigazione['data_dt'] == ultima_data].iloc[0]['importo'])
-                ultime_ore = ultimo_importo / 20.0 if ultimo_importo > 0 else 0.0
+                # Estraiamo il numero di ore dalla descrizione
+                import re
+                match = re.search(r'(\d+(?:\.\d+)?)\s*ore', desc)
+                ore_riga = float(match.group(1)) if match else 0.0
+                
+                # Calcolo del credito e consumi
+                if "ricarica" in desc:
+                    ore_ricaricate += ore_riga
+                elif "turno" in desc:
+                    ore_consumate += ore_riga
+                    # Aggiorna la data per il semaforo
+                    d = row['data_dt']
+                    if pd.notna(d):
+                        if ultima_data_dt is None or d > ultima_data_dt:
+                            ultima_data_dt = d
+                            
+            if ultima_data_dt is not None:
+                giorni_trascorsi = (datetime.now() - ultima_data_dt).days
+                ultima_irrigazione_str = ultima_data_dt.strftime('%d/%m/%Y')
+                
+    # Calcolo finale della variabile che generava l'errore
+    credito_ore = ore_ricaricate - ore_consumate
 
-    st.subheader("🌦️ Previsioni Meteo & Gestione Idratazione (Corato)")
-    st.markdown("Gestione intelligente dell'acqua basata sul meteo reale e sullo storico del tuo impianto.")
-    
+    st.subheader("🌦️ Previsioni Meteo & Gestione Pozzo (Prepagato)")
+    st.markdown("Gestione intelligente del credito acqua e dei turni di irrigazione reali.")
+
     col_meteo, col_irrig = st.columns([2, 1], gap="large")
-    
-    # --- COLONNA DESTRA: MINI-REGISTRO ACQUA ---
+
     # --- COLONNA DESTRA: PORTAFOGLIO POZZO ---
     with col_irrig:
         with st.container(border=True):
             st.markdown("### 💧 Portafoglio Pozzo")
             
-            # Display del monte ore
+            # Display del monte ore (ora la variabile credito_ore è sempre definita)
             if credito_ore >= 0:
                 st.success(f"🔋 **Credito Residuo:** {credito_ore:.1f} Ore")
             else:
@@ -227,11 +250,11 @@ with tab1:
                 st.info(f"**Ultimo Turno:** {ultima_irrigazione_str} ({giorni_trascorsi} gg fa)")
             
             # Tasto 1: RICARICA SCHEDA (Genera Costo)
-            with st.expander("💳 1. Ricarica Scheda Pozzo", expanded=False):
+            with st.expander("💳 1. Ricarica Scheda", expanded=False):
                 with st.form("form_ricarica", clear_on_submit=True):
-                    st.write("Acquista nuove ore (Crea un'uscita a bilancio):")
-                    data_ricarica = st.date_input("Data Ricarica", format="DD/MM/YYYY")
-                    ore_da_comprare = st.number_input("Ore acquistate (Costo: 20€/h)", min_value=1.0, step=1.0, value=24.0)
+                    st.write("Acquista nuove ore (Crea uscita a bilancio):")
+                    data_ricarica = st.date_input("Data", format="DD/MM/YYYY")
+                    ore_da_comprare = st.number_input("Ore (Costo: 20€/h)", min_value=1.0, step=1.0, value=24.0)
                     stato_pag = st.radio("Pagamento", ["Saldato", "Da Saldare"], horizontal=True)
                     
                     if st.form_submit_button("Aggiungi Credito", type="primary"):
@@ -246,16 +269,16 @@ with tab1:
                         }
                         df_meteo_db = pd.concat([df_meteo_db, pd.DataFrame([nuova_riga])], ignore_index=True)
                         if save_to_github(df_meteo_db, sha_meteo_db, f"Ricarica pozzo {ore_da_comprare} ore"):
-                            st.success(f"✅ Ricarica di {costo}€ effettuata. +{ore_da_comprare} ore a disposizione!")
+                            st.success(f"✅ Ricarica di {costo}€ effettuata. +{ore_da_comprare} ore!")
                             time.sleep(1.5); st.rerun()
             
             # Tasto 2: REGISTRA TURNO (Costo Zero)
-            with st.expander("💧 2. Registra Turno (Usa Acqua)", expanded=False):
+            with st.expander("💧 2. Registra Turno", expanded=False):
                 with st.form("form_consumo", clear_on_submit=True):
-                    st.write("Scala le ore dal credito (Costo zero a bilancio):")
+                    st.write("Scala ore dal credito (Costo zero a bilancio):")
                     data_turno = st.date_input("Data Irrigazione", format="DD/MM/YYYY")
                     ore_da_usare = st.number_input("Ore consumate", min_value=0.5, step=0.5, value=18.0)
-                    note_turno = st.text_input("Note opzionali (es. Settore Ovest)")
+                    note_turno = st.text_input("Note opzionali")
                     
                     if st.form_submit_button("Registra Turno", type="primary"):
                         nuova_riga = {
@@ -266,7 +289,7 @@ with tab1:
                         }
                         df_meteo_db = pd.concat([df_meteo_db, pd.DataFrame([nuova_riga])], ignore_index=True)
                         if save_to_github(df_meteo_db, sha_meteo_db, f"Consumo irrigazione {ore_da_usare} ore"):
-                            st.success(f"✅ Turno registrato. {ore_da_usare} ore scalate con successo dal credito.")
+                            st.success(f"✅ Turno registrato. -{ore_da_usare} ore.")
                             time.sleep(1.5); st.rerun()
 
             # --- NUOVO REGISTRO CRONOLOGICO TURNI ---
@@ -286,9 +309,9 @@ with tab1:
                         hide_index=True
                     )
                 else:
-                    st.info("Nessun turno registrato nello storico.")
+                    st.info("Nessun turno registrato.")
             else:
-                st.info("Nessuna operazione idrica trovata.")
+                st.info("Nessun dato idrico trovato.")
 
     # --- COLONNA SINISTRA: METEO E SEMAFORO ---
     with col_meteo:
@@ -317,25 +340,20 @@ with tab1:
                     
                     st.markdown("### 🚦 Semaforo Irriguo Dinamico")
                     
-                    # LOGICA AGRONOMICA AGGIORNATA
                     if pioggia_oggi > 1.5:
-                        st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Non irrigare. La natura bagnando il terreno al posto tuo (Risparmio 20€/h).")
+                        st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Non irrigare. La natura sta bagnando il terreno (Risparmio ore prepagate).")
                     elif giorni_trascorsi <= 7:
-                        st.success(f"✅ **Terreno già idratato:** Hai innaffiato appena {giorni_trascorsi} giorni fa. La Coratina non ha bisogno di acqua al momento. Risparmia i soldi!")
+                        st.success(f"✅ **Terreno idratato:** Hai innaffiato {giorni_trascorsi} giorni fa. Le olive non hanno bisogno di acqua.")
                     elif temp_oggi >= 35.0 and giorni_trascorsi > 7:
-                        st.error(f"🔥 **Caldo Estremo ({temp_oggi}°C):** Sono passati {giorni_trascorsi} giorni dall'ultima irrigazione. La pianta rischia lo stress idrico, si consiglia un turno oggi.")
+                        st.error(f"🔥 **Caldo Estremo ({temp_oggi}°C):** Nessun turno da {giorni_trascorsi} giorni. Si consiglia di usare le ore di credito oggi.")
                     elif temp_oggi >= 31.0 and giorni_trascorsi >= 12:
-                        st.warning(f"⚠️ **Caldo Intenso ({temp_oggi}°C):** Terreno a secco da {giorni_trascorsi} giorni. Valuta un turno di irrigazione per non compromettere l'oliva.")
+                        st.warning(f"⚠️ **Caldo Intenso ({temp_oggi}°C):** Terreno a secco da {giorni_trascorsi} giorni. Valuta un turno.")
                     else:
-                        st.info(f"🆗 **Situazione Stabile ({temp_oggi}°C):** Non piove da {giorni_trascorsi} giorni ma le temperature sono miti. Nessuna urgenza idrica.")
+                        st.info(f"🆗 **Situazione Stabile ({temp_oggi}°C):** Non piove da {giorni_trascorsi} giorni ma le temperature sono miti.")
             else:
                 st.warning("Impossibile leggere i dati meteo giornalieri.")
         except Exception:
             st.info("Connessione al meteo non disponibile in questo momento.")
-            
-    st.divider()
-    
-    # --- FINE BLOCCO METEO ---
     
     # Database Generale
     st.subheader("🗄️ Database Generale Aziendale")
