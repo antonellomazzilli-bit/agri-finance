@@ -683,7 +683,12 @@ with tab5:
     
     if not df_spesa.empty:
         df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
-        df_validi = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
+        
+        # FILTRO APPLICATO: Esclude in automatico le righe con importo a 0.00 € (es. Turni Irrigazione)
+        df_validi = df_spesa[
+            (df_spesa['stato'].isin(['Saldato', 'Impegnato'])) & 
+            (df_spesa['importo'] != 0)
+        ].copy()
         
         categorie_uniche = df_validi['categoria'].dropna().unique()
         
@@ -713,7 +718,11 @@ with tab5:
     st.markdown("Usa questo pannello per identificare esattamente dove stai perdendo marginalità.")
     
     if not df_spesa.empty:
-        df_spese = df_spesa[df_spesa['stato'].isin(['Saldato', 'Impegnato'])].copy()
+        # Usiamo lo stesso filtro per escludere gli importi a zero dalla Spending Review
+        df_spese = df_spesa[
+            (df_spesa['stato'].isin(['Saldato', 'Impegnato'])) & 
+            (df_spesa['importo'] != 0)
+        ].copy()
         df_spese['importo_assoluto'] = df_spese['importo'].abs()
         
         escluse = ['Vendita Olio', 'Vendita Olive', 'Contributi/Aiuti', 'Rimborso Spese']
@@ -747,7 +756,12 @@ with tab5:
 
     if not df_spesa_pdf.empty:
         df_spesa_pdf['importo'] = pd.to_numeric(df_spesa_pdf['importo'], errors='coerce').fillna(0)
-        df_validi_pdf = df_spesa_pdf[df_spesa_pdf['stato'].isin(['Saldato', 'Impegnato'])].copy()
+        
+        # FILTRO APPLICATO ANCHE AL PDF: Via le righe con 0.00 €
+        df_validi_pdf = df_spesa_pdf[
+            (df_spesa_pdf['stato'].isin(['Saldato', 'Impegnato'])) & 
+            (df_spesa_pdf['importo'] != 0)
+        ].copy()
         
         df_validi_pdf = df_validi_pdf.sort_values(by=['tipo', 'categoria', 'data'])
         df_pdf_data = df_validi_pdf.groupby(['tipo', 'categoria'])['importo'].sum().reset_index()
@@ -820,7 +834,7 @@ with tab5:
             
             for cat in sorted(categorie_uniche):
                 df_cat = df_validi_pdf[df_validi_pdf['categoria'] == cat]
-                totale_categoria = df_cat['importo'].sum() # <-- Calcolo automatico del totale di questa categoria
+                totale_categoria = df_cat['importo'].sum() 
                 
                 pdf.set_font("Arial", 'B', 11)
                 pdf.set_fill_color(220, 220, 220)
@@ -844,13 +858,12 @@ with tab5:
                     pdf.cell(30, 6, stato_op, 1, 0, 'C')
                     pdf.cell(30, 6, f"{imp_op:,.2f} EUR", 1, 1, 'R')
                 
-                # --- RIGA AGGIUNTIVA: TOTALE DELLA CATEGORIA ---
                 pdf.set_font("Arial", 'B', 9)
-                pdf.set_fill_color(240, 240, 240) # Sfondo leggermente grigio per far risaltare il totale
+                pdf.set_fill_color(240, 240, 240)
                 pdf.cell(160, 6, f"TOTALE {cat.upper()}", 1, 0, 'R', fill=True)
                 pdf.cell(30, 6, f"{totale_categoria:,.2f} EUR", 1, 1, 'R', fill=True)
                 
-                pdf.ln(6) # Spazio maggiorato per separare bene i blocchi
+                pdf.ln(6) 
 
             pdf_bytes = pdf.output(dest='S').encode('latin-1')
             
