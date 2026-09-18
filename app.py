@@ -771,9 +771,12 @@ with tab5:
     df_spesa, _ = get_github_file()
     
     if not df_spesa.empty:
+        # --- CORREZIONE CRITICA: SALVATAGGIO DELLE VIRGOLE ITALIANE ---
+        # Rimuove simboli euro, spazi e trasforma le virgole in punti prima di calcolare
+        df_spesa['importo'] = df_spesa['importo'].astype(str).str.replace('€', '').str.replace(' ', '').str.replace(',', '.')
         df_spesa['importo'] = pd.to_numeric(df_spesa['importo'], errors='coerce').fillna(0)
         
-        # NUOVO FILTRO MIRATO: Nasconde gli 0.00 € SOLO per l'Irrigazione. Salva i dipendenti!
+        # Filtro mirato: Nasconde gli 0.00 € SOLO per l'Irrigazione.
         df_validi = df_spesa[
             (df_spesa['stato'].isin(['Saldato', 'Impegnato'])) & 
             ~((df_spesa['importo'] == 0) & (df_spesa['categoria'] == 'Irrigazione'))
@@ -807,7 +810,6 @@ with tab5:
     st.markdown("Usa questo pannello per identificare esattamente dove stai perdendo marginalità.")
     
     if not df_spesa.empty:
-        # Applichiamo il filtro mirato anche alla radiografia
         df_spese = df_spesa[
             (df_spesa['stato'].isin(['Saldato', 'Impegnato'])) & 
             ~((df_spesa['importo'] == 0) & (df_spesa['categoria'] == 'Irrigazione'))
@@ -844,9 +846,10 @@ with tab5:
     df_spesa_pdf, _ = get_github_file()
 
     if not df_spesa_pdf.empty:
+        # --- CORREZIONE VIRGOLE ANCHE NEL PDF ---
+        df_spesa_pdf['importo'] = df_spesa_pdf['importo'].astype(str).str.replace('€', '').str.replace(' ', '').str.replace(',', '.')
         df_spesa_pdf['importo'] = pd.to_numeric(df_spesa_pdf['importo'], errors='coerce').fillna(0)
         
-        # Applichiamo il filtro mirato anche alla stampa PDF
         df_validi_pdf = df_spesa_pdf[
             (df_spesa_pdf['stato'].isin(['Saldato', 'Impegnato'])) & 
             ~((df_spesa_pdf['importo'] == 0) & (df_spesa_pdf['categoria'] == 'Irrigazione'))
