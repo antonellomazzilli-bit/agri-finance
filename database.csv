@@ -37,3 +37,4 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-09-03,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Agosto 2026,1095.94,,Saldato,1095.94,1095.94,2026-09-03|1095.94|Erogazione Diretta,0.0,Azienda,
 2026-09-15,Entrata,Vendita Olio,Frantoio Oleario De Palma Domenico | Bonifico Istantaneo,6884.5,,Saldato,6884.5,6884.5,2026-09-15|6884.5|Registrazione iniziale,,,
 2026-06-11,Uscita,Irrigazione,Turno Irrigazione | 16.0 ore | Irrigazione,0.0,,Saldato,0.0,0.0,,,,
+2026-06-22,Uscita,Irrigazione,Turno Irrigazione | 18.0 ore | Irrigazione,0.0,,Saldato,0.0,0.0,,,,
