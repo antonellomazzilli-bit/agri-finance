@@ -212,40 +212,83 @@ with tab1:
     col_meteo, col_irrig = st.columns([2, 1], gap="large")
     
     # --- COLONNA DESTRA: MINI-REGISTRO ACQUA ---
+    # --- COLONNA DESTRA: PORTAFOGLIO POZZO ---
     with col_irrig:
         with st.container(border=True):
-            st.markdown("### 💧 Registro Acqua")
-            if giorni_trascorsi < 999:
-                st.info(f"**Ultimo turno:** {ultima_irrigazione_str} ({giorni_trascorsi} giorni fa)\n\n**Durata:** {ultime_ore:.1f} ore")
+            st.markdown("### 💧 Portafoglio Pozzo")
+            
+            # Display del monte ore
+            if credito_ore >= 0:
+                st.success(f"🔋 **Credito Residuo:** {credito_ore:.1f} Ore")
             else:
-                st.info("Nessun turno di irrigazione registrato di recente.")
+                st.error(f"⚠️ **Credito Esaurito (Sofferto):** {credito_ore:.1f} Ore")
                 
-            with st.form("form_irrigazione", clear_on_submit=True):
-                st.write("Registra l'avvio dell'impianto:")
-                data_irrig = st.date_input("Data di Irrigazione", format="DD/MM/YYYY")
-                ore_irrig = st.number_input("Ore erogate (Costo: 20€/h)", min_value=0.5, step=0.5, value=4.0)
-                note_irrig = st.text_input("Note (es. Concimazione aggiunta)")
+            if giorni_trascorsi < 999:
+                st.info(f"**Ultimo Turno:** {ultima_irrigazione_str} ({giorni_trascorsi} gg fa)")
+            
+            # Tasto 1: RICARICA SCHEDA (Genera Costo)
+            with st.expander("💳 1. Ricarica Scheda Pozzo", expanded=False):
+                with st.form("form_ricarica", clear_on_submit=True):
+                    st.write("Acquista nuove ore (Crea un'uscita a bilancio):")
+                    data_ricarica = st.date_input("Data Ricarica", format="DD/MM/YYYY")
+                    ore_da_comprare = st.number_input("Ore acquistate (Costo: 20€/h)", min_value=1.0, step=1.0, value=24.0)
+                    stato_pag = st.radio("Pagamento", ["Saldato", "Da Saldare"], horizontal=True)
+                    
+                    if st.form_submit_button("Aggiungi Credito", type="primary"):
+                        costo = ore_da_comprare * 20.0
+                        stato_db = "Saldato" if "Saldato" in stato_pag else "Impegnato"
+                        nuova_riga = {
+                            'data': data_ricarica.strftime('%Y-%m-%d'), 'tipo': 'Uscita', 'categoria': 'Irrigazione',
+                            'descrizione': f"Ricarica Pozzo | {ore_da_comprare} ore",
+                            'importo': costo, 'prodotto': '', 'stato': stato_db,
+                            'totale_fattura': costo, 'importo_pagato': costo if stato_db == "Saldato" else 0.0,
+                            'registro_pagamenti': ''
+                        }
+                        df_meteo_db = pd.concat([df_meteo_db, pd.DataFrame([nuova_riga])], ignore_index=True)
+                        if save_to_github(df_meteo_db, sha_meteo_db, f"Ricarica pozzo {ore_da_comprare} ore"):
+                            st.success(f"✅ Ricarica di {costo}€ effettuata. +{ore_da_comprare} ore a disposizione!")
+                            time.sleep(1.5); st.rerun()
+            
+            # Tasto 2: REGISTRA TURNO (Costo Zero)
+            with st.expander("💧 2. Registra Turno (Usa Acqua)", expanded=False):
+                with st.form("form_consumo", clear_on_submit=True):
+                    st.write("Scala le ore dal credito (Costo zero a bilancio):")
+                    data_turno = st.date_input("Data Irrigazione", format="DD/MM/YYYY")
+                    ore_da_usare = st.number_input("Ore consumate", min_value=0.5, step=0.5, value=18.0)
+                    note_turno = st.text_input("Note opzionali (es. Settore Ovest)")
+                    
+                    if st.form_submit_button("Registra Turno", type="primary"):
+                        nuova_riga = {
+                            'data': data_turno.strftime('%Y-%m-%d'), 'tipo': 'Uscita', 'categoria': 'Irrigazione',
+                            'descrizione': f"Turno Irrigazione | {ore_da_usare} ore | {note_turno}".strip(' |'),
+                            'importo': 0.0, 'prodotto': '', 'stato': 'Saldato',
+                            'totale_fattura': 0.0, 'importo_pagato': 0.0, 'registro_pagamenti': ''
+                        }
+                        df_meteo_db = pd.concat([df_meteo_db, pd.DataFrame([nuova_riga])], ignore_index=True)
+                        if save_to_github(df_meteo_db, sha_meteo_db, f"Consumo irrigazione {ore_da_usare} ore"):
+                            st.success(f"✅ Turno registrato. {ore_da_usare} ore scalate con successo dal credito.")
+                            time.sleep(1.5); st.rerun()
+
+            # --- NUOVO REGISTRO CRONOLOGICO TURNI ---
+            st.divider()
+            st.markdown("#### 📜 Cronologia Turni")
+            if not df_irrigazione.empty:
+                df_storico_turni = df_irrigazione[
+                    (df_irrigazione['importo'] == 0) | 
+                    (df_irrigazione['descrizione'].str.contains('Turno', case=False, na=False))
+                ].copy()
                 
-                if st.form_submit_button("💾 Salva Turno", type="primary", use_container_width=True):
-                    # Calcolo automatico spesa e salvataggio nel database
-                    costo_totale = ore_irrig * 20.0
-                    nuova_riga = {
-                        'data': data_irrig.strftime('%Y-%m-%d'),
-                        'tipo': 'Uscita',
-                        'categoria': 'Irrigazione',
-                        'descrizione': f"Turno Irrigazione: {ore_irrig} ore | {note_irrig}".strip(' |'),
-                        'importo': costo_totale,
-                        'prodotto': '',
-                        'stato': 'Impegnato',
-                        'totale_fattura': costo_totale,
-                        'importo_pagato': 0.0,
-                        'registro_pagamenti': ''
-                    }
-                    df_meteo_db = pd.concat([df_meteo_db, pd.DataFrame([nuova_riga])], ignore_index=True)
-                    if save_to_github(df_meteo_db, sha_meteo_db, f"Registrato turno irrigazione di {ore_irrig} ore"):
-                        st.success(f"✅ Turno registrato! {costo_totale}€ inseriti a bilancio.")
-                        time.sleep(1.5)
-                        st.rerun()
+                if not df_storico_turni.empty:
+                    df_storico_turni = df_storico_turni.sort_values(by='data', ascending=False)
+                    st.dataframe(
+                        df_storico_turni[['data', 'descrizione']], 
+                        use_container_width=True, 
+                        hide_index=True
+                    )
+                else:
+                    st.info("Nessun turno registrato nello storico.")
+            else:
+                st.info("Nessuna operazione idrica trovata.")
 
     # --- COLONNA SINISTRA: METEO E SEMAFORO ---
     with col_meteo:
