@@ -36,14 +36,16 @@ def load_github_data():
         return pd.read_csv(io.StringIO(content))
     return pd.DataFrame()
 
+# --- MODIFICA: Funzione di estrazione rinforzata ---
 def estrai_giornate_operaio(descrizione, nome_target):
-    try:
-        if "|" in str(descrizione) and nome_target.lower() in str(descrizione).lower():
-            parti = descrizione.split("|")
-            info_tempo = parti[1].strip()
-            return float(info_tempo.split(" gg")[0].strip())
-    except:
-        pass
+    if not isinstance(descrizione, str):
+        return 0.0
+    if nome_target.lower() not in descrizione.lower():
+        return 0.0
+    import re
+    match = re.search(r'(\d+(?:[\.,]\d+)?)\s*(?:gg|giornate)', descrizione.lower())
+    if match:
+        return float(match.group(1).replace(',', '.'))
     return 0.0
 
 def is_festivo_italiano(d):
@@ -94,7 +96,11 @@ with st.spinner("Sincronizzazione calendario e lettura cloud (Senza Cache)..."):
     
     if not df_git.empty:
         df_git['data_dt'] = pd.to_datetime(df_git['data'], errors='coerce')
-        df_lavoro = df_git[(df_git['data_dt'].dt.year == anno_sel) & (df_git['categoria'] == 'Manodopera')]
+        # --- MODIFICA: Ora legge TUTTE le giornate, anche extra e commerciali! ---
+        df_lavoro = df_git[
+            (df_git['data_dt'].dt.year == anno_sel) & 
+            (df_git['categoria'].isin(['Manodopera', 'Manodopera Extra', 'Busta Paga']))
+        ]
         
         for _, row in df_lavoro.iterrows():
             gg_lavorate = estrai_giornate_operaio(row['descrizione'], dipendente_target)
