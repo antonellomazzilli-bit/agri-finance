@@ -41,3 +41,4 @@ data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_
 2026-07-03,Uscita,Irrigazione,Turno Irrigazione | 22.0 ore | Irrigazione,0.0,,Saldato,0.0,0.0,,,,
 2026-09-05,Uscita,Irrigazione,Turno Irrigazione | 24.0 ore | Irrigazione,0.0,,Saldato,0.0,0.0,,,,
 2026-09-18,Uscita,Irrigazione,Ricarica Pozzo | 10.0 ore,200.0,,Saldato,200.0,200.0,,,,
+2026-09-21,Uscita,Irrigazione,Turno Irrigazione | 18.0 ore | Irrigazione dalle 12.00 alle 6.00,0.0,,Saldato,0.0,0.0,,,,
