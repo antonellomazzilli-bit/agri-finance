@@ -100,17 +100,23 @@ def format_euro(valore):
     importo_str = importo_str.replace(",", "X").replace(".", ",").replace("X", ".")
     return f"€ {importo_str}"
 
-def estrai_giornate(descrizione, dipendente):
-    """Estrae il numero di giornate (gg) dalla descrizione testuale"""
-    try:
-        if dipendente in descrizione:
-            parti = descrizione.split('|')
-            for p in parti:
-                if 'gg' in p:
-                    return float(p.replace('gg', '').strip())
+def estrai_giornate(descrizione, nome_operatore):
+    if not isinstance(descrizione, str):
         return 0.0
-    except: 
+    # Controlla se la riga appartiene all'operatore giusto
+    if nome_operatore.lower() not in descrizione.lower():
         return 0.0
+    
+    # Usa le espressioni regolari (regex) per trovare qualsiasi numero prima di "gg"
+    import re
+    # Cerca un numero (anche con virgola o punto) seguito opzionalmente da spazi e poi "gg" o "giornate"
+    match = re.search(r'(\d+(?:[\.,]\d+)?)\s*(?:gg|giornate)', descrizione.lower())
+    if match:
+        # Estrae il numero, trasforma eventuale virgola in punto e lo converte
+        numero_str = match.group(1).replace(',', '.')
+        return float(numero_str)
+    
+    return 0.0
 
 # --- INTERFACCIA PRINCIPALE (LE 6 TAB) ---
 st.title("AgriFinance")
