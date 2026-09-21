@@ -36,12 +36,13 @@ def load_github_data():
         return pd.read_csv(io.StringIO(content))
     return pd.DataFrame()
 
-# --- MODIFICA: Funzione di estrazione rinforzata ---
+# --- FUNZIONE POTENZIATA: Estrae perfettamente i numeri (anche con virgola) ed evita gli zeri ---
 def estrai_giornate_operaio(descrizione, nome_target):
     if not isinstance(descrizione, str):
         return 0.0
     if nome_target.lower() not in descrizione.lower():
         return 0.0
+    
     import re
     match = re.search(r'(\d+(?:[\.,]\d+)?)\s*(?:gg|giornate)', descrizione.lower())
     if match:
@@ -96,10 +97,11 @@ with st.spinner("Sincronizzazione calendario e lettura cloud (Senza Cache)..."):
     
     if not df_git.empty:
         df_git['data_dt'] = pd.to_datetime(df_git['data'], errors='coerce')
-        # --- MODIFICA: Ora legge TUTTE le giornate, anche extra e commerciali! ---
+        
+        # --- FILTRO CORRETTO: Conta solo le ore fisiche e ignora la Busta Paga per evitare doppi conteggi ---
         df_lavoro = df_git[
             (df_git['data_dt'].dt.year == anno_sel) & 
-            (df_git['categoria'].isin(['Manodopera', 'Manodopera Extra', 'Busta Paga']))
+            (df_git['categoria'].isin(['Manodopera', 'Manodopera Extra']))
         ]
         
         for _, row in df_lavoro.iterrows():
@@ -180,6 +182,7 @@ with st.spinner("Sincronizzazione calendario e lettura cloud (Senza Cache)..."):
         
     df_plan = pd.DataFrame(dati_tabella)
 
+    # --- SALVATAGGIO DINAMICO DELLE MODIFICHE DELLA TABELLA ---
     def applica_modifiche_tabella():
         edits = st.session_state.editor_pianificatore.get("edited_rows", {})
         for idx_str, modifiche in edits.items():
