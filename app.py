@@ -329,7 +329,7 @@ with tab1:
         if mese_oggi in [3, 4]:
             fase = "🌱 Risveglio / Mignolatura"
             fabbisogno = "Basso"
-            soglia_temp = 32.0  # L'albero tollera bene
+            soglia_temp = 32.0  
             giorni_allarme = 15
             msg_fase = "Fase di preparazione alla fioritura. Irrigare solo in caso di siccità prolungata."
         elif mese_oggi == 5:
@@ -347,7 +347,7 @@ with tab1:
         elif mese_oggi in [7, 8]:
             fase = "🫒 Indurimento Nocciolo / Accrescimento"
             fabbisogno = "CRITICO (Massima esigenza idrica)"
-            soglia_temp = 30.0  # Molto sensibile allo stress
+            soglia_temp = 30.0  
             giorni_allarme = 7
             msg_fase = "Fase decisiva. L'acqua è vitale per ingrossare la polpa ed evitare frutti piccoli e raggrinziti."
         elif mese_oggi == 9:
@@ -369,7 +369,6 @@ with tab1:
             giorni_allarme = 999
             msg_fase = "L'albero è in riposo vegetativo o in fase di raccolta. Nessuna irrigazione richiesta."
 
-        # Box informativo sulla biologia della pianta
         st.info(f"**Fase Attuale:** {fase}\n\n**Esigenza Idrica:** {fabbisogno}\n\n*{msg_fase}*")
 
         # 2. SCARICAMENTO DATI METEO
@@ -399,7 +398,7 @@ with tab1:
                     temp_oggi = max_temps[indice_oggi]
                     pioggia_oggi = rain_sums[indice_oggi]
                     
-                    # 3. CALCOLO STRESS ADATTATO ALLA FASE FENOLOGICA
+                    # 3. CALCOLO STRESS E ALGORITMO ORE POZZO
                     giorni_stress_caldo = 0
                     pioggia_accumulata = 0.0
                     
@@ -407,17 +406,33 @@ with tab1:
                         for i, d_str in enumerate(dates):
                             d_obj = datetime.strptime(d_str, '%Y-%m-%d')
                             if ultima_data_dt.date() < d_obj.date() < datetime.now().date():
-                                # Ora la soglia cambia in base al mese!
                                 if max_temps[i] >= soglia_temp: 
                                     giorni_stress_caldo += 1
                                 pioggia_accumulata += rain_sums[i]
+                        
+                        # --- CALCOLO ORE CONSIGLIATE ---
+                        # Sconto pioggia: ogni 10 mm tolgono circa 3.5 giorni di debito idrico
+                        giorni_sconto_pioggia = (pioggia_accumulata / 10.0) * 3.5
+                        giorni_debito = max(0.0, giorni_trascorsi - giorni_sconto_pioggia)
+                        
+                        # Moltiplicatore ore per giorno in base alla fase fenologica
+                        if mese_oggi in [7, 8]:
+                            moltiplicatore = 1.8
+                        elif mese_oggi == 9:
+                            moltiplicatore = 1.5
+                        elif mese_oggi in [5, 6, 10]:
+                            moltiplicatore = 1.0
+                        else:
+                            moltiplicatore = 0.0
+                            
+                        ore_consigliate = int(round(giorni_debito * moltiplicatore))
                     
                     st.markdown("### 🚦 Semaforo Dinamico Intelligente")
                     
                     if ultima_data_dt is not None:
-                        st.caption(f"Dall'ultimo turno: **{giorni_stress_caldo} gg** sopra i {soglia_temp}°C (Soglia di stress attuale) | Pioggia: **{pioggia_accumulata} mm**")
+                        st.caption(f"Dall'ultimo turno: **{giorni_stress_caldo} gg** sopra i {soglia_temp}°C (Soglia attuale) | Pioggia: **{pioggia_accumulata} mm**")
                     
-                    # 4. LOGICA DECISIONALE AGRONOMICA
+                    # 4. LOGICA DECISIONALE
                     if mese_oggi in [11, 12, 1, 2]:
                         st.success("❄️ **Pausa Invernale:** L'impianto di irrigazione dovrebbe essere spento o svuotato per evitare gelate.")
                     elif pioggia_oggi > 2.0:
@@ -427,11 +442,11 @@ with tab1:
                     elif giorni_trascorsi <= (giorni_allarme / 2):
                         st.success(f"✅ **Pianta Idratata:** Hai irrigato {giorni_trascorsi} giorni fa. La fase di {fase.split()[1]} procede bene.")
                     elif giorni_stress_caldo >= giorni_allarme:
-                        st.error(f"🔥 **Allarme Stress Idrico:** Sono passati {giorni_trascorsi} gg con troppi giorni sopra i {soglia_temp}°C! Intervenire per proteggere la {fase.split()[1]}.")
+                        st.error(f"🔥 **Allarme Stress Idrico:** Sono passati {giorni_trascorsi} gg con troppi giorni sopra i {soglia_temp}°C! Intervenire per proteggere la {fase.split()[1]}.\n\n🎯 **Turno consigliato: {ore_consigliate} ore**")
                     elif giorni_trascorsi >= giorni_allarme and giorni_stress_caldo >= 3:
-                        st.warning(f"⚠️ **Fabbisogno Crescente:** Nessuna pioggia da {giorni_trascorsi} giorni. Il terreno si sta asciugando, valuta un turno di irrigazione.")
+                        st.warning(f"⚠️ **Fabbisogno Crescente:** Nessuna pioggia utile da {giorni_trascorsi} giorni. Il terreno si sta asciugando.\n\n🎯 **Turno consigliato: {ore_consigliate} ore**")
                     else:
-                        st.info(f"🆗 **Clima Mite:** Temperature sotto controllo dall'ultimo turno. La pianta sopporta bene, si consiglia di risparmiare il credito ore.")
+                        st.info(f"🆗 **Clima Mite:** Temperature sotto controllo dall'ultimo turno. La pianta sopporta bene, risparmia il credito ore del pozzo.")
             else:
                 st.warning("Impossibile leggere i dati meteo.")
         except Exception:
