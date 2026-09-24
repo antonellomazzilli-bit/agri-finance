@@ -1127,7 +1127,7 @@ with tab6:
 # ==========================================
 st.divider()
 st.subheader("🛠️ Manutenzione Database (Strumento Admin)")
-if st.button("🗑️ Elimina 'coltura_id' e 'prodotto' definitivamente da GitHub", type="primary"):
+if st.button("🗑️ Elimina 'coltura_id' e 'prodotto' definitivamente", type="primary"):
     with st.spinner("Pulizia profonda del database in corso..."):
         import json
         import requests
@@ -1135,7 +1135,6 @@ if st.button("🗑️ Elimina 'coltura_id' e 'prodotto' definitivamente da GitHu
         import io
         import pandas as pd
         
-        # --- PERCORSI ESPLICITI PER EVITARE ERRORI ---
         repo_esatto = "antonellomazzilli-bit/agri-finance"
         file_esatto = "database.csv"
         token_esatto = st.secrets["GITHUB_TOKEN"]
@@ -1144,7 +1143,6 @@ if st.button("🗑️ Elimina 'coltura_id' e 'prodotto' definitivamente da GitHu
         headers_git = {"Authorization": f"token {token_esatto}"}
         
         try:
-            # 1. Scarica il file originale
             r_get = requests.get(url_file, headers=headers_git)
             if r_get.status_code == 200:
                 file_data = r_get.json()
@@ -1152,15 +1150,14 @@ if st.button("🗑️ Elimina 'coltura_id' e 'prodotto' definitivamente da GitHu
                 contenuto_testo = base64.b64decode(file_data["content"]).decode("utf-8")
                 df_admin = pd.read_csv(io.StringIO(contenuto_testo))
                 
-                # 2. Amputa le colonne dal database (se esistono)
-                df_pulito = df_admin.drop(columns=['id_coltura', 'prodotto'], errors='ignore')
+                # --- CORREZIONE: Usa i nomi ESATTI mostrati nella tabella ---
+                df_pulito = df_admin.drop(columns=['coltura_id', 'prodotto'], errors='ignore')
                 
-                # 3. Ricarica il file pulito su GitHub
                 nuovo_csv = df_pulito.to_csv(index=False)
                 contenuto_codificato = base64.b64encode(nuovo_csv.encode("utf-8")).decode("utf-8")
                 
                 payload = {
-                    "message": "Pulizia database: eliminate colonne id_coltura e prodotto",
+                    "message": "Pulizia database: rimosse colonne coltura_id e prodotto",
                     "content": contenuto_codificato,
                     "sha": sha_attuale,
                     "branch": "main"
@@ -1169,10 +1166,10 @@ if st.button("🗑️ Elimina 'coltura_id' e 'prodotto' definitivamente da GitHu
                 r_put = requests.put(url_file, headers=headers_git, data=json.dumps(payload))
                 
                 if r_put.status_code == 200:
-                    st.success("✅ Operazione completata! Le colonne sono state rimosse per sempre dal CSV. Ricarica la pagina.")
+                    st.success("✅ Operazione completata! Le colonne sono state rimosse. Ricarica la pagina per vedere il database pulito.")
                 else:
                     st.error(f"Errore nel salvataggio su GitHub: {r_put.text}")
             else:
-                st.error("Errore: impossibile leggere il file originale da GitHub. Controlla il Token.")
+                st.error("Errore: impossibile leggere il file originale da GitHub.")
         except Exception as e:
             st.error(f"Errore imprevisto durante l'esecuzione: {e}")
