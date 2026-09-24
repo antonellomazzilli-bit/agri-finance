@@ -53,10 +53,10 @@ def get_github_file():
             df = pd.read_csv(StringIO(content))
             return df, data['sha']
         else:
-            return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'prodotto', 'stato', 'totale_fattura', 'importo_pagato', 'registro_pagamenti']), ""
+            return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'stato', 'totale_fattura', 'importo_pagato', 'registro_pagamenti']), ""
     except Exception as e:
         st.error(f"Errore di comunicazione in Lettura: {e}")
-        return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'prodotto', 'stato', 'totale_fattura', 'importo_pagato', 'registro_pagamenti']), ""
+        return pd.DataFrame(columns=['data', 'tipo', 'categoria', 'descrizione', 'importo', 'stato', 'totale_fattura', 'importo_pagato', 'registro_pagamenti']), ""
 
 def save_to_github(df, sha, message):
     """Salva i dati e restituisce True SOLO in caso di successo effettivo."""
