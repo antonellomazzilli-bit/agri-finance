@@ -1122,3 +1122,42 @@ with tab6:
                     st.rerun()
             else:
                 st.warning("⚠️ Compila almeno Fornitore/Cliente e assicurati che l'importo sia maggiore di zero.")
+
+st.divider()
+st.subheader("🛠️ Manutenzione Database (Strumento Admin)")
+if st.button("🗑️ Elimina 'id_coltura' e 'prodotto' definitivamente da GitHub", type="primary"):
+    with st.spinner("Pulizia profonda del database in corso..."):
+        import json
+        url_file = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
+        headers_git = {"Authorization": f"token {GITHUB_TOKEN}"}
+        
+        # 1. Scarica il file originale
+        r_get = requests.get(url_file, headers=headers_git)
+        if r_get.status_code == 200:
+            file_data = r_get.json()
+            sha_attuale = file_data["sha"]
+            contenuto_testo = base64.b64decode(file_data["content"]).decode("utf-8")
+            df_admin = pd.read_csv(io.StringIO(contenuto_testo))
+            
+            # 2. Amputa le colonne dal database
+            df_pulito = df_admin.drop(columns=['id_coltura', 'prodotto'], errors='ignore')
+            
+            # 3. Ricarica il file pulito su GitHub
+            nuovo_csv = df_pulito.to_csv(index=False)
+            contenuto_codificato = base64.b64encode(nuovo_csv.encode("utf-8")).decode("utf-8")
+            
+            payload = {
+                "message": "Pulizia database: eliminate colonne id_coltura e prodotto",
+                "content": contenuto_codificato,
+                "sha": sha_attuale,
+                "branch": "main"
+            }
+            
+            r_put = requests.put(url_file, headers=headers_git, data=json.dumps(payload))
+            
+            if r_put.status_code == 200:
+                st.success("✅ Operazione completata! Le colonne sono state rimosse per sempre. Ricarica la pagina.")
+            else:
+                st.error(f"Errore nel salvataggio: {r_put.text}")
+        else:
+            st.error("Errore nella lettura del file originale.")
