@@ -319,6 +319,24 @@ with tab1:
             else:
                 st.info("Nessun dato idrico trovato.")
 
+   # --- FUNZIONE CACHE PER IL METEO (Evita l'errore 429) ---
+    @st.cache_data(ttl=10800) # Il sistema ricorderà i dati per 3 ore (10800 secondi) senza richiederli al server
+    def scarica_meteo_in_cache():
+        url_meteo = "https://api.open-meteo.com/v1/forecast"
+        parametri_meteo = {
+            "latitude": 41.1535,
+            "longitude": 16.4132,
+            "daily": "temperature_2m_max,precipitation_sum",
+            "timezone": "Europe/Rome",
+            "past_days": 30,
+            "forecast_days": 4
+        }
+        try:
+            resp = requests.get(url_meteo, params=parametri_meteo, timeout=10)
+            return resp.json(), resp.status_code
+        except Exception:
+            return None, 0
+
     # --- COLONNA SINISTRA: METEO E SEMAFORO AGRONOMICO ---
     with col_meteo:
         st.subheader("🌦️ Previsioni e Ciclo Fenologico")
@@ -385,104 +403,86 @@ with tab1:
 
         st.info(f"**Fase Attuale:** {fase}\n\n**Esigenza Idrica:** {fabbisogno}\n\n*{msg_fase}*")
 
-        # 2. SCARICAMENTO DATI METEO (SISTEMA CORRETTO E ANTI-CRASH)
-        url_meteo = "https://api.open-meteo.com/v1/forecast"
-        parametri_meteo = {
-            "latitude": 41.1535,
-            "longitude": 16.4132,
-            "daily": "temperature_2m_max,precipitation_sum",
-            "timezone": "Europe/Rome",
-            "past_days": 30,
-            "forecast_days": 4
-        }
+        # 2. SCARICAMENTO DATI METEO (TRAMITE CACHE)
+        m_data, status_code = scarica_meteo_in_cache()
         
-        try:
-            # Passaggio sicuro dei parametri e timeout prolungato
-            resp_meteo = requests.get(url_meteo, params=parametri_meteo, timeout=10)
+        if status_code == 200 and m_data:
+            daily = m_data.get("daily", {})
+            dates = daily.get("time", [])
+            max_temps = daily.get("temperature_2m_max", [])
+            rain_sums = daily.get("precipitation_sum", [])
             
-            if resp_meteo.status_code == 200:
-                m_data = resp_meteo.json()
-                daily = m_data.get("daily", {})
-                dates = daily.get("time", [])
-                max_temps = daily.get("temperature_2m_max", [])
-                rain_sums = daily.get("precipitation_sum", [])
+            if dates and max_temps:
+                oggi_str = datetime.now().strftime('%Y-%m-%d')
+                indice_oggi = dates.index(oggi_str) if oggi_str in dates else 30
                 
-                if dates and max_temps:
-                    oggi_str = datetime.now().strftime('%Y-%m-%d')
-                    # Gestione anno sfalsato: prende sempre l'oggi relativo all'API
-                    if oggi_str in dates:
-                        indice_oggi = dates.index(oggi_str)
-                    else:
-                        indice_oggi = 30
+                forecast_list = []
+                for i in range(indice_oggi, min(indice_oggi + 4, len(dates))):
+                    forecast_list.append({
+                        "Giorno": dates[i],
+                        "Temp Mass (°C)": max_temps[i],
+                        "Pioggia (mm)": rain_sums[i] if i < len(rain_sums) else 0.0
+                    })
+                st.dataframe(pd.DataFrame(forecast_list), use_container_width=True, hide_index=True)
+                
+                temp_oggi = max_temps[indice_oggi]
+                pioggia_oggi = rain_sums[indice_oggi]
+                
+                # 3. CALCOLO STRESS E ALGORITMO ORE POZZO
+                giorni_stress_caldo = 0
+                pioggia_accumulata = 0.0
+                ore_consigliate = 0
+                
+                if ultima_data_dt is not None and pd.notna(ultima_data_dt):
+                    giorni_da_controllare = min(giorni_trascorsi, 30)
+                    start_idx = max(0, indice_oggi - giorni_da_controllare)
                     
-                    forecast_list = []
-                    for i in range(indice_oggi, min(indice_oggi + 4, len(dates))):
-                        forecast_list.append({
-                            "Giorno": dates[i],
-                            "Temp Mass (°C)": max_temps[i],
-                            "Pioggia (mm)": rain_sums[i] if i < len(rain_sums) else 0.0
-                        })
-                    st.dataframe(pd.DataFrame(forecast_list), use_container_width=True, hide_index=True)
-                    
-                    temp_oggi = max_temps[indice_oggi]
-                    pioggia_oggi = rain_sums[indice_oggi]
-                    
-                    # 3. CALCOLO STRESS E ALGORITMO ORE POZZO (Indipendente dall'anno solare)
-                    giorni_stress_caldo = 0
-                    pioggia_accumulata = 0.0
-                    ore_consigliate = 0
-                    
-                    if ultima_data_dt is not None and pd.notna(ultima_data_dt):
-                        # Conta all'indietro usando gli indici (massimo 30 giorni)
-                        giorni_da_controllare = min(giorni_trascorsi, 30)
-                        start_idx = max(0, indice_oggi - giorni_da_controllare)
+                    for i in range(start_idx, indice_oggi):
+                        if max_temps[i] >= soglia_temp: 
+                            giorni_stress_caldo += 1
+                        pioggia_accumulata += rain_sums[i]
                         
-                        for i in range(start_idx, indice_oggi):
-                            if max_temps[i] >= soglia_temp: 
-                                giorni_stress_caldo += 1
-                            pioggia_accumulata += rain_sums[i]
-                            
-                        # --- CALCOLO ORE CONSIGLIATE ---
-                        giorni_sconto_pioggia = (pioggia_accumulata / 10.0) * 3.5
-                        giorni_debito = max(0.0, giorni_trascorsi - giorni_sconto_pioggia)
+                    # --- CALCOLO ORE CONSIGLIATE ---
+                    giorni_sconto_pioggia = (pioggia_accumulata / 10.0) * 3.5
+                    giorni_debito = max(0.0, giorni_trascorsi - giorni_sconto_pioggia)
+                    
+                    if mese_oggi in [7, 8]:
+                        moltiplicatore = 1.8
+                    elif mese_oggi == 9:
+                        moltiplicatore = 1.5
+                    elif mese_oggi in [5, 6, 10]:
+                        moltiplicatore = 1.0
+                    else:
+                        moltiplicatore = 0.0
                         
-                        if mese_oggi in [7, 8]:
-                            moltiplicatore = 1.8
-                        elif mese_oggi == 9:
-                            moltiplicatore = 1.5
-                        elif mese_oggi in [5, 6, 10]:
-                            moltiplicatore = 1.0
-                        else:
-                            moltiplicatore = 0.0
-                            
-                        ore_consigliate = int(round(giorni_debito * moltiplicatore))
-                    
-                    st.markdown("### 🚦 Semaforo Dinamico Intelligente")
-                    
-                    if ultima_data_dt is not None and pd.notna(ultima_data_dt):
-                        st.caption(f"Dall'ultimo turno ({ultima_data_dt.strftime('%d/%m/%Y')}): **{giorni_stress_caldo} gg** oltre i {soglia_temp}°C | Pioggia accumulata: **{pioggia_accumulata:.1f} mm**")
-                    else:
-                        st.caption("Nessuna irrigazione registrata di recente nel database.")
-                    
-                    # 4. LOGICA DECISIONALE
-                    if mese_oggi in [11, 12, 1, 2]:
-                        st.success("❄️ **Pausa Invernale:** L'impianto di irrigazione dovrebbe essere spento o svuotato per evitare gelate.")
-                    elif pioggia_oggi > 2.0:
-                        st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Impianto spento. Lascia fare alla natura.")
-                    elif pioggia_accumulata > 15.0 and giorni_trascorsi < 12:
-                        st.success(f"✅ **Terreno Bagnato:** Sono caduti {pioggia_accumulata:.1f} mm di pioggia di recente. Le radici hanno scorte sufficienti.")
-                    elif giorni_trascorsi <= (giorni_allarme / 2):
-                        st.success(f"✅ **Pianta Idratata:** Hai irrigato {giorni_trascorsi} giorni fa. La fase di {fase.split()[1]} procede bene.")
-                    elif giorni_stress_caldo >= giorni_allarme:
-                        st.error(f"🔥 **Allarme Stress Idrico:** Sono passati {giorni_trascorsi} gg con troppi giorni sopra i {soglia_temp}°C! Intervenire per proteggere la {fase.split()[1]}.\n\n🎯 **Turno consigliato: {ore_consigliate} ore**")
-                    elif giorni_trascorsi >= giorni_allarme and giorni_stress_caldo >= 3:
-                        st.warning(f"⚠️ **Fabbisogno Crescente:** Nessuna pioggia utile da {giorni_trascorsi} giorni. Il terreno si sta asciugando.\n\n🎯 **Turno consigliato: {ore_consigliate} ore**")
-                    else:
-                        st.info(f"🆗 **Clima Mite:** Temperature sotto controllo dall'ultimo turno. La pianta sopporta bene, risparmia il credito ore del pozzo.")
-            else:
-                st.warning(f"Impossibile leggere i dati meteo (Errore API {resp_meteo.status_code}). I server potrebbero essere momentaneamente occupati.")
-        except requests.exceptions.RequestException as e:
-            st.error(f"Problema di connessione con il servizio meteo: Controlla la rete. ({e})")
+                    ore_consigliate = int(round(giorni_debito * moltiplicatore))
+                
+                st.markdown("### 🚦 Semaforo Dinamico Intelligente")
+                
+                if ultima_data_dt is not None and pd.notna(ultima_data_dt):
+                    st.caption(f"Dall'ultimo turno ({ultima_data_dt.strftime('%d/%m/%Y')}): **{giorni_stress_caldo} gg** oltre i {soglia_temp}°C | Pioggia accumulata: **{pioggia_accumulata:.1f} mm**")
+                else:
+                    st.caption("Nessuna irrigazione registrata di recente nel database.")
+                
+                # 4. LOGICA DECISIONALE
+                if mese_oggi in [11, 12, 1, 2]:
+                    st.success("❄️ **Pausa Invernale:** L'impianto di irrigazione dovrebbe essere spento o svuotato per evitare gelate.")
+                elif pioggia_oggi > 2.0:
+                    st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Impianto spento. Lascia fare alla natura.")
+                elif pioggia_accumulata > 15.0 and giorni_trascorsi < 12:
+                    st.success(f"✅ **Terreno Bagnato:** Sono caduti {pioggia_accumulata:.1f} mm di pioggia di recente. Le radici hanno scorte sufficienti.")
+                elif giorni_trascorsi <= (giorni_allarme / 2):
+                    st.success(f"✅ **Pianta Idratata:** Hai irrigato {giorni_trascorsi} giorni fa. La fase di {fase.split()[1]} procede bene.")
+                elif giorni_stress_caldo >= giorni_allarme:
+                    st.error(f"🔥 **Allarme Stress Idrico:** Sono passati {giorni_trascorsi} gg con troppi giorni sopra i {soglia_temp}°C! Intervenire per proteggere la {fase.split()[1]}.\n\n🎯 **Turno consigliato: {ore_consigliate} ore**")
+                elif giorni_trascorsi >= giorni_allarme and giorni_stress_caldo >= 3:
+                    st.warning(f"⚠️ **Fabbisogno Crescente:** Nessuna pioggia utile da {giorni_trascorsi} giorni. Il terreno si sta asciugando.\n\n🎯 **Turno consigliato: {ore_consigliate} ore**")
+                else:
+                    st.info(f"🆗 **Clima Mite:** Temperature sotto controllo dall'ultimo turno. La pianta sopporta bene, risparmia il credito ore del pozzo.")
+        elif status_code == 429:
+            st.warning("⚠️ Troppe richieste inviate (Errore 429). Il server Open-Meteo ha attivato il blocco di sicurezza temporaneo sul tuo IP. Riprova tra circa un'ora per permettere lo sblocco automatico.")
+        else:
+            st.warning(f"Impossibile leggere i dati meteo (Codice Errore API: {status_code}).")
     
     # Database Generale
     st.subheader("🗄️ Database Generale Aziendale")
