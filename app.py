@@ -323,6 +323,20 @@ with tab1:
     with col_meteo:
         st.subheader("🌦️ Previsioni e Ciclo Fenologico")
         
+        # --- 0. RECUPERO DATA ULTIMA IRRIGAZIONE DAL DATABASE ---
+        ultima_data_dt = None
+        giorni_trascorsi = 0
+        try:
+            df_meteo, _ = get_github_file()
+            df_irr = df_meteo[df_meteo['categoria'] == 'Irrigazione'].copy()
+            if not df_irr.empty:
+                df_irr['data_dt'] = pd.to_datetime(df_irr['data'], errors='coerce')
+                ultima_data_dt = df_irr['data_dt'].max()
+                if pd.notna(ultima_data_dt):
+                    giorni_trascorsi = max(0, (datetime.now() - ultima_data_dt).days)
+        except Exception:
+            pass # Se non trova il file, prosegue senza bloccare l'app
+
         # 1. MOTORE AGRONOMICO: Calcolo della Fase Fenologica attuale
         mese_oggi = datetime.now().month
         
@@ -401,8 +415,9 @@ with tab1:
                     # 3. CALCOLO STRESS E ALGORITMO ORE POZZO
                     giorni_stress_caldo = 0
                     pioggia_accumulata = 0.0
+                    ore_consigliate = 0
                     
-                    if ultima_data_dt is not None:
+                    if ultima_data_dt is not None and pd.notna(ultima_data_dt):
                         for i, d_str in enumerate(dates):
                             d_obj = datetime.strptime(d_str, '%Y-%m-%d')
                             if ultima_data_dt.date() < d_obj.date() < datetime.now().date():
@@ -411,11 +426,9 @@ with tab1:
                                 pioggia_accumulata += rain_sums[i]
                         
                         # --- CALCOLO ORE CONSIGLIATE ---
-                        # Sconto pioggia: ogni 10 mm tolgono circa 3.5 giorni di debito idrico
                         giorni_sconto_pioggia = (pioggia_accumulata / 10.0) * 3.5
                         giorni_debito = max(0.0, giorni_trascorsi - giorni_sconto_pioggia)
                         
-                        # Moltiplicatore ore per giorno in base alla fase fenologica
                         if mese_oggi in [7, 8]:
                             moltiplicatore = 1.8
                         elif mese_oggi == 9:
@@ -429,8 +442,10 @@ with tab1:
                     
                     st.markdown("### 🚦 Semaforo Dinamico Intelligente")
                     
-                    if ultima_data_dt is not None:
-                        st.caption(f"Dall'ultimo turno: **{giorni_stress_caldo} gg** sopra i {soglia_temp}°C (Soglia attuale) | Pioggia: **{pioggia_accumulata} mm**")
+                    if ultima_data_dt is not None and pd.notna(ultima_data_dt):
+                        st.caption(f"Dall'ultimo turno ({ultima_data_dt.strftime('%d/%m/%Y')}): **{giorni_stress_caldo} gg** oltre i {soglia_temp}°C | Pioggia accumulata: **{pioggia_accumulata:.1f} mm**")
+                    else:
+                        st.caption("Nessuna irrigazione registrata di recente nel database.")
                     
                     # 4. LOGICA DECISIONALE
                     if mese_oggi in [11, 12, 1, 2]:
@@ -438,7 +453,7 @@ with tab1:
                     elif pioggia_oggi > 2.0:
                         st.success(f"🌧️ **Pioggia in arrivo ({pioggia_oggi} mm):** Impianto spento. Lascia fare alla natura.")
                     elif pioggia_accumulata > 15.0 and giorni_trascorsi < 12:
-                        st.success(f"✅ **Terreno Bagnato:** Sono caduti {pioggia_accumulata} mm di pioggia di recente. Le radici hanno scorte sufficienti.")
+                        st.success(f"✅ **Terreno Bagnato:** Sono caduti {pioggia_accumulata:.1f} mm di pioggia di recente. Le radici hanno scorte sufficienti.")
                     elif giorni_trascorsi <= (giorni_allarme / 2):
                         st.success(f"✅ **Pianta Idratata:** Hai irrigato {giorni_trascorsi} giorni fa. La fase di {fase.split()[1]} procede bene.")
                     elif giorni_stress_caldo >= giorni_allarme:
@@ -449,8 +464,8 @@ with tab1:
                         st.info(f"🆗 **Clima Mite:** Temperature sotto controllo dall'ultimo turno. La pianta sopporta bene, risparmia il credito ore del pozzo.")
             else:
                 st.warning("Impossibile leggere i dati meteo.")
-        except Exception:
-            st.info("Servizio meteo momentaneamente non disponibile.")
+        except Exception as e:
+            st.error(f"Errore di sistema nel blocco meteo: {e}")
     
     # Database Generale
     st.subheader("🗄️ Database Generale Aziendale")
