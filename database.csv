@@ -1,44 +1,44 @@
-data,tipo,categoria,descrizione,importo,coltura_id,stato,totale_fattura,importo_pagato,registro_pagamenti,Residuo (€),data_dt
-2026-07-03,Uscita,Oneri,"F.24 dipendente mese di Giugno 2026, pagato da Zurich",160.42,Olive,Saldato,160.42,160.42,2026-07-03|160.42,0.0,2026-07-03
-2026-06-30,Uscita,Manodopera Extra,Iannone Felice | 1.090 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,610.0,Olive,Saldato,610.0,0.0,2026-06-30|0.0,610.0,2026-06-30
-2026-06-29,Uscita,Irrigazione,Ricarica Pozzo | 25 ore,500.0,Olive,Saldato,500.0,500.0,2026-06-29|500.0,0.0,2026-06-29
-2026-06-25,Uscita,Altro,gestione Contabile  | Note: Bonifico da cc ingdirect,500.02,Olive,Saldato,500.02,500.02,2026-06-25|500.02,0.0,2026-06-25
-2026-06-23,Uscita,Altro,Olive felice 2025,9000.0,Olive,Impegnato,9000.0,9000.0,,9000.0,2026-06-23
-2026-06-20,Uscita,Irrigazione,Ricarica Pozzo | 20 ore,400.0,Olive,Saldato,400.0,400.0,2026-06-20|400.0,0.0,2026-06-20
-2026-06-10,Uscita,Oneri,Pagamento f24 contributi operai IV Trimestre 2025,685.11,Olive,Saldato,685.11,685.11,2026-06-10|685.11,0.0,2026-06-10
-2026-06-07,Uscita,Irrigazione,Ricarica Pozzo | 15 ore,300.0,Olive ,Saldato,300.0,300.0,2026-06-07|300.0,0.0,2026-06-07
-2026-06-05,Uscita,Altro,"Pagamento provvigioni apertura azienda agricola e partita IVA, infoagri",90.0,Olive ,Saldato,90.0,90.0,2026-06-05|90.0,0.0,2026-06-05
-2026-05-31,Uscita,Manodopera Extra,Iannone Felice | 10.818 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,595.0,Olive,Saldato,595.0,0.0,2026-05-31|0.0,595.0,2026-05-31
-2026-05-18,Uscita,Oneri,ONERI MESE DI APRILE,133.34,Olive,Saldato,133.34,133.34,2026-05-18|133.34,0.0,2026-05-18
-2026-04-30,Uscita,Manodopera Extra,Iannone Felice | 18.181 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,1495.0,Olive,Saldato,1495.0,0.0,2026-04-30|0.0,1495.0,2026-04-30
-2026-04-16,Uscita,Oneri,ONERI MESE DI MARZO,234.47,Olive,Saldato,234.47,234.47,2026-04-16|234.47,0.0,2026-04-16
-2026-03-31,Uscita,Manodopera Extra,Iannone Felice | 21.363 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,2000.0,Olive,Saldato,2000.0,0.0,2026-03-31|0.0,2000.0,2026-03-31
-2026-02-28,Uscita,Manodopera Extra,Iannone Felice | 9.454 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riepilogo Febbraio 2026,1290.0,Olive,Saldato,1290.0,0.0,2026-02-28|0.0,1290.0,2026-02-28
-2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.364 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Totale Gennaio 2026,475.0,Olive,Saldato,475.0,0.0,2026-01-31|0.0,475.0,2026-01-31
-2026-01-01,Entrata,Vendita Olive,Mazzilli Nunzio | Vendite Olive 2025,9000.0,Olive,Saldato,9000.0,9000.0,2026-01-01|9000.0,0.0,2026-01-01
-2026-06-29,Uscita,Materiale Agricolo (Concimi/Piante),L'Agraria di raimondo G. & C. s.n.c. | fattura Proforma n. 39,1315.55,Azienda Generale,Saldato,1315.55,1315.55,2026-06-29|1315.55,0.0,2026-06-29
-2026-07-11,Uscita,Materiale Agricolo (Concimi/Piante),Racanati | Doc. di consegna 6913/c del 11/07/2026,2522.0,Azienda Generale,Impegnato,2522.0,2522.0,,2522.0,2026-07-11
-2026-07-23,Uscita,Consulenze/Tasse,"TECSIAL SRL | CORSO FORMAZIONE ART 37, IANNONE FELICE",73.2,Azienda Generale,Saldato,73.2,73.2,2026-07-23|73.2,0.0,2026-07-23
-2026-07-28,Uscita,Consulenze/Tasse,tecsial | Fatt. N° 17.309| DWR,610.0,,Saldato,610.0,610.0,2026-07-29|610.0|Bonifico da ING,0.0,2026-07-28
-2026-07-28,Uscita,Consulenze/Tasse,TECSIAL | FATT. N. 17.310|RSPP,366.0,,Saldato,366.0,366.0,2026-07-29|366.0|Bonifico da ING,0.0,2026-07-28
-2026-07-29,Uscita,Attrezzature,Ferrante Antonio | Fatt. n. 5 | Trattorista | Lavori Vari,2090.0,,Saldato,2090.0,2090.0,2026-07-29|2090.0|Registrazione iniziale,0.0,2026-07-29
-2026-07-31,Uscita,Manodopera Extra,Iannone Felice | -14.334 gg | EXTRA: Giornate Luglio 2026,0.0,,Saldato,0.0,0.0,,0.01,2026-07-31
-2026-02-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Gennaio 2026 | 13 gg,914.29,,Saldato,914.29,914.29,2026-02-02|914.29|Erogazione Diretta,0.0,2026-02-02
-2026-03-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Febbraio 2026 | 14 gg,989.2,,Saldato,989.2,989.2,2026-03-02|989.2|Erogazione Diretta,0.0,2026-03-02
-2026-04-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Marzo 2026 | 15 gg,1058.67,,Saldato,1058.67,1058.67,2026-04-02|1058.67|Erogazione Diretta,0.0,2026-04-02
-2026-05-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Aprile 2026 | 9 gg,641.63,,Saldato,641.63,641.63,2026-05-02|641.63|Erogazione Diretta,0.0,2026-05-02
-2026-07-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Giugno 2026 | 10 gg,734.0,,Saldato,734.0,734.0,2026-07-02|734.0|Erogazione Diretta,0.0,2026-07-02
-2026-08-05,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Luglio 2026 | 15 gg,1092.0,,Saldato,1092.0,1092.0,2026-08-05|1092.0|Erogazione Diretta,0.0,2026-08-05
-2026-08-05,Uscita,Oneri,Iannone Felice | Oneri Luglio 2026,244.15,,Saldato,244.15,244.15,2026-08-05|244.15|Registrazione iniziale,0.0,2026-08-05
-2026-08-25,Uscita,Irrigazione,Ricarica Pozzo | 25 ore,500.0,,Saldato,500.0,500.0,2026-08-25|500.0|Registrazione iniziale,0.0,2026-08-25
-2026-09-02,Uscita,Oneri,Iannone Felice | Oneri mese di Agosto,238.8,,Saldato,238.8,238.8,,238.8,2026-09-02
-2026-09-02,Uscita,Oneri,Iannone Felice | Oneri Inps 1° Trimestre 2026,834.01,,Saldato,834.01,834.01,,834.01,2026-09-02
-2026-08-31,Uscita,Manodopera Extra,Iannone Felice | -15.000 gg | EXTRA: Giornate mese di Agosto 2026,0.0,,Saldato,0.0,0.0,,0.0,2026-08-31
-2026-09-03,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Agosto 2026,1095.94,,Saldato,1095.94,1095.94,2026-09-03|1095.94|Erogazione Diretta,0.0,
-2026-09-15,Entrata,Vendita Olio,Frantoio Oleario De Palma Domenico | Bonifico Istantaneo,6884.5,,Saldato,6884.5,6884.5,2026-09-15|6884.5|Registrazione iniziale,,
-2026-06-11,Uscita,Irrigazione,Turno Irrigazione | 16.0 ore | Irrigazione,0.0,,Saldato,0.0,0.0,,,
-2026-06-22,Uscita,Irrigazione,Turno Irrigazione | 18.0 ore | Irrigazione,0.0,,Saldato,0.0,0.0,,,
-2026-07-03,Uscita,Irrigazione,Turno Irrigazione | 22.0 ore | Irrigazione,0.0,,Saldato,0.0,0.0,,,
-2026-09-05,Uscita,Irrigazione,Turno Irrigazione | 24.0 ore | Irrigazione,0.0,,Saldato,0.0,0.0,,,
-2026-09-18,Uscita,Irrigazione,Ricarica Pozzo | 10.0 ore,200.0,,Saldato,200.0,200.0,,,
-2026-09-21,Uscita,Irrigazione,Turno Irrigazione | 18.0 ore | Irrigazione dalle 12.00 alle 6.00,0.0,,Saldato,0.0,0.0,,,
+data,tipo,categoria,descrizione,importo,stato,totale_fattura,importo_pagato,registro_pagamenti,Residuo (€),data_dt
+2026-07-03,Uscita,Oneri,"F.24 dipendente mese di Giugno 2026, pagato da Zurich",160.42,Saldato,160.42,160.42,2026-07-03|160.42,0.0,2026-07-03
+2026-06-30,Uscita,Manodopera Extra,Iannone Felice | 1.090 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,610.0,Saldato,610.0,0.0,2026-06-30|0.0,610.0,2026-06-30
+2026-06-29,Uscita,Irrigazione,Ricarica Pozzo | 25 ore,500.0,Saldato,500.0,500.0,2026-06-29|500.0,0.0,2026-06-29
+2026-06-25,Uscita,Altro,gestione Contabile  | Note: Bonifico da cc ingdirect,500.02,Saldato,500.02,500.02,2026-06-25|500.02,0.0,2026-06-25
+2026-06-23,Uscita,Altro,Olive felice 2025,9000.0,Impegnato,9000.0,9000.0,,9000.0,2026-06-23
+2026-06-20,Uscita,Irrigazione,Ricarica Pozzo | 20 ore,400.0,Saldato,400.0,400.0,2026-06-20|400.0,0.0,2026-06-20
+2026-06-10,Uscita,Oneri,Pagamento f24 contributi operai IV Trimestre 2025,685.11,Saldato,685.11,685.11,2026-06-10|685.11,0.0,2026-06-10
+2026-06-07,Uscita,Irrigazione,Ricarica Pozzo | 15 ore,300.0,Saldato,300.0,300.0,2026-06-07|300.0,0.0,2026-06-07
+2026-06-05,Uscita,Altro,"Pagamento provvigioni apertura azienda agricola e partita IVA, infoagri",90.0,Saldato,90.0,90.0,2026-06-05|90.0,0.0,2026-06-05
+2026-05-31,Uscita,Manodopera Extra,Iannone Felice | 10.818 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,595.0,Saldato,595.0,0.0,2026-05-31|0.0,595.0,2026-05-31
+2026-05-18,Uscita,Oneri,ONERI MESE DI APRILE,133.34,Saldato,133.34,133.34,2026-05-18|133.34,0.0,2026-05-18
+2026-04-30,Uscita,Manodopera Extra,Iannone Felice | 18.181 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,1495.0,Saldato,1495.0,0.0,2026-04-30|0.0,1495.0,2026-04-30
+2026-04-16,Uscita,Oneri,ONERI MESE DI MARZO,234.47,Saldato,234.47,234.47,2026-04-16|234.47,0.0,2026-04-16
+2026-03-31,Uscita,Manodopera Extra,Iannone Felice | 21.363 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: ,2000.0,Saldato,2000.0,0.0,2026-03-31|0.0,2000.0,2026-03-31
+2026-02-28,Uscita,Manodopera Extra,Iannone Felice | 9.454 gg | Nessuno (Attesa Busta Paga) | FUORI BUSTA: Riepilogo Febbraio 2026,1290.0,Saldato,1290.0,0.0,2026-02-28|0.0,1290.0,2026-02-28
+2026-01-31,Uscita,Manodopera Extra,Iannone Felice | -4.364 gg | Nessuno (Attesa Busta Paga) | RECUPERO (Anticipo Ufficiale): Totale Gennaio 2026,475.0,Saldato,475.0,0.0,2026-01-31|0.0,475.0,2026-01-31
+2026-01-01,Entrata,Vendita Olive,Mazzilli Nunzio | Vendite Olive 2025,9000.0,Saldato,9000.0,9000.0,2026-01-01|9000.0,0.0,2026-01-01
+2026-06-29,Uscita,Materiale Agricolo (Concimi/Piante),L'Agraria di raimondo G. & C. s.n.c. | fattura Proforma n. 39,1315.55,Saldato,1315.55,1315.55,2026-06-29|1315.55,0.0,2026-06-29
+2026-07-11,Uscita,Materiale Agricolo (Concimi/Piante),Racanati | Doc. di consegna 6913/c del 11/07/2026,2522.0,Impegnato,2522.0,2522.0,,2522.0,2026-07-11
+2026-07-23,Uscita,Consulenze/Tasse,"TECSIAL SRL | CORSO FORMAZIONE ART 37, IANNONE FELICE",73.2,Saldato,73.2,73.2,2026-07-23|73.2,0.0,2026-07-23
+2026-07-28,Uscita,Consulenze/Tasse,tecsial | Fatt. N° 17.309| DWR,610.0,Saldato,610.0,610.0,2026-07-29|610.0|Bonifico da ING,0.0,2026-07-28
+2026-07-28,Uscita,Consulenze/Tasse,TECSIAL | FATT. N. 17.310|RSPP,366.0,Saldato,366.0,366.0,2026-07-29|366.0|Bonifico da ING,0.0,2026-07-28
+2026-07-29,Uscita,Attrezzature,Ferrante Antonio | Fatt. n. 5 | Trattorista | Lavori Vari,2090.0,Saldato,2090.0,2090.0,2026-07-29|2090.0|Registrazione iniziale,0.0,2026-07-29
+2026-07-31,Uscita,Manodopera Extra,Iannone Felice | -14.334 gg | EXTRA: Giornate Luglio 2026,0.0,Saldato,0.0,0.0,,0.01,2026-07-31
+2026-02-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Gennaio 2026 | 13 gg,914.29,Saldato,914.29,914.29,2026-02-02|914.29|Erogazione Diretta,0.0,2026-02-02
+2026-03-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Febbraio 2026 | 14 gg,989.2,Saldato,989.2,989.2,2026-03-02|989.2|Erogazione Diretta,0.0,2026-03-02
+2026-04-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Marzo 2026 | 15 gg,1058.67,Saldato,1058.67,1058.67,2026-04-02|1058.67|Erogazione Diretta,0.0,2026-04-02
+2026-05-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Aprile 2026 | 9 gg,641.63,Saldato,641.63,641.63,2026-05-02|641.63|Erogazione Diretta,0.0,2026-05-02
+2026-07-02,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Giugno 2026 | 10 gg,734.0,Saldato,734.0,734.0,2026-07-02|734.0|Erogazione Diretta,0.0,2026-07-02
+2026-08-05,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Luglio 2026 | 15 gg,1092.0,Saldato,1092.0,1092.0,2026-08-05|1092.0|Erogazione Diretta,0.0,2026-08-05
+2026-08-05,Uscita,Oneri,Iannone Felice | Oneri Luglio 2026,244.15,Saldato,244.15,244.15,2026-08-05|244.15|Registrazione iniziale,0.0,2026-08-05
+2026-08-25,Uscita,Irrigazione,Ricarica Pozzo | 25 ore,500.0,Saldato,500.0,500.0,2026-08-25|500.0|Registrazione iniziale,0.0,2026-08-25
+2026-09-02,Uscita,Oneri,Iannone Felice | Oneri mese di Agosto,238.8,Saldato,238.8,238.8,,238.8,2026-09-02
+2026-09-02,Uscita,Oneri,Iannone Felice | Oneri Inps 1° Trimestre 2026,834.01,Saldato,834.01,834.01,,834.01,2026-09-02
+2026-08-31,Uscita,Manodopera Extra,Iannone Felice | -15.000 gg | EXTRA: Giornate mese di Agosto 2026,0.0,Saldato,0.0,0.0,,0.0,2026-08-31
+2026-09-03,Uscita,Busta Paga,Pagamento Iannone Felice | Busta Paga | Rif: Agosto 2026,1095.94,Saldato,1095.94,1095.94,2026-09-03|1095.94|Erogazione Diretta,0.0,
+2026-09-15,Entrata,Vendita Olio,Frantoio Oleario De Palma Domenico | Bonifico Istantaneo,6884.5,Saldato,6884.5,6884.5,2026-09-15|6884.5|Registrazione iniziale,,
+2026-06-11,Uscita,Irrigazione,Turno Irrigazione | 16.0 ore | Irrigazione,0.0,Saldato,0.0,0.0,,,
+2026-06-22,Uscita,Irrigazione,Turno Irrigazione | 18.0 ore | Irrigazione,0.0,Saldato,0.0,0.0,,,
+2026-07-03,Uscita,Irrigazione,Turno Irrigazione | 22.0 ore | Irrigazione,0.0,Saldato,0.0,0.0,,,
+2026-09-05,Uscita,Irrigazione,Turno Irrigazione | 24.0 ore | Irrigazione,0.0,Saldato,0.0,0.0,,,
+2026-09-18,Uscita,Irrigazione,Ricarica Pozzo | 10.0 ore,200.0,Saldato,200.0,200.0,,,
+2026-09-21,Uscita,Irrigazione,Turno Irrigazione | 18.0 ore | Irrigazione dalle 12.00 alle 6.00,0.0,Saldato,0.0,0.0,,,
