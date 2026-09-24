@@ -1127,7 +1127,7 @@ with tab6:
 # ==========================================
 st.divider()
 st.subheader("🛠️ Manutenzione Database (Strumento Admin)")
-if st.button("🗑️ Elimina 'id_coltura' e 'prodotto' definitivamente da GitHub", type="primary"):
+if st.button("🗑️ Elimina 'coltura_id' e 'prodotto' definitivamente da GitHub", type="primary"):
     with st.spinner("Pulizia profonda del database in corso..."):
         import json
         import requests
