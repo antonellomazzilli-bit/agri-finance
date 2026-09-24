@@ -335,7 +335,7 @@ with tab1:
                 if pd.notna(ultima_data_dt):
                     giorni_trascorsi = max(0, (datetime.now() - ultima_data_dt).days)
         except Exception:
-            pass # Se non trova il file, prosegue senza bloccare l'app
+            pass
 
         # 1. MOTORE AGRONOMICO: Calcolo della Fase Fenologica attuale
         mese_oggi = datetime.now().month
@@ -385,10 +385,21 @@ with tab1:
 
         st.info(f"**Fase Attuale:** {fase}\n\n**Esigenza Idrica:** {fabbisogno}\n\n*{msg_fase}*")
 
-        # 2. SCARICAMENTO DATI METEO
-        url_meteo = "https://api.open-meteo.com/v1/forecast?latitude=41.1535&longitude=16.4132&daily=temperature_2m_max,precipitation_sum&timezone=Europe/Rome&past_days=30&forecast_days=4"
+        # 2. SCARICAMENTO DATI METEO (SISTEMA CORRETTO E ANTI-CRASH)
+        url_meteo = "https://api.open-meteo.com/v1/forecast"
+        parametri_meteo = {
+            "latitude": 41.1535,
+            "longitude": 16.4132,
+            "daily": "temperature_2m_max,precipitation_sum",
+            "timezone": "Europe/Rome",
+            "past_days": 30,
+            "forecast_days": 4
+        }
+        
         try:
-            resp_meteo = requests.get(url_meteo, timeout=5)
+            # Passaggio sicuro dei parametri e timeout prolungato
+            resp_meteo = requests.get(url_meteo, params=parametri_meteo, timeout=10)
+            
             if resp_meteo.status_code == 200:
                 m_data = resp_meteo.json()
                 daily = m_data.get("daily", {})
@@ -398,7 +409,11 @@ with tab1:
                 
                 if dates and max_temps:
                     oggi_str = datetime.now().strftime('%Y-%m-%d')
-                    indice_oggi = dates.index(oggi_str) if oggi_str in dates else 30
+                    # Gestione anno sfalsato: prende sempre l'oggi relativo all'API
+                    if oggi_str in dates:
+                        indice_oggi = dates.index(oggi_str)
+                    else:
+                        indice_oggi = 30
                     
                     forecast_list = []
                     for i in range(indice_oggi, min(indice_oggi + 4, len(dates))):
@@ -412,19 +427,21 @@ with tab1:
                     temp_oggi = max_temps[indice_oggi]
                     pioggia_oggi = rain_sums[indice_oggi]
                     
-                    # 3. CALCOLO STRESS E ALGORITMO ORE POZZO
+                    # 3. CALCOLO STRESS E ALGORITMO ORE POZZO (Indipendente dall'anno solare)
                     giorni_stress_caldo = 0
                     pioggia_accumulata = 0.0
                     ore_consigliate = 0
                     
                     if ultima_data_dt is not None and pd.notna(ultima_data_dt):
-                        for i, d_str in enumerate(dates):
-                            d_obj = datetime.strptime(d_str, '%Y-%m-%d')
-                            if ultima_data_dt.date() < d_obj.date() < datetime.now().date():
-                                if max_temps[i] >= soglia_temp: 
-                                    giorni_stress_caldo += 1
-                                pioggia_accumulata += rain_sums[i]
+                        # Conta all'indietro usando gli indici (massimo 30 giorni)
+                        giorni_da_controllare = min(giorni_trascorsi, 30)
+                        start_idx = max(0, indice_oggi - giorni_da_controllare)
                         
+                        for i in range(start_idx, indice_oggi):
+                            if max_temps[i] >= soglia_temp: 
+                                giorni_stress_caldo += 1
+                            pioggia_accumulata += rain_sums[i]
+                            
                         # --- CALCOLO ORE CONSIGLIATE ---
                         giorni_sconto_pioggia = (pioggia_accumulata / 10.0) * 3.5
                         giorni_debito = max(0.0, giorni_trascorsi - giorni_sconto_pioggia)
@@ -463,9 +480,9 @@ with tab1:
                     else:
                         st.info(f"🆗 **Clima Mite:** Temperature sotto controllo dall'ultimo turno. La pianta sopporta bene, risparmia il credito ore del pozzo.")
             else:
-                st.warning("Impossibile leggere i dati meteo.")
-        except Exception as e:
-            st.error(f"Errore di sistema nel blocco meteo: {e}")
+                st.warning(f"Impossibile leggere i dati meteo (Errore API {resp_meteo.status_code}). I server potrebbero essere momentaneamente occupati.")
+        except requests.exceptions.RequestException as e:
+            st.error(f"Problema di connessione con il servizio meteo: Controlla la rete. ({e})")
     
     # Database Generale
     st.subheader("🗄️ Database Generale Aziendale")
