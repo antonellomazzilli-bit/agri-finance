@@ -44,3 +44,4 @@ data,tipo,categoria,descrizione,importo,stato,totale_fattura,importo_pagato,regi
 2026-09-21,Uscita,Irrigazione,Turno Irrigazione | 18.0 ore | Irrigazione dalle 12.00 alle 6.00,0.0,Saldato,0.0,0.0,,,,
 2026-09-30,Uscita,Manodopera,Iannone Felice | 15.000 gg | UFFICIALE: Taglio erba,0.0,Impegnato,0.0,0.0,,,,Olive
 2026-09-30,Uscita,Manodopera Extra,Iannone Felice | 15.880 gg | EXTRA: Taglio erba,0.0,Impegnato,0.0,0.0,,,,Olive
+2026-10-06,Uscita,Irrigazione,Associazioone IRRIGUA CANALE | RICARICA SCHEDA PER 20 ORE,400.0,Saldato,400.0,400.0,2026-10-06|400.0|Registrazione iniziale,,,
